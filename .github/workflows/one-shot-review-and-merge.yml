@@ -1,0 +1,68 @@
+name: One-shot review and merge
+
+on:
+  push:
+    branches: [feat/four-pillars-v1]
+    paths: [.github/workflows/one-shot-review-and-merge.yml]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  review-verify-merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      NIM_MODEL: ${{ vars.NIM_MODEL || 'nvidia/llama-3.3-nemotron-super-49b-v1.5' }}
+      NIM_EVAL_MODEL: ${{ vars.NIM_EVAL_MODEL || 'nvidia/llama-3.3-nemotron-super-49b-v1.5' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/four-pillars-v1
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Locate open pull request
+        id: pr
+        run: |
+          number=$(gh pr list --repo "$GITHUB_REPOSITORY" --head feat/four-pillars-v1 --base main --state open --json number --jq '.[0].number')
+          test -n "$number"
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+      - name: Review blocking feedback
+        run: |
+          changes_requested=$(gh api "repos/$GITHUB_REPOSITORY/pulls/${{ steps.pr.outputs.number }}/reviews" --jq '[.[] | select(.state == "CHANGES_REQUESTED")] | length')
+          if [ "$changes_requested" -ne 0 ]; then
+            echo "Blocking review requests remain: $changes_requested"
+            exit 1
+          fi
+          gh pr diff "${{ steps.pr.outputs.number }}" --repo "$GITHUB_REPOSITORY" --name-only
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e '.[dev]'
+      - name: Static and deterministic verification
+        run: |
+          ruff check .
+          python -m compileall -q src tests scripts
+          python scripts/check_docs.py
+          python scripts/check_prompts.py
+      - name: Offline test suite and coverage
+        run: pytest -m 'not nim_live' -W error::ResourceWarning --cov=four_pillars --cov-report=term-missing
+      - name: Package build
+        run: python -m build
+      - name: Hosted NVIDIA NIM smoke and judge when configured
+        run: |
+          if [ -n "$NVIDIA_API_KEY" ]; then
+            pytest -m nim_live -vv
+            python scripts/nim_eval.py
+          else
+            echo 'NVIDIA_API_KEY is not configured; hosted NIM evaluation remains an explicit external gate.'
+          fi
+      - name: Squash merge verified pull request
+        run: |
+          gh pr comment "${{ steps.pr.outputs.number }}" --repo "$GITHUB_REPOSITORY" --body "Automated merge gate passed: static checks, deterministic fixtures, mocked NIM contract tests, quality gates, API/queue/rendering tests, coverage, and wheel build succeeded on commit $GITHUB_SHA. Hosted NIM evaluation ran only when NVIDIA_API_KEY was configured."
+          gh pr merge "${{ steps.pr.outputs.number }}" --repo "$GITHUB_REPOSITORY" --squash --delete-branch
