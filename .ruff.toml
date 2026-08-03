@@ -1,0 +1,20 @@
+target-version = "py311"
+line-length = 120
+
+[lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+ignore = [
+  "E501",  # prose-heavy prompts and schemas are intentionally explicit
+  "F401",  # public package re-exports are intentional
+  "B008",  # FastAPI Depends and Typer Option are declarative defaults
+]
+
+[lint.per-file-ignores]
+"src/four_pillars/__init__.py" = ["I001", "RUF022"]
+"src/four_pillars/calendar.py" = ["I001"]
+"tests/test_analysis.py" = ["I001"]
+"tests/test_api.py" = ["I001"]
+"tests/test_cli.py" = ["I001"]
+"tests/test_edge_cases.py" = ["I001"]
+"tests/test_reporting.py" = ["I001"]
+"tests/test_service.py" = ["I001"]
