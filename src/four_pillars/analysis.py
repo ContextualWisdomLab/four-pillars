@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .models import (
     Chart,
@@ -14,30 +14,57 @@ from .models import (
     ReportSection,
 )
 from .nim import NimClient, NimTrace
-from .prompts import PROMPT_NAMES, load_prompt
+from .prompts import PROMPT_NAMES, PromptTemplate, load_prompt
 from .quality import ReportQualityError, assert_report_quality
 
 
 class PracticalSkillsDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     practical_skills: list[PracticalSkill] = Field(min_length=1, max_length=8)
 
 
 class SynthesisDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     executive_summary: str
     sections: dict[str, ReportSection]
     disclaimer: str
 
 
 class GeneratedReport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     report: ReportDocument
     traces: dict[str, dict[str, Any]]
 
 
-def _trace_payload(trace: NimTrace) -> dict[str, Any]:
+def _allowed_pillars(
+    chart: Chart,
+    daewoon: DaewoonResult,
+    annual: LuckSnapshot,
+    monthly: LuckSnapshot,
+) -> set[str]:
+    allowed = {chart.year.hanja, chart.month.hanja, chart.day.hanja}
+    if chart.hour is not None:
+        allowed.add(chart.hour.hanja)
+    allowed.add(annual.pillar.hanja)
+    allowed.add(monthly.pillar.hanja)
+    allowed.update(
+        period.pillar.hanja
+        for scenario in daewoon.scenarios
+        for period in scenario.periods
+    )
+    return allowed
+
+
+def _trace_payload(trace: NimTrace, prompt: PromptTemplate) -> dict[str, Any]:
     return {
         "model": trace.model,
         "attempts": trace.attempts,
         "repairs": trace.repairs,
+        "prompt_version": prompt.version,
+        "prompt_sha256": prompt.sha256,
     }
 
 
@@ -59,6 +86,7 @@ async def generate_report(
         "calculation_fingerprint": chart.fingerprint,
     }
     context = {"user_context": user_context}
+    allowed_pillars = _allowed_pillars(chart, daewoon, annual, monthly)
     traces: dict[str, dict[str, Any]] = {}
 
     async def section(name: str, payload: dict[str, Any]) -> ReportSection:
@@ -68,7 +96,7 @@ async def generate_report(
             user_payload=payload,
             response_model=ReportSection,
         )
-        traces[name] = _trace_payload(trace)
+        traces[name] = _trace_payload(trace, prompt)
         return result
 
     natal = await section("natal_analysis", {"calculation": immutable["chart"], **context})
@@ -102,7 +130,7 @@ async def generate_report(
         },
         response_model=PracticalSkillsDraft,
     )
-    traces["practical_skills"] = _trace_payload(practical_trace)
+    traces["practical_skills"] = _trace_payload(practical_trace, practical_prompt)
 
     synthesis_prompt = load_prompt("synthesis")
     synthesis, synthesis_trace = await client.generate(
@@ -121,7 +149,7 @@ async def generate_report(
         response_model=SynthesisDraft,
         max_tokens=8192,
     )
-    traces["synthesis"] = _trace_payload(synthesis_trace)
+    traces["synthesis"] = _trace_payload(synthesis_trace, synthesis_prompt)
     prompt_versions = {name: load_prompt(name).version for name in PROMPT_NAMES}
     report = ReportDocument(
         subject_name=subject_name,
@@ -137,7 +165,7 @@ async def generate_report(
     )
 
     try:
-        assert_report_quality(report, chart.fingerprint)
+        assert_report_quality(report, chart.fingerprint, allowed_pillars)
     except ReportQualityError as error:
         repair_prompt = load_prompt("editorial_repair")
         repaired, repair_trace = await client.generate(
@@ -151,7 +179,7 @@ async def generate_report(
             temperature=0,
             max_tokens=8192,
         )
-        traces["editorial_repair"] = _trace_payload(repair_trace)
+        traces["editorial_repair"] = _trace_payload(repair_trace, repair_prompt)
         report = repaired.model_copy(
             update={
                 "subject_name": subject_name,
@@ -163,6 +191,6 @@ async def generate_report(
                 "quality_notes": [issue.message for issue in error.issues],
             }
         )
-        assert_report_quality(report, chart.fingerprint)
+        assert_report_quality(report, chart.fingerprint, allowed_pillars)
 
     return GeneratedReport(report=report, traces=traces)

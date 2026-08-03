@@ -2,18 +2,20 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
 from fastapi.responses import FileResponse, HTMLResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .calendar import calculate_chart
 from .fortune import calculate_annual_luck, calculate_daewoon, calculate_monthly_luck
-from .models import BirthInput, Chart, DaewoonResult, LuckSnapshot, ReportJob
+from .models import BirthInput, Chart, DaewoonResult, JobStatus, LuckSnapshot, ReportJob
 from .service import ReportRequest, ReportService
 from .settings import Settings, get_settings
+from .web import render_home
 
 app = FastAPI(
     title="Four Pillars API",
@@ -23,9 +25,22 @@ app = FastAPI(
 
 
 class LuckRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     birth: BirthInput
     year: int = Field(ge=1900, le=2200)
     month: int = Field(default=1, ge=1, le=12)
+
+
+class ReportJobView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    status: JobStatus
+    created_at: datetime
+    updated_at: datetime
+    error: str | None = None
+    artifacts: list[str] = Field(default_factory=list)
 
 
 @lru_cache(maxsize=1)
@@ -47,9 +62,21 @@ def require_api_key(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
 
 
+def _job_view(job: ReportJob, service: ReportService) -> ReportJobView:
+    artifacts = service.available_artifacts(job.id) if job.status is JobStatus.COMPLETED else []
+    return ReportJobView(
+        id=job.id,
+        status=job.status,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+        error=job.error,
+        artifacts=artifacts,
+    )
+
+
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 def index() -> str:
-    return """<!doctype html><html lang='ko'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width'><title>Four Pillars</title><style>body{font-family:system-ui,sans-serif;margin:0;background:#f7f6f1;color:#17263f}main{max-width:920px;margin:8vh auto;padding:36px}section{background:white;border-radius:18px;padding:34px;box-shadow:0 16px 48px #17263f16}a{color:#315a84}code{background:#eaf1f7;padding:3px 6px;border-radius:5px}</style></head><body><main><section><p>FOUR PILLARS</p><h1>계산은 결정론적으로, 해석은 근거와 함께.</h1><p>원국·대운·세운·월운을 계산하고 NVIDIA NIM으로 스키마 검증된 보고서를 생성합니다.</p><p><a href='/docs'>API 문서 열기</a> · <a href='/health'>상태 확인</a></p><p>보고서 작업은 <code>POST /v1/reports</code>로 등록하고 별도 worker가 처리합니다.</p></section></main></body></html>"""
+    return render_home()
 
 
 @app.get("/health")
@@ -90,23 +117,27 @@ def monthly(request: LuckRequest) -> LuckSnapshot:
 
 @app.post(
     "/v1/reports",
-    response_model=ReportJob,
+    response_model=ReportJobView,
     status_code=status.HTTP_202_ACCEPTED,
     dependencies=[Depends(require_api_key)],
 )
 def create_report(
     request: ReportRequest,
     service: ReportService = Depends(get_service),
-) -> ReportJob:
-    return service.enqueue(request)
+) -> ReportJobView:
+    return _job_view(service.enqueue(request), service)
 
 
-@app.get("/v1/reports/{job_id}", response_model=ReportJob, dependencies=[Depends(require_api_key)])
-def get_report(job_id: str, service: ReportService = Depends(get_service)) -> ReportJob:
+@app.get(
+    "/v1/reports/{job_id}",
+    response_model=ReportJobView,
+    dependencies=[Depends(require_api_key)],
+)
+def get_report(job_id: str, service: ReportService = Depends(get_service)) -> ReportJobView:
     job = service.store.get(job_id)
     if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report job not found")
-    return job
+    return _job_view(job, service)
 
 
 @app.get("/v1/reports/{job_id}/artifacts/{filename}", dependencies=[Depends(require_api_key)])
@@ -135,7 +166,8 @@ def delete_report(job_id: str, service: ReportService = Depends(get_service)) ->
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report job not found")
     if job.artifact_dir:
         root = Path(job.artifact_dir).resolve()
-        if root.parent == service.settings.artifact_dir.resolve() and root.exists():
+        configured_root = service.settings.artifact_dir.resolve()
+        if root.parent == configured_root and root.name == job.id and root.exists():
             import shutil
 
             shutil.rmtree(root)

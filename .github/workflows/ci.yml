@@ -37,3 +37,15 @@ jobs:
       - run: pytest -m 'not nim_live' -W error::ResourceWarning --cov=four_pillars --cov-report=term-missing
       - run: python -m build --no-isolation
         if: matrix.python-version == '3.12'
+
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Build the pinned runtime image
+        run: docker build --tag four-pillars:pr .
+      - name: Verify runtime imports and application metadata
+        run: >-
+          docker run --rm four-pillars:pr python -c
+          "import four_pillars; from four_pillars.api import app; assert app.version == '0.1.0'"

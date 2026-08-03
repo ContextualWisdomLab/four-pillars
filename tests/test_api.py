@@ -41,6 +41,7 @@ def teardown_function() -> None:
 def test_health_and_chart_golden_case(tmp_path: Path) -> None:
     with client(tmp_path) as http:
         assert http.get("/health").json()["status"] == "ok"
+        assert 'id="report-form"' in http.get("/").text
         response = http.post("/v1/chart", json=BIRTH)
     assert response.status_code == 200
     payload = response.json()
@@ -59,7 +60,7 @@ def test_optional_api_key_uses_sha256_digest(tmp_path: Path) -> None:
         assert http.post("/v1/chart", json=BIRTH, headers={"X-API-Key": "secret"}).status_code == 200
 
 
-def test_report_request_is_queued_durably(tmp_path: Path) -> None:
+def test_report_request_is_queued_durably_without_echoing_sensitive_input(tmp_path: Path) -> None:
     body = {
         "subject_name": "최혜지",
         "birth": BIRTH,
@@ -75,6 +76,10 @@ def test_report_request_is_queued_durably(tmp_path: Path) -> None:
         fetched = http.get(f"/v1/reports/{job['id']}")
     assert fetched.status_code == 200
     assert fetched.json()["status"] == "queued"
+    for view in (job, fetched.json()):
+        assert "request" not in view
+        assert "artifact_dir" not in view
+        assert view["artifacts"] == []
 
 
 def test_unknown_artifact_name_is_not_resolved(tmp_path: Path) -> None:

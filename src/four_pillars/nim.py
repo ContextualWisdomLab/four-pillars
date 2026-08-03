@@ -63,22 +63,27 @@ class NimClient:
 
     async def _post(self, payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
         attempts = 0
-        while True:
+        max_attempts = self.settings.nim_max_retries + 1
+        while attempts < max_attempts:
             attempts += 1
             try:
                 response = await self._client.post("/chat/completions", json=payload)
             except (httpx.TimeoutException, httpx.NetworkError) as exc:
-                if attempts > self.settings.nim_max_retries + 1:
+                if attempts >= max_attempts:
                     raise NimError("NIM request failed after network retries") from exc
                 await asyncio.sleep(min(2 ** (attempts - 1), 8))
                 continue
             if response.status_code in {408, 429} or response.status_code >= 500:
-                if attempts > self.settings.nim_max_retries + 1:
+                if attempts >= max_attempts:
                     raise NimError(
                         f"NIM request failed after retries with HTTP {response.status_code}"
                     )
                 retry_after = response.headers.get("Retry-After")
-                delay = float(retry_after) if retry_after and retry_after.isdigit() else min(2 ** (attempts - 1), 8)
+                delay = (
+                    float(retry_after)
+                    if retry_after and retry_after.isdigit()
+                    else min(2 ** (attempts - 1), 8)
+                )
                 await asyncio.sleep(delay)
                 continue
             if response.is_error:
@@ -87,6 +92,7 @@ class NimClient:
                 return response.json(), attempts
             except json.JSONDecodeError as exc:
                 raise NimError("NIM returned a non-JSON HTTP response") from exc
+        raise NimError("NIM request exhausted its retry budget")
 
     @staticmethod
     def _content(data: dict[str, Any]) -> str:
