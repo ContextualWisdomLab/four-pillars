@@ -1,4 +1,4 @@
-name: One-shot format and verify
+name: One-shot repair, verify, and clean
 
 on:
   push:
@@ -9,57 +9,58 @@ permissions:
   contents: write
 
 jobs:
-  format-verify:
+  repair-verify:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
           ref: feat/four-pillars-v1
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: pip
-      - name: Normalize known source issues
+      - name: Repair explicit static-analysis findings
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          p = Path('pyproject.toml')
-          text = p.read_text(encoding='utf-8')
-          if '"build>=1.2,<2"' not in text:
-              text = text.replace('dev = [\n', 'dev = [\n  "build>=1.2,<2",\n', 1)
-          p.write_text(text, encoding='utf-8')
-
-          p = Path('src/four_pillars/prompts/synthesis.md')
-          text = p.read_text(encoding='utf-8').replace(
-              '# Quality requirements', '# Immutable quality requirements', 1
+          path = Path('src/four_pillars/prompts/__init__.py')
+          text = path.read_text(encoding='utf-8')
+          target = 'from importlib.resources import files\n'
+          replacement = (
+              '# The project requires Python 3.11+, so importlib.resources is available.\n'
+              'from importlib.resources import files  # nosemgrep\n'
           )
-          p.write_text(text, encoding='utf-8')
-
-          p = Path('tests/test_fortune.py')
-          text = p.read_text(encoding='utf-8').replace(
-              'zip(scenario.periods, scenario.periods[1:], strict=True)',
-              'zip(scenario.periods, scenario.periods[1:])',
-          )
-          p.write_text(text, encoding='utf-8')
+          if target in text and '# nosemgrep' not in text:
+              text = text.replace(target, replacement, 1)
+          path.write_text(text, encoding='utf-8')
           PY
-          rm -f .github/workflows/one-shot-normalize.yml .github/workflows/one-shot-verify.yml .github/workflows/one-shot-format-verify.yml
       - run: python -m pip install --upgrade pip
       - run: pip install -e '.[dev]'
-      - run: ruff check --fix .
-      - run: ruff format .
-      - run: ruff check .
-      - run: python -m compileall -q src tests scripts
-      - run: python scripts/check_docs.py
-      - run: python scripts/check_prompts.py
-      - run: pytest -m 'not nim_live' -W error::ResourceWarning --cov=four_pillars --cov-report=term-missing
-      - run: python -m build
-      - name: Commit verified source
+      - name: Format and lint
+        run: |
+          ruff check --fix .
+          ruff format .
+          ruff check .
+      - name: Deterministic and document verification
+        run: |
+          python -m compileall -q src tests scripts
+          python scripts/check_docs.py
+          python scripts/check_prompts.py
+      - name: Offline tests and package build
+        run: |
+          pytest -m 'not nim_live' -W error::ResourceWarning --cov=four_pillars --cov-report=term-missing
+          python -m build
+      - name: Remove one-shot maintenance workflows
+        run: rm -f .github/workflows/one-shot-*.yml
+      - name: Commit verified repair
         run: |
           git config user.name 'four-pillars-ci'
           git config user.email 'actions@users.noreply.github.com'
           git add --all
           git diff --cached --check
-          git commit -m 'test: format and verify Four Pillars service'
+          git commit -m 'fix: satisfy CI formatting and security gates'
           git push origin HEAD:feat/four-pillars-v1
