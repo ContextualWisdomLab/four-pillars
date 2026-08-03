@@ -139,6 +139,8 @@ class LuckSnapshot(BaseModel):
 
 
 class ReportSection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: str
     summary: str
     opportunities: list[str] = Field(min_length=1)
@@ -149,6 +151,8 @@ class ReportSection(BaseModel):
 
 
 class PracticalSkill(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     purpose: str
     steps: list[str] = Field(min_length=2)
