@@ -291,8 +291,14 @@ def _year_index(moment: datetime) -> tuple[int, SolarTerm]:
 
 def _month_index(moment: datetime, year_stem: int) -> tuple[int, SolarTerm, SolarTerm]:
     terms = _surrounding_terms(moment)
-    previous = max(term for term in terms if term.occurs_at <= moment)
-    following = min(term for term in terms if term.occurs_at > moment)
+    previous = max(
+        (term for term in terms if term.occurs_at <= moment),
+        key=lambda term: term.occurs_at,
+    )
+    following = min(
+        (term for term in terms if term.occurs_at > moment),
+        key=lambda term: term.occurs_at,
+    )
     offset = (previous.month_branch_index - 2) % 12
     stem_index = (year_stem * 2 + 2 + offset) % 10
     return sexagenary_index(stem_index, previous.month_branch_index), previous, following
