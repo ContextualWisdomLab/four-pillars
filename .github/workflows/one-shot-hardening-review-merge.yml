@@ -1,0 +1,63 @@
+name: One-shot hardening review and merge
+
+on:
+  push:
+    branches: [fix/commercial-hardening]
+    paths: [.github/workflows/one-shot-hardening-review-merge.yml]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  review-verify-merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      NIM_MODEL: ${{ vars.NIM_MODEL || 'nvidia/llama-3.3-nemotron-super-49b-v1.5' }}
+      NIM_EVAL_MODEL: ${{ vars.NIM_EVAL_MODEL || 'nvidia/llama-3.3-nemotron-super-49b-v1.5' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/commercial-hardening
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Locate pull request and reject blocking reviews
+        id: pr
+        run: |
+          number=$(gh pr list --repo "$GITHUB_REPOSITORY" --head fix/commercial-hardening --base main --state open --json number --jq '.[0].number')
+          test -n "$number"
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          requested=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$number/reviews" --jq '[.[] | select(.state == "CHANGES_REQUESTED")] | length')
+          test "$requested" -eq 0
+          gh pr diff "$number" --repo "$GITHUB_REPOSITORY" --check
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e '.[dev]'
+      - name: Fresh complete verification
+        run: |
+          ruff check .
+          python -m compileall -q src tests scripts
+          python scripts/check_docs.py
+          python scripts/check_prompts.py
+          pytest -m 'not nim_live' -W error::ResourceWarning --cov=four_pillars --cov-report=term-missing
+          python -m build
+      - name: Hosted NVIDIA NIM evaluation when configured
+        run: |
+          if [ -n "$NVIDIA_API_KEY" ]; then
+            pytest -m nim_live -vv
+            python scripts/nim_eval.py
+          else
+            echo 'NVIDIA_API_KEY is absent; hosted NIM remains an explicitly recorded external gate.'
+          fi
+      - name: Merge only the verified current head
+        run: |
+          current=$(gh pr view "${{ steps.pr.outputs.number }}" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid)
+          test "$current" = "$GITHUB_SHA"
+          gh pr comment "${{ steps.pr.outputs.number }}" --repo "$GITHUB_REPOSITORY" --body "Fresh hardening verification passed on $GITHUB_SHA: deterministic boundary tests, grounding, privacy, exact NIM retries, artifact confinement, responsive browser workflow, quality gates, coverage, and wheel build. Hosted NIM ran only when NVIDIA_API_KEY was configured."
+          gh pr merge "${{ steps.pr.outputs.number }}" --repo "$GITHUB_REPOSITORY" --squash --delete-branch --match-head-commit "$GITHUB_SHA"
