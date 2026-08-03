@@ -48,7 +48,10 @@ class ReportQualityError(ValueError):
 
 
 def _all_text(report: ReportDocument) -> str:
-    return json.dumps(report.model_dump(mode="json"), ensure_ascii=False)
+    # Diagnostic notes intentionally quote rejected copy. They are audit metadata,
+    # not reader-visible report prose, and must not cause the repaired report to fail again.
+    payload = report.model_dump(mode="json", exclude={"quality_notes"})
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def validate_report(report: ReportDocument, expected_fingerprint: str) -> list[QualityIssue]:
