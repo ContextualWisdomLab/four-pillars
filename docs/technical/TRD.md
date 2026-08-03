@@ -61,7 +61,7 @@ Modern Gregorian dates use integer Julian day numbers for the sexagenary day and
 
 ## 6. NIM contract
 
-The API key is supplied only through environment/secret storage. Generation uses `response_format={"type":"json_object"}` and Pydantic JSON Schema is included in a bounded repair instruction when the first output is invalid. HTTP 408, 429, and 5xx responses are retried using `Retry-After` or exponential delay. Other 4xx responses fail immediately. No model-provider fallback is allowed.
+The API key is supplied only through the `NVIDIA_NIM_API_KEY` environment variable or the corresponding secret-store entry. Generation uses `response_format={"type":"json_object"}` and Pydantic JSON Schema is included in a bounded repair instruction when the first output is invalid. HTTP 408, 429, and 5xx responses are retried using `Retry-After` or exponential delay. Other 4xx responses fail immediately. No model-provider fallback is allowed.
 
 ## 7. Reliability and failure handling
 
@@ -77,7 +77,7 @@ Health checks prove process availability; readiness verifies artifact writes and
 
 ## 10. Test strategy
 
-Unit tests cover known pillars, solar-term boundaries, time policies, ten gods, daewoon direction, monthly period dates, queue transitions, quality rules, report rendering, and API authentication. NIM contract tests use `httpx.MockTransport`; live hosted-NIM tests are marked and skipped without `NVIDIA_API_KEY`. CI compiles the source, validates documents/prompts, runs Ruff and coverage, and builds an installable wheel.
+Unit tests cover known pillars, solar-term boundaries, time policies, ten gods, daewoon direction, monthly period dates, queue transitions, quality rules, report rendering, and API authentication. NIM contract tests use `httpx.MockTransport`; live hosted-NIM tests are marked and skipped without `NVIDIA_NIM_API_KEY`. CI compiles the source, validates documents/prompts, runs Ruff and coverage, and builds an installable wheel.
 
 ## 11. Deployment
 

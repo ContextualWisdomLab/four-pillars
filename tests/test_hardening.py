@@ -50,7 +50,7 @@ async def test_zero_nim_retries_means_one_total_http_attempt() -> None:
         return httpx.Response(503, text="unavailable")
 
     settings = Settings(
-        nvidia_api_key="key",
+        nvidia_nim_api_key="key",
         nim_base_url="https://nim.test/v1",
         nim_model="model",
         nim_max_retries=0,

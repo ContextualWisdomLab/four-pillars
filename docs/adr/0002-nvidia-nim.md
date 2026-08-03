@@ -11,7 +11,7 @@ The product needs structured Korean generation, an independently configurable ju
 
 Use NVIDIA's hosted OpenAI-compatible NIM chat-completions API behind a small `NimClient`. Generation and evaluation model names are environment configuration. The default points to a Nemotron model previously available in the free hosted catalog, but operators must select a model currently available to their account. The client implements Bearer authentication, timeout, retries for transient errors, JSON-object response mode, Pydantic validation, one bounded schema repair, and trace metadata.
 
-No silent model-provider fallback is permitted. Offline CI uses HTTPX mock transport. Live model tests and NIM-as-judge evaluation are opt-in, require `NVIDIA_API_KEY`, and must not run with secrets on untrusted fork pull requests.
+No silent model-provider fallback is permitted. Offline CI uses HTTPX mock transport. Live model tests and NIM-as-judge evaluation are opt-in, require `NVIDIA_NIM_API_KEY`, and must not run with secrets on untrusted fork pull requests.
 
 ## Consequences
 

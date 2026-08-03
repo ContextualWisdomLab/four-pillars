@@ -54,8 +54,8 @@ def fixture_report() -> ReportDocument:
 
 
 async def main() -> None:
-    if not os.getenv("NVIDIA_API_KEY"):
-        raise SystemExit("NVIDIA_API_KEY is required for live NIM evaluation")
+    if not os.getenv("NVIDIA_NIM_API_KEY"):
+        raise SystemExit("NVIDIA_NIM_API_KEY is required for live NIM evaluation")
     settings = Settings()
     prompt = load_prompt("llm_judge")
     async with NimClient(settings) as client:

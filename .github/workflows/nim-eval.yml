@@ -26,21 +26,21 @@ jobs:
       - run: python -m pip check
       - name: Require the hosted NIM credential
         env:
-          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NVIDIA_NIM_API_KEY: ${{ secrets.NVIDIA_NIM_API_KEY }}
         run: |
-          if [ -z "$NVIDIA_API_KEY" ]; then
-            echo '::error::NVIDIA_API_KEY is required for hosted NIM evaluation.'
+          if [ -z "$NVIDIA_NIM_API_KEY" ]; then
+            echo '::error::NVIDIA_NIM_API_KEY is required for hosted NIM evaluation.'
             exit 1
           fi
       - name: Hosted NIM smoke test
         env:
-          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NVIDIA_NIM_API_KEY: ${{ secrets.NVIDIA_NIM_API_KEY }}
           NIM_MODEL: ${{ vars.NIM_MODEL || 'nvidia/llama-3.3-nemotron-super-49b-v1.5' }}
           NIM_EVAL_MODEL: ${{ vars.NIM_EVAL_MODEL || 'nvidia/llama-3.3-nemotron-super-49b-v1.5' }}
         run: pytest -m nim_live -vv
       - name: NIM-as-judge fixture
         env:
-          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NVIDIA_NIM_API_KEY: ${{ secrets.NVIDIA_NIM_API_KEY }}
           NIM_MODEL: ${{ vars.NIM_MODEL || 'nvidia/llama-3.3-nemotron-super-49b-v1.5' }}
           NIM_EVAL_MODEL: ${{ vars.NIM_EVAL_MODEL || 'nvidia/llama-3.3-nemotron-super-49b-v1.5' }}
         run: python scripts/nim_eval.py
