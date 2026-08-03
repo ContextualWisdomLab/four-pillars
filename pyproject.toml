@@ -27,6 +27,7 @@ dependencies = [
 dev = [
   "build>=1.2,<2",
   "hatchling>=1.26,<2",
+  "httpx2>=2.7,<3",
   "mypy>=1.14,<2",
   "pytest>=8.3,<9",
   "pytest-asyncio>=0.25,<1",
@@ -45,6 +46,10 @@ addopts = "-ra --strict-markers"
 testpaths = ["tests"]
 markers = [
   "nim_live: calls the hosted NVIDIA NIM API and requires NVIDIA_API_KEY"
+]
+filterwarnings = [
+  "error::ResourceWarning",
+  "error::starlette.testclient.StarletteDeprecationWarning"
 ]
 asyncio_mode = "auto"
 
