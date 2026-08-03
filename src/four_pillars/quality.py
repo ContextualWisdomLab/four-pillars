@@ -4,7 +4,7 @@ import json
 import re
 from dataclasses import dataclass
 
-from .constants import FORBIDDEN_COPY, VAGUE_COPY
+from .constants import BRANCHES_HANJA, FORBIDDEN_COPY, STEMS_HANJA, VAGUE_COPY
 from .models import ReportDocument
 
 REQUIRED_SECTIONS = {
@@ -32,6 +32,7 @@ FALSE_AUTHORITY_PATTERNS = (
     re.compile(r"AI가.*보장"),
     re.compile(r"계산기.*확정"),
 )
+PILLAR_PATTERN = re.compile(f"[{''.join(STEMS_HANJA)}][{''.join(BRANCHES_HANJA)}]")
 
 
 @dataclass(frozen=True)
@@ -54,7 +55,11 @@ def _all_text(report: ReportDocument) -> str:
     return json.dumps(payload, ensure_ascii=False)
 
 
-def validate_report(report: ReportDocument, expected_fingerprint: str) -> list[QualityIssue]:
+def validate_report(
+    report: ReportDocument,
+    expected_fingerprint: str,
+    allowed_pillars: set[str] | None = None,
+) -> list[QualityIssue]:
     issues: list[QualityIssue] = []
     if report.calculation_fingerprint != expected_fingerprint:
         issues.append(
@@ -93,6 +98,15 @@ def validate_report(report: ReportDocument, expected_fingerprint: str) -> list[Q
                 )
             )
     text = _all_text(report)
+    if allowed_pillars is not None:
+        for mentioned in sorted(set(PILLAR_PATTERN.findall(text)) - allowed_pillars):
+            issues.append(
+                QualityIssue(
+                    "ungrounded_pillar",
+                    f"계산 자료에 없는 간지가 보고서에 포함되었습니다: {mentioned}",
+                    "$",
+                )
+            )
     for phrase in FORBIDDEN_COPY:
         if phrase in text:
             issues.append(QualityIssue("forbidden_copy", f"금지 표현이 포함되었습니다: {phrase}", "$"))
@@ -120,7 +134,11 @@ def validate_report(report: ReportDocument, expected_fingerprint: str) -> list[Q
     return issues
 
 
-def assert_report_quality(report: ReportDocument, expected_fingerprint: str) -> None:
-    issues = validate_report(report, expected_fingerprint)
+def assert_report_quality(
+    report: ReportDocument,
+    expected_fingerprint: str,
+    allowed_pillars: set[str] | None = None,
+) -> None:
+    issues = validate_report(report, expected_fingerprint, allowed_pillars)
     if issues:
         raise ReportQualityError(issues)
