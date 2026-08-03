@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from itertools import pairwise
 
 import pytest
 
@@ -46,6 +47,6 @@ def test_august_2026_monthly_luck_is_bingshen_between_liqiu_and_bailu() -> None:
 
 def test_daewoon_periods_are_ordered_and_non_overlapping() -> None:
     scenario = calculate_daewoon(chart_1990(), Gender.FEMALE, count=4).scenarios[0]
-    for left, right in zip(scenario.periods, scenario.periods[1:], strict=True):
+    for left, right in pairwise(scenario.periods):
         assert left.ends_at < right.starts_at
         assert right.start_age - left.start_age == pytest.approx(10)
