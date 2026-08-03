@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import pytest
+
 from four_pillars.calendar import calculate_chart
 from four_pillars.fortune import calculate_annual_luck, calculate_daewoon, calculate_monthly_luck
 from four_pillars.models import BirthInput, Gender
@@ -46,4 +48,4 @@ def test_daewoon_periods_are_ordered_and_non_overlapping() -> None:
     scenario = calculate_daewoon(chart_1990(), Gender.FEMALE, count=4).scenarios[0]
     for left, right in zip(scenario.periods, scenario.periods[1:], strict=True):
         assert left.ends_at < right.starts_at
-        assert right.start_age - left.start_age == 10
+        assert right.start_age - left.start_age == pytest.approx(10)
