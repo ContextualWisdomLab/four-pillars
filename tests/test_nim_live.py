@@ -17,8 +17,8 @@ class LiveAnswer(BaseModel):
 @pytest.mark.nim_live
 @pytest.mark.asyncio
 async def test_hosted_nim_returns_schema_valid_korean_json() -> None:
-    if not os.getenv("NVIDIA_API_KEY"):
-        pytest.skip("NVIDIA_API_KEY is not configured")
+    if not os.getenv("NVIDIA_NIM_API_KEY"):
+        pytest.skip("NVIDIA_NIM_API_KEY is not configured")
     settings = Settings()
     async with NimClient(settings) as client:
         result, trace = await client.generate(
