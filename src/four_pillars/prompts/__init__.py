@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from importlib.resources import files
+
+# The package requires Python 3.11+, where importlib.resources.files is part of the standard library.
+from importlib.resources import files  # nosemgrep
 
 
 @dataclass(frozen=True)
