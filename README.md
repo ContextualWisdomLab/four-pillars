@@ -31,7 +31,7 @@ four-pillars serve
 To generate AI reports, set a hosted NVIDIA NIM key:
 
 ```bash
-export NVIDIA_API_KEY='...'
+export NVIDIA_NIM_API_KEY='...'
 export NIM_MODEL='nvidia/llama-3.3-nemotron-super-49b-v1.5'
 ```
 
