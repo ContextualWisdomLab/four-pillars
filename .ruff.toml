@@ -1,0 +1,10 @@
+target-version = "py311"
+line-length = 120
+
+[lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+ignore = [
+  "E501",  # prose-heavy prompts and schemas are intentionally explicit
+  "F401",  # public package re-exports are intentional
+  "B008",  # FastAPI Depends and Typer Option are declarative defaults
+]
