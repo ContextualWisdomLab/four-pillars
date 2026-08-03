@@ -38,15 +38,15 @@ class NimClient:
         *,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
-        if not settings.nvidia_api_key:
-            raise NimError("NVIDIA_API_KEY is required for AI report generation")
+        if not settings.nvidia_nim_api_key:
+            raise NimError("NVIDIA_NIM_API_KEY is required for AI report generation")
         self.settings = settings
         self._client = httpx.AsyncClient(
             base_url=settings.nim_base_url.rstrip("/"),
             timeout=httpx.Timeout(settings.nim_timeout_seconds),
             transport=transport,
             headers={
-                "Authorization": f"Bearer {settings.nvidia_api_key}",
+                "Authorization": f"Bearer {settings.nvidia_nim_api_key}",
                 "Accept": "application/json",
                 "Content-Type": "application/json",
             },
