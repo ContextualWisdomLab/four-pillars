@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Deterministic Korean Four Pillars calculation and NVIDIA NIM report generation service"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "Proprietary" }
+license = { file = "LICENSE" }
 authors = [{ name = "Contextual Wisdom Lab" }]
 dependencies = [
   "fastapi>=0.115,<1",
