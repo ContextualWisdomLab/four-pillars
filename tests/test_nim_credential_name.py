@@ -1,6 +1,3 @@
-from __future__ import annotations
-
-
 CANONICAL_ENV_NAME = "NVIDIA_NIM_API_KEY"
 LEGACY_ENV_NAME = "NVIDIA_" + "API_KEY"
 
