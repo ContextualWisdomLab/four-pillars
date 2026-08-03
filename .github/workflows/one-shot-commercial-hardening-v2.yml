@@ -1,0 +1,815 @@
+name: One-shot commercial hardening v2
+
+on:
+  push:
+    branches: [fix/commercial-hardening]
+    paths: [.github/workflows/one-shot-commercial-hardening-v2.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  harden-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/commercial-hardening
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Write hardened source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f pyproject.toml
+          cat > src/four_pillars/quality.py <<'PY'
+          from __future__ import annotations
+
+          import json
+          import re
+          from dataclasses import dataclass
+
+          from .constants import BRANCHES_HANJA, FORBIDDEN_COPY, STEMS_HANJA, VAGUE_COPY
+          from .models import ReportDocument
+
+          REQUIRED_SECTIONS = {
+              "natal",
+              "daewoon",
+              "annual",
+              "monthly",
+              "work",
+              "money",
+              "relationships",
+              "daily_rhythm",
+          }
+          CERTAINTY_PATTERNS = (
+              re.compile(r"반드시 .*(발생|된다|합니다)"),
+              re.compile(r"틀림없이"),
+              re.compile(r"확정적으로"),
+          )
+          MEDICAL_PATTERNS = (
+              re.compile(r"진단(됩니다|이다|입니다)"),
+              re.compile(r"약을 (복용|중단)"),
+              re.compile(r"치료를 (받아야|중단해야)"),
+          )
+          FALSE_AUTHORITY_PATTERNS = (
+              re.compile(r"만세력 앱.*근거"),
+              re.compile(r"AI가.*보장"),
+              re.compile(r"계산기.*확정"),
+          )
+          PILLAR_PATTERN = re.compile(
+              f"[{''.join(STEMS_HANJA)}][{''.join(BRANCHES_HANJA)}]"
+          )
+
+
+          @dataclass(frozen=True)
+          class QualityIssue:
+              code: str
+              message: str
+              path: str
+
+
+          class ReportQualityError(ValueError):
+              def __init__(self, issues: list[QualityIssue]) -> None:
+                  self.issues = issues
+                  super().__init__("; ".join(f"{issue.code}: {issue.message}" for issue in issues))
+
+
+          def _all_text(report: ReportDocument) -> str:
+              return json.dumps(report.model_dump(mode="json"), ensure_ascii=False)
+
+
+          def validate_report(
+              report: ReportDocument,
+              expected_fingerprint: str,
+              allowed_pillars: set[str] | None = None,
+          ) -> list[QualityIssue]:
+              issues: list[QualityIssue] = []
+              if report.calculation_fingerprint != expected_fingerprint:
+                  issues.append(
+                      QualityIssue(
+                          "fingerprint_mismatch",
+                          "보고서의 계산 fingerprint가 원 계산과 다릅니다.",
+                          "calculation_fingerprint",
+                      )
+                  )
+              missing = sorted(REQUIRED_SECTIONS - set(report.sections))
+              if missing:
+                  issues.append(
+                      QualityIssue(
+                          "missing_sections",
+                          f"필수 장이 누락되었습니다: {', '.join(missing)}",
+                          "sections",
+                      )
+                  )
+              for key, section in report.sections.items():
+                  if not section.opportunities:
+                      issues.append(QualityIssue("missing_opportunity", "긍정적 가능성이 없습니다.", key))
+                  if not section.cautions:
+                      issues.append(QualityIssue("missing_caution", "주의점이 없습니다.", key))
+                  if not section.actions:
+                      issues.append(QualityIssue("missing_action", "실천 행동이 없습니다.", key))
+              relationship = report.sections.get("relationships")
+              if relationship is not None:
+                  positive_terms = ("신뢰", "협력", "안정", "지원", "친밀", "합의")
+                  relationship_copy = " ".join(
+                      [relationship.summary, *relationship.opportunities]
+                  )
+                  if not any(term in relationship_copy for term in positive_terms):
+                      issues.append(
+                          QualityIssue(
+                              "relationship_warning_only",
+                              "가까운 관계 장에 신뢰·협력·안정 가능성이 구체적으로 제시되지 않았습니다.",
+                              "sections.relationships",
+                          )
+                      )
+              text = _all_text(report)
+              if allowed_pillars is not None:
+                  ungrounded = sorted(set(PILLAR_PATTERN.findall(text)) - allowed_pillars)
+                  for mentioned in ungrounded:
+                      issues.append(
+                          QualityIssue(
+                              "ungrounded_pillar",
+                              f"계산 자료에 없는 간지가 보고서에 포함되었습니다: {mentioned}",
+                              "$",
+                          )
+                      )
+              for phrase in FORBIDDEN_COPY:
+                  if phrase in text:
+                      issues.append(
+                          QualityIssue(
+                              "forbidden_copy",
+                              f"금지 표현이 포함되었습니다: {phrase}",
+                              "$",
+                          )
+                      )
+              for phrase in VAGUE_COPY:
+                  if phrase in text:
+                      issues.append(
+                          QualityIssue("vague_copy", f"지시 대상이 모호합니다: {phrase}", "$")
+                      )
+              for pattern in CERTAINTY_PATTERNS:
+                  if pattern.search(text):
+                      issues.append(
+                          QualityIssue("event_certainty", "미래 사건을 확정하는 문장이 있습니다.", "$")
+                      )
+              for pattern in MEDICAL_PATTERNS:
+                  if pattern.search(text):
+                      issues.append(
+                          QualityIssue("medical_claim", "의학적 진단 또는 치료 지시가 있습니다.", "$")
+                      )
+              for pattern in FALSE_AUTHORITY_PATTERNS:
+                  if pattern.search(text):
+                      issues.append(
+                          QualityIssue(
+                              "false_authority",
+                              "앱·AI·계산기를 권위 근거로 사용했습니다.",
+                              "$",
+                          )
+                      )
+              disclaimer_terms = ("전통", "상징", "의학", "법률", "재정", "실제")
+              if not all(term in report.disclaimer for term in disclaimer_terms):
+                  issues.append(
+                      QualityIssue(
+                          "weak_disclaimer",
+                          "면책문이 전통 상징 해석과 현실 판단의 우선순위를 충분히 설명하지 않습니다.",
+                          "disclaimer",
+                      )
+                  )
+              return issues
+
+
+          def assert_report_quality(
+              report: ReportDocument,
+              expected_fingerprint: str,
+              allowed_pillars: set[str] | None = None,
+          ) -> None:
+              issues = validate_report(report, expected_fingerprint, allowed_pillars)
+              if issues:
+                  raise ReportQualityError(issues)
+          PY
+
+          cat > src/four_pillars/analysis.py <<'PY'
+          from __future__ import annotations
+
+          from datetime import UTC, datetime
+          from typing import Any
+
+          from pydantic import BaseModel, ConfigDict, Field
+
+          from .models import (
+              Chart,
+              DaewoonResult,
+              LuckSnapshot,
+              PracticalSkill,
+              ReportDocument,
+              ReportSection,
+          )
+          from .nim import NimClient, NimTrace
+          from .prompts import PROMPT_NAMES, PromptTemplate, load_prompt
+          from .quality import ReportQualityError, assert_report_quality
+
+
+          class PracticalSkillsDraft(BaseModel):
+              model_config = ConfigDict(extra="forbid")
+
+              practical_skills: list[PracticalSkill] = Field(min_length=1, max_length=8)
+
+
+          class SynthesisDraft(BaseModel):
+              model_config = ConfigDict(extra="forbid")
+
+              executive_summary: str
+              sections: dict[str, ReportSection]
+              disclaimer: str
+
+
+          class GeneratedReport(BaseModel):
+              report: ReportDocument
+              traces: dict[str, dict[str, Any]]
+
+
+          def _allowed_pillars(
+              chart: Chart,
+              daewoon: DaewoonResult,
+              annual: LuckSnapshot,
+              monthly: LuckSnapshot,
+          ) -> set[str]:
+              allowed = {chart.year.hanja, chart.month.hanja, chart.day.hanja}
+              if chart.hour is not None:
+                  allowed.add(chart.hour.hanja)
+              allowed.add(annual.pillar.hanja)
+              allowed.add(monthly.pillar.hanja)
+              allowed.update(
+                  period.pillar.hanja
+                  for scenario in daewoon.scenarios
+                  for period in scenario.periods
+              )
+              return allowed
+
+
+          def _trace_payload(
+              trace: NimTrace,
+              prompt: PromptTemplate | None = None,
+          ) -> dict[str, Any]:
+              payload: dict[str, Any] = {
+                  "model": trace.model,
+                  "attempts": trace.attempts,
+                  "repairs": trace.repairs,
+              }
+              if prompt is not None:
+                  payload["prompt_version"] = prompt.version
+                  payload["prompt_sha256"] = prompt.sha256
+              return payload
+
+
+          async def generate_report(
+              *,
+              client: NimClient,
+              subject_name: str,
+              chart: Chart,
+              daewoon: DaewoonResult,
+              annual: LuckSnapshot,
+              monthly: LuckSnapshot,
+              user_context: str = "",
+          ) -> GeneratedReport:
+              immutable = {
+                  "chart": chart.model_dump(mode="json"),
+                  "daewoon": daewoon.model_dump(mode="json"),
+                  "annual": annual.model_dump(mode="json"),
+                  "monthly": monthly.model_dump(mode="json"),
+                  "calculation_fingerprint": chart.fingerprint,
+              }
+              context = {"user_context": user_context}
+              allowed_pillars = _allowed_pillars(chart, daewoon, annual, monthly)
+              traces: dict[str, dict[str, Any]] = {}
+
+              async def section(name: str, payload: dict[str, Any]) -> ReportSection:
+                  prompt = load_prompt(name)
+                  result, trace = await client.generate(
+                      system_prompt=prompt.body,
+                      user_payload=payload,
+                      response_model=ReportSection,
+                  )
+                  traces[name] = _trace_payload(trace, prompt)
+                  return result
+
+              natal = await section(
+                  "natal_analysis",
+                  {"calculation": immutable["chart"], **context},
+              )
+              daewoon_section = await section(
+                  "daewoon_analysis",
+                  {
+                      "calculation": {
+                          "chart": immutable["chart"],
+                          "daewoon": immutable["daewoon"],
+                      },
+                      **context,
+                  },
+              )
+              annual_section = await section(
+                  "annual_analysis",
+                  {
+                      "calculation": {
+                          "chart": immutable["chart"],
+                          "daewoon": immutable["daewoon"],
+                          "annual": immutable["annual"],
+                      },
+                      **context,
+                  },
+              )
+              monthly_section = await section(
+                  "monthly_analysis",
+                  {"calculation": immutable, **context},
+              )
+
+              practical_prompt = load_prompt("practical_skills")
+              practical, practical_trace = await client.generate(
+                  system_prompt=practical_prompt.body,
+                  user_payload={
+                      "monthly_analysis": monthly_section.model_dump(mode="json"),
+                      "annual_analysis": annual_section.model_dump(mode="json"),
+                      **context,
+                  },
+                  response_model=PracticalSkillsDraft,
+              )
+              traces["practical_skills"] = _trace_payload(
+                  practical_trace,
+                  practical_prompt,
+              )
+
+              synthesis_prompt = load_prompt("synthesis")
+              synthesis, synthesis_trace = await client.generate(
+                  system_prompt=synthesis_prompt.body,
+                  user_payload={
+                      "calculation": immutable,
+                      "drafts": {
+                          "natal": natal.model_dump(mode="json"),
+                          "daewoon": daewoon_section.model_dump(mode="json"),
+                          "annual": annual_section.model_dump(mode="json"),
+                          "monthly": monthly_section.model_dump(mode="json"),
+                          "practical_skills": practical.model_dump(mode="json"),
+                      },
+                      **context,
+                  },
+                  response_model=SynthesisDraft,
+                  max_tokens=8192,
+              )
+              traces["synthesis"] = _trace_payload(synthesis_trace, synthesis_prompt)
+              prompt_versions = {
+                  name: load_prompt(name).version for name in PROMPT_NAMES
+              }
+              report = ReportDocument(
+                  subject_name=subject_name,
+                  title=f"{subject_name} 사주 보고서",
+                  executive_summary=synthesis.executive_summary,
+                  calculation_fingerprint=chart.fingerprint,
+                  sections=synthesis.sections,
+                  practical_skills=practical.practical_skills,
+                  disclaimer=synthesis.disclaimer,
+                  generated_at=datetime.now(UTC),
+                  model=synthesis_trace.model,
+                  prompt_versions=prompt_versions,
+              )
+
+              try:
+                  assert_report_quality(
+                      report,
+                      chart.fingerprint,
+                      allowed_pillars,
+                  )
+              except ReportQualityError as error:
+                  repair_prompt = load_prompt("editorial_repair")
+                  repaired, repair_trace = await client.generate(
+                      system_prompt=repair_prompt.body,
+                      user_payload={
+                          "calculation": immutable,
+                          "report": report.model_dump(mode="json"),
+                          "violations": [issue.__dict__ for issue in error.issues],
+                      },
+                      response_model=ReportDocument,
+                      temperature=0,
+                      max_tokens=8192,
+                  )
+                  traces["editorial_repair"] = _trace_payload(
+                      repair_trace,
+                      repair_prompt,
+                  )
+                  report = repaired.model_copy(
+                      update={
+                          "subject_name": subject_name,
+                          "title": f"{subject_name} 사주 보고서",
+                          "calculation_fingerprint": chart.fingerprint,
+                          "generated_at": datetime.now(UTC),
+                          "model": repair_trace.model,
+                          "prompt_versions": prompt_versions,
+                          "quality_notes": [
+                              issue.message for issue in error.issues
+                          ],
+                      }
+                  )
+                  assert_report_quality(
+                      report,
+                      chart.fingerprint,
+                      allowed_pillars,
+                  )
+
+              return GeneratedReport(report=report, traces=traces)
+          PY
+
+          cat > src/four_pillars/api.py <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import secrets
+          from datetime import datetime
+          from functools import lru_cache
+          from pathlib import Path
+
+          from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
+          from fastapi.responses import FileResponse, HTMLResponse
+          from pydantic import BaseModel, Field
+
+          from .calendar import calculate_chart
+          from .fortune import (
+              calculate_annual_luck,
+              calculate_daewoon,
+              calculate_monthly_luck,
+          )
+          from .models import (
+              BirthInput,
+              Chart,
+              DaewoonResult,
+              JobStatus,
+              LuckSnapshot,
+              ReportJob,
+          )
+          from .service import ReportRequest, ReportService
+          from .settings import Settings, get_settings
+          from .web import render_home
+
+          app = FastAPI(
+              title="Four Pillars API",
+              version="0.1.0",
+              description=(
+                  "Deterministic Korean Four Pillars calculation with "
+                  "NVIDIA NIM report generation"
+              ),
+          )
+
+
+          class ReportJobView(BaseModel):
+              id: str
+              status: JobStatus
+              created_at: datetime
+              updated_at: datetime
+              error: str | None = None
+              artifacts: list[str] = Field(default_factory=list)
+
+              @classmethod
+              def from_job(cls, job: ReportJob) -> "ReportJobView":
+                  artifacts = (
+                      [
+                          "report.pdf",
+                          "report.html",
+                          "report.json",
+                          "chart.json",
+                          "manifest.json",
+                      ]
+                      if job.status is JobStatus.COMPLETED
+                      else []
+                  )
+                  return cls(
+                      id=job.id,
+                      status=job.status,
+                      created_at=job.created_at,
+                      updated_at=job.updated_at,
+                      error=job.error,
+                      artifacts=artifacts,
+                  )
+
+
+          class LuckRequest(BaseModel):
+              birth: BirthInput
+              year: int = Field(ge=1900, le=2200)
+              month: int = Field(default=1, ge=1, le=12)
+
+
+          @lru_cache(maxsize=1)
+          def get_service() -> ReportService:
+              return ReportService(get_settings())
+
+
+          def require_api_key(
+              settings: Settings = Depends(get_settings),
+              x_api_key: str | None = Header(default=None),
+          ) -> None:
+              expected = settings.api_key_sha256
+              if not expected:
+                  return
+              if not x_api_key:
+                  raise HTTPException(
+                      status_code=status.HTTP_401_UNAUTHORIZED,
+                      detail="API key required",
+                  )
+              actual = hashlib.sha256(x_api_key.encode()).hexdigest()
+              if not secrets.compare_digest(actual, expected):
+                  raise HTTPException(
+                      status_code=status.HTTP_401_UNAUTHORIZED,
+                      detail="Invalid API key",
+                  )
+
+
+          @app.get("/", response_class=HTMLResponse, include_in_schema=False)
+          def index() -> str:
+              return render_home()
+
+
+          @app.get("/health")
+          def health() -> dict[str, str]:
+              return {"status": "ok", "version": app.version}
+
+
+          @app.get("/ready")
+          def ready(service: ReportService = Depends(get_service)) -> dict[str, str]:
+              service.settings.artifact_dir.mkdir(parents=True, exist_ok=True)
+              probe = service.settings.artifact_dir / ".ready"
+              probe.write_text("ok", encoding="utf-8")
+              probe.unlink(missing_ok=True)
+              service.store.get("00000000-0000-0000-0000-000000000000")
+              return {"status": "ready"}
+
+
+          @app.post(
+              "/v1/chart",
+              response_model=Chart,
+              dependencies=[Depends(require_api_key)],
+          )
+          def chart(request: BirthInput) -> Chart:
+              return calculate_chart(request)
+
+
+          @app.post(
+              "/v1/luck/daewoon",
+              response_model=DaewoonResult,
+              dependencies=[Depends(require_api_key)],
+          )
+          def daewoon(request: BirthInput) -> DaewoonResult:
+              calculated = calculate_chart(request)
+              return calculate_daewoon(calculated, request.gender)
+
+
+          @app.post(
+              "/v1/luck/annual",
+              response_model=LuckSnapshot,
+              dependencies=[Depends(require_api_key)],
+          )
+          def annual(request: LuckRequest) -> LuckSnapshot:
+              return calculate_annual_luck(
+                  calculate_chart(request.birth),
+                  request.year,
+              )
+
+
+          @app.post(
+              "/v1/luck/monthly",
+              response_model=LuckSnapshot,
+              dependencies=[Depends(require_api_key)],
+          )
+          def monthly(request: LuckRequest) -> LuckSnapshot:
+              return calculate_monthly_luck(
+                  calculate_chart(request.birth),
+                  request.year,
+                  request.month,
+              )
+
+
+          @app.post(
+              "/v1/reports",
+              response_model=ReportJobView,
+              status_code=status.HTTP_202_ACCEPTED,
+              dependencies=[Depends(require_api_key)],
+          )
+          def create_report(
+              request: ReportRequest,
+              service: ReportService = Depends(get_service),
+          ) -> ReportJobView:
+              return ReportJobView.from_job(service.enqueue(request))
+
+
+          @app.get(
+              "/v1/reports/{job_id}",
+              response_model=ReportJobView,
+              dependencies=[Depends(require_api_key)],
+          )
+          def get_report(
+              job_id: str,
+              service: ReportService = Depends(get_service),
+          ) -> ReportJobView:
+              job = service.store.get(job_id)
+              if job is None:
+                  raise HTTPException(
+                      status_code=status.HTTP_404_NOT_FOUND,
+                      detail="Report job not found",
+                  )
+              return ReportJobView.from_job(job)
+
+
+          @app.get(
+              "/v1/reports/{job_id}/artifacts/{filename}",
+              dependencies=[Depends(require_api_key)],
+          )
+          def get_artifact(
+              job_id: str,
+              filename: str,
+              download: bool = Query(default=True),
+              service: ReportService = Depends(get_service),
+          ) -> FileResponse:
+              try:
+                  path = service.artifact(job_id, filename)
+              except (FileNotFoundError, ValueError) as exc:
+                  raise HTTPException(
+                      status_code=status.HTTP_404_NOT_FOUND,
+                      detail="Artifact not found",
+                  ) from exc
+              media_types = {
+                  ".pdf": "application/pdf",
+                  ".html": "text/html",
+                  ".json": "application/json",
+              }
+              return FileResponse(
+                  path,
+                  media_type=media_types.get(
+                      path.suffix,
+                      "application/octet-stream",
+                  ),
+                  filename=path.name if download else None,
+              )
+
+
+          @app.delete(
+              "/v1/reports/{job_id}",
+              status_code=status.HTTP_204_NO_CONTENT,
+              dependencies=[Depends(require_api_key)],
+          )
+          def delete_report(
+              job_id: str,
+              service: ReportService = Depends(get_service),
+          ) -> None:
+              job = service.store.get(job_id)
+              if job is None:
+                  raise HTTPException(
+                      status_code=status.HTTP_404_NOT_FOUND,
+                      detail="Report job not found",
+                  )
+              if job.status not in {
+                  JobStatus.COMPLETED,
+                  JobStatus.FAILED,
+                  JobStatus.QUALITY_FAILED,
+              }:
+                  raise HTTPException(
+                      status_code=status.HTTP_409_CONFLICT,
+                      detail="Only terminal jobs can be deleted",
+                  )
+              if job.artifact_dir:
+                  root = Path(job.artifact_dir).resolve()
+                  if (
+                      root.parent == service.settings.artifact_dir.resolve()
+                      and root.exists()
+                  ):
+                      import shutil
+
+                      shutil.rmtree(root)
+              if not service.store.delete(job_id):
+                  raise HTTPException(
+                      status_code=status.HTTP_409_CONFLICT,
+                      detail="Only terminal jobs can be deleted",
+                  )
+          PY
+
+          python - <<'PY'
+          from pathlib import Path
+
+          fortune = Path('src/four_pillars/fortune.py')
+          text = fortune.read_text(encoding='utf-8')
+          old = '    annual_index = (year - 1984) % 60\n    annual_stem = annual_index % 10\n'
+          if old in text:
+              text = text.replace(
+                  old,
+                  '    lichun = current_terms[1].occurs_at\n'
+                  '    pillar_year = year if starts.occurs_at >= lichun else year - 1\n'
+                  '    annual_index = (pillar_year - 1984) % 60\n'
+                  '    annual_stem = annual_index % 10\n',
+                  1,
+              )
+          fortune.write_text(text, encoding='utf-8')
+
+          nim = Path('src/four_pillars/nim.py')
+          text = nim.read_text(encoding='utf-8').replace(
+              'if attempts > self.settings.nim_max_retries + 1:',
+              'if attempts >= self.settings.nim_max_retries + 1:',
+          )
+          nim.write_text(text, encoding='utf-8')
+
+          models = Path('src/four_pillars/models.py')
+          text = models.read_text(encoding='utf-8')
+          if 'class ReportSection(BaseModel):\n    model_config' not in text:
+              text = text.replace(
+                  'class ReportSection(BaseModel):\n',
+                  'class ReportSection(BaseModel):\n'
+                  '    model_config = ConfigDict(extra="forbid")\n\n',
+                  1,
+              )
+          if 'class PracticalSkill(BaseModel):\n    model_config' not in text:
+              text = text.replace(
+                  'class PracticalSkill(BaseModel):\n',
+                  'class PracticalSkill(BaseModel):\n'
+                  '    model_config = ConfigDict(extra="forbid")\n\n',
+                  1,
+              )
+          models.write_text(text, encoding='utf-8')
+
+          service = Path('src/four_pillars/service.py')
+          text = service.read_text(encoding='utf-8')
+          old = (
+              '        root = Path(job.artifact_dir).resolve()\n'
+              '        candidate = (root / filename).resolve()\n'
+          )
+          if old in text:
+              text = text.replace(
+                  old,
+                  '        root = Path(job.artifact_dir).resolve()\n'
+                  '        if root.parent != self.settings.artifact_dir.resolve():\n'
+                  '            raise FileNotFoundError(job_id)\n'
+                  '        candidate = (root / filename).resolve()\n',
+                  1,
+              )
+          service.write_text(text, encoding='utf-8')
+
+          web = Path('src/four_pillars/web.py')
+          text = web.read_text(encoding='utf-8')
+          text = text.replace(
+              '<label>달력<select id="calendar"><option value="solar">양력</option><option value="lunar">한국 음력</option></select></label>',
+              '<label>달력<select id="calendar"><option value="solar">양력</option><option value="lunar">한국 음력</option></select></label><label><span>음력 윤달</span><input id="leap" type="checkbox"><span class="hint">음력 입력에서만 적용합니다.</span></label>',
+          )
+          text = text.replace(
+              "lunar_leap_month:false",
+              "lunar_leap_month:document.querySelector('#leap').checked",
+          )
+          text = text.replace(
+              ".downloads a{background:",
+              ".downloads a,.downloads button{background:",
+          )
+          old = "downloads.innerHTML=['report.pdf','report.html','report.json','chart.json','manifest.json'].map(name=>`<a href=\"/v1/reports/${id}/artifacts/${name}\">${name}</a>`).join('');message('보고서 생성이 완료되었습니다.');return"
+          new = "downloads.innerHTML=['report.pdf','report.html','report.json','chart.json','manifest.json'].map(name=>`<button class=\"ghost\" type=\"button\" data-file=\"${name}\">${name}</button>`).join('');downloads.querySelectorAll('[data-file]').forEach(button=>button.addEventListener('click',()=>downloadArtifact(id,button.dataset.file)));message('보고서 생성이 완료되었습니다.');return"
+          if old not in text:
+              raise SystemExit('web download insertion point not found')
+          text = text.replace(old, new, 1)
+          marker = "async function poll(id){"
+          helper = "async function downloadArtifact(id,name){try{message(`${name} 파일을 준비하고 있습니다…`);const response=await fetch(`/v1/reports/${id}/artifacts/${name}`,{headers:headers()});if(!response.ok)throw new Error(`HTTP ${response.status}`);const blob=await response.blob(),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=name;document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);message(`${name} 다운로드를 시작했습니다.`)}catch(error){message(error.message,true)}}\n"
+          if helper not in text:
+              text = text.replace(marker, helper + marker, 1)
+          input_marker = "document.querySelector('#calculate').addEventListener('click',calculate);"
+          guard = "const calculationFields=new Set(['gender','birth-date','birth-time','calendar','leap','timezone']);form.addEventListener('input',event=>{if(reviewed&&calculationFields.has(event.target.id)){reviewed=null;generate.disabled=true;message('계산에 영향을 주는 입력이 바뀌었습니다. 계산을 다시 확인하세요.')}});\n"
+          if guard not in text:
+              text = text.replace(input_marker, guard + input_marker, 1)
+          web.write_text(text, encoding='utf-8')
+
+          test_api = Path('tests/test_api.py')
+          text = test_api.read_text(encoding='utf-8')
+          old = '    assert fetched.json()["status"] == "queued"\n'
+          if old in text:
+              text = text.replace(
+                  old,
+                  '    payload = fetched.json()\n'
+                  '    assert payload["status"] == "queued"\n'
+                  '    assert "request" not in payload\n'
+                  '    assert "artifact_dir" not in payload\n',
+                  1,
+              )
+          test_api.write_text(text, encoding='utf-8')
+          PY
+
+          rm -f .github/workflows/one-shot-*.yml
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e '.[dev]'
+      - run: ruff check --fix .
+      - run: ruff format .
+      - run: ruff check .
+      - run: python -m compileall -q src tests scripts
+      - run: python scripts/check_docs.py
+      - run: python scripts/check_prompts.py
+      - run: pytest -m 'not nim_live' -W error::ResourceWarning --cov=four_pillars --cov-report=term-missing
+      - run: python -m build
+      - name: Commit verified Python 3.11-compatible hardening
+        run: |
+          git config user.name 'four-pillars-ci'
+          git config user.email 'actions@users.noreply.github.com'
+          git add --all
+          git diff --cached --check
+          git commit -m 'fix: verify commercial hardening on Python 3.11'
+          git push origin HEAD:fix/commercial-hardening
