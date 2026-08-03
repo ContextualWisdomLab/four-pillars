@@ -1,0 +1,32 @@
+name: NVIDIA NIM Evaluation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -e '.[dev]'
+      - name: Hosted NIM smoke test
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NIM_MODEL: ${{ vars.NIM_MODEL || 'nvidia/llama-3.3-nemotron-super-49b-v1.5' }}
+          NIM_EVAL_MODEL: ${{ vars.NIM_EVAL_MODEL || 'nvidia/llama-3.3-nemotron-super-49b-v1.5' }}
+        run: pytest -m nim_live -vv
+      - name: NIM-as-judge fixture
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NIM_MODEL: ${{ vars.NIM_MODEL || 'nvidia/llama-3.3-nemotron-super-49b-v1.5' }}
+          NIM_EVAL_MODEL: ${{ vars.NIM_EVAL_MODEL || 'nvidia/llama-3.3-nemotron-super-49b-v1.5' }}
+        run: python scripts/nim_eval.py
