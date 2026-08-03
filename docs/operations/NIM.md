@@ -2,12 +2,12 @@
 
 ## Provider boundary
 
-Four Pillars uses the hosted NVIDIA NIM OpenAI-compatible chat-completions endpoint for LLM generation and LLM-as-judge evaluation. The application does not silently route to another provider. Calculation-only endpoints remain available without a key; AI report jobs fail clearly when `NVIDIA_API_KEY` is absent.
+Four Pillars uses the hosted NVIDIA NIM OpenAI-compatible chat-completions endpoint for LLM generation and LLM-as-judge evaluation. The application does not silently route to another provider. Calculation-only endpoints remain available without a key; AI report jobs fail clearly when `NVIDIA_NIM_API_KEY` is absent.
 
 ## Configuration
 
 ```env
-NVIDIA_API_KEY=nvapi-...
+NVIDIA_NIM_API_KEY=nvapi-...
 NIM_BASE_URL=https://integrate.api.nvidia.com/v1
 NIM_MODEL=nvidia/llama-3.3-nemotron-super-49b-v1.5
 NIM_EVAL_MODEL=nvidia/llama-3.3-nemotron-super-49b-v1.5
@@ -36,14 +36,14 @@ pytest -m 'not nim_live'
 
 ## Live model tests
 
-Live tests are opt-in and skipped when `NVIDIA_API_KEY` is not present. They verify that the configured hosted model returns valid JSON for a deterministic fixture and that the judge can score a report. Run locally:
+Live tests are opt-in and skipped when `NVIDIA_NIM_API_KEY` is not present. They verify that the configured hosted model returns valid JSON for a deterministic fixture and that the judge can score a report. Run locally:
 
 ```bash
 pytest -m nim_live -vv
 python scripts/nim_eval.py
 ```
 
-The repository workflow `nim-eval.yml` runs only through manual dispatch or an explicitly labeled pull request and requires the `NVIDIA_API_KEY` repository secret. It must not run on contributions from untrusted forks because a prompt could attempt to exfiltrate secrets.
+The repository workflow `nim-eval.yml` runs only through manual dispatch and requires the `NVIDIA_NIM_API_KEY` repository secret. It must not run on contributions from untrusted forks because a prompt could attempt to exfiltrate secrets.
 
 ## Cost and privacy
 
