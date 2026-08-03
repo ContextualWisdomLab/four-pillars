@@ -112,6 +112,17 @@ async def test_generate_report_runs_all_stages_and_preserves_fingerprint() -> No
     assert len(generated.report.practical_skills) == 1
     assert client.calls.count("ReportSection") == 4
     assert "SynthesisDraft" in client.calls
+    assert set(generated.traces) == {
+        "natal_analysis",
+        "daewoon_analysis",
+        "annual_analysis",
+        "monthly_analysis",
+        "practical_skills",
+        "synthesis",
+    }
+    for trace in generated.traces.values():
+        assert trace["prompt_version"] == "1.0.0"
+        assert len(trace["prompt_sha256"]) == 64
 
 
 @pytest.mark.asyncio
@@ -129,3 +140,5 @@ async def test_invalid_synthesis_receives_one_editorial_repair() -> None:
     assert "ReportDocument" in client.calls
     assert generated.report.quality_notes
     assert "시키는 대로" not in generated.report.executive_summary
+    assert generated.traces["editorial_repair"]["prompt_version"] == "1.0.0"
+    assert len(generated.traces["editorial_repair"]["prompt_sha256"]) == 64
