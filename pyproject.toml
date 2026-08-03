@@ -46,6 +46,10 @@ testpaths = ["tests"]
 markers = [
   "nim_live: calls the hosted NVIDIA NIM API and requires NVIDIA_API_KEY"
 ]
+filterwarnings = [
+  "error::ResourceWarning",
+  "error::starlette.testclient.StarletteDeprecationWarning"
+]
 asyncio_mode = "auto"
 
 [tool.coverage.run]
