@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-from four_pillars.settings import Settings
-
 
 CANONICAL_ENV_NAME = "NVIDIA_NIM_API_KEY"
 LEGACY_ENV_NAME = "NVIDIA_" + "API_KEY"
 
 
 def test_settings_reads_the_canonical_nim_credential(monkeypatch) -> None:
+    from four_pillars.settings import Settings
+
     monkeypatch.delenv(LEGACY_ENV_NAME, raising=False)
     monkeypatch.setenv(CANONICAL_ENV_NAME, "nim-secret")
 
@@ -19,6 +17,8 @@ def test_settings_reads_the_canonical_nim_credential(monkeypatch) -> None:
 
 
 def test_legacy_credential_name_is_not_silently_accepted(monkeypatch) -> None:
+    from four_pillars.settings import Settings
+
     monkeypatch.delenv(CANONICAL_ENV_NAME, raising=False)
     monkeypatch.setenv(LEGACY_ENV_NAME, "legacy-secret")
 
@@ -28,8 +28,18 @@ def test_legacy_credential_name_is_not_silently_accepted(monkeypatch) -> None:
 
 
 def test_repository_uses_only_the_canonical_nim_credential_name() -> None:
+    from pathlib import Path
+
     text_suffixes = {".md", ".py", ".toml", ".yaml", ".yml"}
-    ignored_parts = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv", "build", "dist"}
+    ignored_parts = {
+        ".git",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".venv",
+        "build",
+        "dist",
+    }
     offenders: list[str] = []
 
     for path in Path(".").rglob("*"):
