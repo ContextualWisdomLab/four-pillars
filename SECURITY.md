@@ -10,7 +10,7 @@ Do not open a public issue for a vulnerability that could expose birth data, gen
 
 ## Protected information
 
-Birth date, birth time, location, calendar choice, relationship notes, work notes, and generated reports can identify a person or reveal sensitive circumstances. Production deployments must encrypt transport, restrict storage access, set a retention period, avoid logging raw report prompts, and provide deletion. `NVIDIA_API_KEY`, API authentication values, and database credentials must be stored as secrets and must never be committed.
+Birth date, birth time, location, calendar choice, relationship notes, work notes, and generated reports can identify a person or reveal sensitive circumstances. Production deployments must encrypt transport, restrict storage access, set a retention period, avoid logging raw report prompts, and provide deletion. `NVIDIA_NIM_API_KEY`, API authentication values, and database credentials must be stored as secrets and must never be committed.
 
 ## Security boundaries
 
