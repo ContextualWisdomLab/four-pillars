@@ -45,7 +45,7 @@ packages = ["src/four_pillars"]
 addopts = "-ra --strict-markers"
 testpaths = ["tests"]
 markers = [
-  "nim_live: calls the hosted NVIDIA NIM API and requires NVIDIA_API_KEY"
+  "nim_live: calls the hosted NVIDIA NIM API and requires NVIDIA_NIM_API_KEY"
 ]
 filterwarnings = [
   "error::ResourceWarning",
