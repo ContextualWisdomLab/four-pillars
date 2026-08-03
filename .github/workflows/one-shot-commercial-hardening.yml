@@ -1,0 +1,242 @@
+name: One-shot commercial hardening
+
+on:
+  push:
+    branches: [fix/commercial-hardening]
+    paths: [.github/workflows/one-shot-commercial-hardening.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  harden-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/commercial-hardening
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Apply deterministic, privacy, and delivery hardening
+        run: |
+          test -f pyproject.toml
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          def replace(path: str, old: str, new: str, count: int = -1) -> None:
+              target = Path(path)
+              text = target.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'insertion point not found in {path}: {old[:80]!r}')
+              target.write_text(text.replace(old, new, count), encoding='utf-8')
+
+          # January's Xiao Han month still belongs to the pre-Li-Chun year stem.
+          replace(
+              'src/four_pillars/fortune.py',
+              '    annual_index = (year - 1984) % 60\n    annual_stem = annual_index % 10\n',
+              '    lichun = current_terms[1].occurs_at\n    pillar_year = year if starts.occurs_at >= lichun else year - 1\n    annual_index = (pillar_year - 1984) % 60\n    annual_stem = annual_index % 10\n',
+              1,
+          )
+
+          # max_retries means retries after the first attempt, not an extra hidden request.
+          nim = Path('src/four_pillars/nim.py')
+          text = nim.read_text(encoding='utf-8')
+          text = text.replace(
+              'if attempts > self.settings.nim_max_retries + 1:',
+              'if attempts >= self.settings.nim_max_retries + 1:',
+          )
+          nim.write_text(text, encoding='utf-8')
+
+          # LLM schemas reject extra fields rather than silently discarding them.
+          replace(
+              'src/four_pillars/models.py',
+              'class ReportSection(BaseModel):\n    title: str\n',
+              'class ReportSection(BaseModel):\n    model_config = ConfigDict(extra="forbid")\n\n    title: str\n',
+              1,
+          )
+          replace(
+              'src/four_pillars/models.py',
+              'class PracticalSkill(BaseModel):\n    name: str\n',
+              'class PracticalSkill(BaseModel):\n    model_config = ConfigDict(extra="forbid")\n\n    name: str\n',
+              1,
+          )
+          replace(
+              'src/four_pillars/analysis.py',
+              'from pydantic import BaseModel, Field\n',
+              'from pydantic import BaseModel, ConfigDict, Field\n',
+              1,
+          )
+          replace(
+              'src/four_pillars/analysis.py',
+              'class PracticalSkillsDraft(BaseModel):\n    practical_skills:',
+              'class PracticalSkillsDraft(BaseModel):\n    model_config = ConfigDict(extra="forbid")\n\n    practical_skills:',
+              1,
+          )
+          replace(
+              'src/four_pillars/analysis.py',
+              'class SynthesisDraft(BaseModel):\n    executive_summary:',
+              'class SynthesisDraft(BaseModel):\n    model_config = ConfigDict(extra="forbid")\n\n    executive_summary:',
+              1,
+          )
+
+          # Reject any sexagenary pillar in prose/evidence that was not supplied by the calculator.
+          replace(
+              'src/four_pillars/quality.py',
+              'from .constants import FORBIDDEN_COPY, VAGUE_COPY\n',
+              'from .constants import BRANCHES_HANJA, FORBIDDEN_COPY, STEMS_HANJA, VAGUE_COPY\n',
+              1,
+          )
+          replace(
+              'src/four_pillars/quality.py',
+              'def validate_report(report: ReportDocument, expected_fingerprint: str) -> list[QualityIssue]:\n',
+              'def validate_report(\n    report: ReportDocument,\n    expected_fingerprint: str,\n    allowed_pillars: set[str] | None = None,\n) -> list[QualityIssue]:\n',
+              1,
+          )
+          replace(
+              'src/four_pillars/quality.py',
+              '    text = _all_text(report)\n    for phrase in FORBIDDEN_COPY:\n',
+              '    text = _all_text(report)\n    if allowed_pillars is not None:\n        pillar_pattern = re.compile(\n            f"[{\"\".join(STEMS_HANJA)}][{\"\".join(BRANCHES_HANJA)}]"\n        )\n        for mentioned in sorted(set(pillar_pattern.findall(text)) - allowed_pillars):\n            issues.append(\n                QualityIssue(\n                    "ungrounded_pillar",\n                    f"계산 자료에 없는 간지가 보고서에 포함되었습니다: {mentioned}",\n                    "$",\n                )\n            )\n    for phrase in FORBIDDEN_COPY:\n',
+              1,
+          )
+          replace(
+              'src/four_pillars/quality.py',
+              'def assert_report_quality(report: ReportDocument, expected_fingerprint: str) -> None:\n    issues = validate_report(report, expected_fingerprint)\n',
+              'def assert_report_quality(\n    report: ReportDocument,\n    expected_fingerprint: str,\n    allowed_pillars: set[str] | None = None,\n) -> None:\n    issues = validate_report(report, expected_fingerprint, allowed_pillars)\n',
+              1,
+          )
+
+          # Build the exact grounding set once and apply it before and after editorial repair.
+          replace(
+              'src/four_pillars/analysis.py',
+              'def _trace_payload(trace: NimTrace) -> dict[str, Any]:\n',
+              'def _allowed_pillars(\n    chart: Chart,\n    daewoon: DaewoonResult,\n    annual: LuckSnapshot,\n    monthly: LuckSnapshot,\n) -> set[str]:\n    allowed = {chart.year.hanja, chart.month.hanja, chart.day.hanja}\n    if chart.hour is not None:\n        allowed.add(chart.hour.hanja)\n    allowed.add(annual.pillar.hanja)\n    allowed.add(monthly.pillar.hanja)\n    allowed.update(\n        period.pillar.hanja\n        for scenario in daewoon.scenarios\n        for period in scenario.periods\n    )\n    return allowed\n\n\ndef _trace_payload(trace: NimTrace, prompt: Any | None = None) -> dict[str, Any]:\n',
+              1,
+          )
+          replace(
+              'src/four_pillars/analysis.py',
+              '    return {\n        "model": trace.model,\n        "attempts": trace.attempts,\n        "repairs": trace.repairs,\n    }\n',
+              '    payload: dict[str, Any] = {\n        "model": trace.model,\n        "attempts": trace.attempts,\n        "repairs": trace.repairs,\n    }\n    if prompt is not None:\n        payload["prompt_version"] = prompt.version\n        payload["prompt_sha256"] = prompt.sha256\n    return payload\n',
+              1,
+          )
+          analysis = Path('src/four_pillars/analysis.py')
+          text = analysis.read_text(encoding='utf-8')
+          text = text.replace('traces[name] = _trace_payload(trace)', 'traces[name] = _trace_payload(trace, prompt)')
+          text = text.replace('traces["practical_skills"] = _trace_payload(practical_trace)', 'traces["practical_skills"] = _trace_payload(practical_trace, practical_prompt)')
+          text = text.replace('traces["synthesis"] = _trace_payload(synthesis_trace)', 'traces["synthesis"] = _trace_payload(synthesis_trace, synthesis_prompt)')
+          text = text.replace('traces["editorial_repair"] = _trace_payload(repair_trace)', 'traces["editorial_repair"] = _trace_payload(repair_trace, repair_prompt)')
+          text = text.replace(
+              '    context = {"user_context": user_context}\n    traces:',
+              '    context = {"user_context": user_context}\n    allowed_pillars = _allowed_pillars(chart, daewoon, annual, monthly)\n    traces:',
+              1,
+          )
+          text = text.replace(
+              'assert_report_quality(report, chart.fingerprint)',
+              'assert_report_quality(report, chart.fingerprint, allowed_pillars)',
+          )
+          analysis.write_text(text, encoding='utf-8')
+
+          # The database path is untrusted even when the artifact filename is allow-listed.
+          replace(
+              'src/four_pillars/service.py',
+              '        root = Path(job.artifact_dir).resolve()\n        candidate = (root / filename).resolve()\n',
+              '        root = Path(job.artifact_dir).resolve()\n        if root.parent != self.settings.artifact_dir.resolve():\n            raise FileNotFoundError(job_id)\n        candidate = (root / filename).resolve()\n',
+              1,
+          )
+
+          # Serve an actual browser workflow and redact job request/internal paths from API views.
+          api = Path('src/four_pillars/api.py')
+          text = api.read_text(encoding='utf-8')
+          text = text.replace(
+              'from .models import BirthInput, Chart, DaewoonResult, LuckSnapshot, ReportJob\n',
+              'from .models import BirthInput, Chart, DaewoonResult, JobStatus, LuckSnapshot, ReportJob\n',
+              1,
+          )
+          text = text.replace(
+              'from .settings import Settings, get_settings\n',
+              'from .settings import Settings, get_settings\nfrom .web import render_home\n',
+              1,
+          )
+          text = re.sub(
+              r'@app\.get\("/", response_class=HTMLResponse, include_in_schema=False\)\ndef index\(\) -> str:\n    return """.*?"""\n\n\n@app\.get\("/health"\)',
+              '@app.get("/", response_class=HTMLResponse, include_in_schema=False)\ndef index() -> str:\n    return render_home()\n\n\n@app.get("/health")',
+              text,
+              flags=re.S,
+          )
+          marker = 'class LuckRequest(BaseModel):\n'
+          job_view = '''class ReportJobView(BaseModel):
+    id: str
+    status: JobStatus
+    created_at: datetime
+    updated_at: datetime
+    error: str | None = None
+    artifacts: list[str] = []
+
+    @classmethod
+    def from_job(cls, job: ReportJob) -> "ReportJobView":
+        artifacts = (
+            ["report.pdf", "report.html", "report.json", "chart.json", "manifest.json"]
+            if job.status is JobStatus.COMPLETED
+            else []
+        )
+        return cls(
+            id=job.id,
+            status=job.status,
+            created_at=job.created_at,
+            updated_at=job.updated_at,
+            error=job.error,
+            artifacts=artifacts,
+        )
+
+
+'''
+          if marker not in text:
+              raise SystemExit('API schema insertion point not found')
+          text = text.replace(marker, job_view + marker, 1)
+          text = text.replace('response_model=ReportJob,', 'response_model=ReportJobView,', 1)
+          text = text.replace(') -> ReportJob:\n    return service.enqueue(request)', ') -> ReportJobView:\n    return ReportJobView.from_job(service.enqueue(request))', 1)
+          text = text.replace(
+              '@app.get("/v1/reports/{job_id}", response_model=ReportJob, dependencies=[Depends(require_api_key)])\ndef get_report(job_id: str, service: ReportService = Depends(get_service)) -> ReportJob:',
+              '@app.get("/v1/reports/{job_id}", response_model=ReportJobView, dependencies=[Depends(require_api_key)])\ndef get_report(job_id: str, service: ReportService = Depends(get_service)) -> ReportJobView:',
+              1,
+          )
+          text = text.replace('    return job\n\n\n@app.get("/v1/reports/{job_id}/artifacts/{filename}"', '    return ReportJobView.from_job(job)\n\n\n@app.get("/v1/reports/{job_id}/artifacts/{filename}"', 1)
+          text = text.replace(
+              '    if job.artifact_dir:\n        root = Path(job.artifact_dir).resolve()\n',
+              '    if job.status not in {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.QUALITY_FAILED}:\n        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only terminal jobs can be deleted")\n    if job.artifact_dir:\n        root = Path(job.artifact_dir).resolve()\n',
+              1,
+          )
+          api.write_text(text, encoding='utf-8')
+
+          # Prove that status responses do not echo sensitive birth notes or internal paths.
+          test_api = Path('tests/test_api.py')
+          text = test_api.read_text(encoding='utf-8')
+          text = text.replace(
+              '    assert fetched.json()["status"] == "queued"\n',
+              '    payload = fetched.json()\n    assert payload["status"] == "queued"\n    assert "request" not in payload\n    assert "artifact_dir" not in payload\n',
+              1,
+          )
+          test_api.write_text(text, encoding='utf-8')
+          PY
+          rm .github/workflows/one-shot-commercial-hardening.yml
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e '.[dev]'
+      - run: ruff check --fix .
+      - run: ruff format .
+      - run: ruff check .
+      - run: python -m compileall -q src tests scripts
+      - run: python scripts/check_docs.py
+      - run: python scripts/check_prompts.py
+      - run: pytest -m 'not nim_live' -W error::ResourceWarning --cov=four_pillars --cov-report=term-missing
+      - run: python -m build
+      - name: Commit only after full verification
+        run: |
+          git config user.name 'four-pillars-ci'
+          git config user.email 'actions@users.noreply.github.com'
+          git add --all
+          git diff --cached --check
+          git commit -m 'fix: harden grounding, privacy, calendar, and web delivery'
+          git push origin HEAD:fix/commercial-hardening
