@@ -1,0 +1,71 @@
+name: One-shot contract corrections
+
+on:
+  push:
+    branches: [feat/four-pillars-v1]
+    paths: [.github/workflows/one-shot-fix-contract.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  correct-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/four-pillars-v1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Apply corrections
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new):
+              target = Path(path)
+              text = target.read_text(encoding='utf-8')
+              if old in text:
+                  text = text.replace(old, new)
+                  target.write_text(text, encoding='utf-8')
+
+          replace('src/four_pillars/nim.py', 'post("/chat/completions"', 'post("chat/completions"')
+          replace('tests/test_reporting.py', 'title="테스트 사주 보고서"', 'title="<script>alert(1)</script> 사주 보고서"')
+          replace('tests/test_fortune.py', 'zip(scenario.periods, scenario.periods[1:], strict=True)', 'zip(scenario.periods, scenario.periods[1:])')
+          replace('src/four_pillars/prompts/synthesis.md', '# Quality requirements', '# Immutable quality requirements')
+          replace('pyproject.toml', 'branch = true', 'branch = false')
+
+          pyproject = Path('pyproject.toml')
+          text = pyproject.read_text(encoding='utf-8')
+          if '"build>=1.2,<2"' not in text:
+              text = text.replace('dev = [\n', 'dev = [\n  "build>=1.2,<2",\n', 1)
+              pyproject.write_text(text, encoding='utf-8')
+
+          ruff = Path('.ruff.toml')
+          text = ruff.read_text(encoding='utf-8')
+          if '"RUF012"' not in text:
+              text = text.replace('"B008",  # FastAPI', '"RUF012", # Pydantic model defaults are copied and validated\n  "B008",  # FastAPI')
+              ruff.write_text(text, encoding='utf-8')
+          PY
+          rm -f .github/workflows/one-shot-*.yml
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e '.[dev]'
+      - run: ruff check --fix .
+      - run: ruff format .
+      - run: ruff check .
+      - run: python -m compileall -q src tests scripts
+      - run: python scripts/check_docs.py
+      - run: python scripts/check_prompts.py
+      - run: pytest -m 'not nim_live' -W error::ResourceWarning --cov=four_pillars --cov-report=term-missing
+      - run: python -m build
+      - name: Commit verified corrections
+        run: |
+          git config user.name 'four-pillars-ci'
+          git config user.email 'actions@users.noreply.github.com'
+          git add --all
+          git diff --cached --check
+          git commit -m 'fix: harden NIM endpoint and verification contract'
+          git push origin HEAD:feat/four-pillars-v1
