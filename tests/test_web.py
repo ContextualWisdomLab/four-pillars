@@ -10,7 +10,8 @@ def test_browser_workflow_contains_calculation_review_and_report_polling() -> No
     assert 'id="generate" disabled' in page
     assert "'/v1/chart'" in page
     assert "'/v1/reports'" in page
-    assert "report.pdf" in page
+    assert "job.artifacts.forEach" in page
+    assert "/artifacts/${name}" in page
     assert "계산 fingerprint" in page
     assert "경계" in page
 
