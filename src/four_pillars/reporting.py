@@ -86,13 +86,13 @@ def render_html(
 * {{ box-sizing:border-box; }} body {{ margin:0; color:var(--navy); background:var(--page); font-family:"Noto Sans KR","Apple SD Gothic Neo",sans-serif; line-height:1.65; }}
 main {{ max-width:900px; margin:auto; padding:42px; }} header {{ background:var(--navy); color:white; padding:50px; border-radius:18px; }}
 h1 {{ font-size:34px; margin:0 0 12px; }} h2 {{ margin-top:34px; border-left:6px solid var(--coral); padding-left:14px; }} h3 {{ margin-top:0; }}
-.fingerprint {{ overflow-wrap:anywhere; opacity:.7; font-size:12px; }} .summary {{ font-size:17px; }} .columns {{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }}
+.subject {{ font-size:14px; opacity:.82; }} .fingerprint {{ overflow-wrap:anywhere; opacity:.7; font-size:12px; }} .summary {{ font-size:17px; }} .columns {{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }}
 .card,.actions,.skill {{ padding:20px; border-radius:10px; background:white; border:1px solid #e4e1d8; break-inside:avoid; }} .opportunity {{ border-top:5px solid var(--teal); }} .caution {{ border-top:5px solid var(--coral); }}
 table {{ width:100%; border-collapse:collapse; margin:22px 0; background:white; }} th,td {{ padding:10px; border:1px solid #ddd9cf; text-align:left; }} th {{ background:#eaf1f7; }}
 .when {{ color:var(--muted); }} .disclaimer {{ margin-top:40px; padding:20px; background:#f2efe8; border-left:5px solid var(--gold); }}
 @media(max-width:700px) {{ main {{ padding:18px; }} .columns {{ grid-template-columns:1fr; }} }}
 </style></head><body><main>
-<header><p>FOUR PILLARS REPORT</p><h1>{_safe(report.title)}</h1><p>{_safe(report.executive_summary)}</p><p class="fingerprint">계산 fingerprint: {_safe(report.calculation_fingerprint)}</p></header>
+<header><p>FOUR PILLARS REPORT</p><h1>{_safe(report.title)}</h1><p class="subject">대상: {_safe(report.subject_name)}</p><p>{_safe(report.executive_summary)}</p><p class="fingerprint">계산 fingerprint: {_safe(report.calculation_fingerprint)}</p></header>
 <section><h2>계산 요약</h2><table><tr><th>연주</th><th>월주</th><th>일주</th><th>시주</th></tr><tr><td>{chart.year.hanja}</td><td>{chart.month.hanja}</td><td>{chart.day.hanja}</td><td>{hour}</td></tr></table>
 <table><tr><th>구분</th><th>시작</th><th>종료</th><th>간지</th></tr><tr><td>세운</td><td>{annual.starts_at:%Y-%m-%d}</td><td>{annual.ends_at:%Y-%m-%d}</td><td>{annual.pillar.hanja}</td></tr><tr><td>월운</td><td>{monthly.starts_at:%Y-%m-%d}</td><td>{monthly.ends_at:%Y-%m-%d}</td><td>{monthly.pillar.hanja}</td></tr></table>
 <table><tr><th>대운 방향</th><th>시작 나이</th><th>초기 네 대운</th></tr>{daewoon_rows}</table></section>
@@ -103,12 +103,13 @@ table {{ width:100%; border-collapse:collapse; margin:22px 0; background:white; 
 
 
 def _register_fonts() -> tuple[str, str]:
+    # ReportLab ships this Korean CID font without requiring a host font file.
+    # Newer ReportLab releases no longer recognize HYGoThic-Medium, so the
+    # portable CID face is used for both regular and emphasized styles.
     regular = "HYSMyeongJo-Medium"
-    bold = "HYGoThic-Medium"
-    for name in (regular, bold):
-        if name not in pdfmetrics.getRegisteredFontNames():
-            pdfmetrics.registerFont(UnicodeCIDFont(name))
-    return regular, bold
+    if regular not in pdfmetrics.getRegisteredFontNames():
+        pdfmetrics.registerFont(UnicodeCIDFont(regular))
+    return regular, regular
 
 
 def render_pdf(
@@ -140,6 +141,7 @@ def render_pdf(
     story: list[Any] = [
         Paragraph("FOUR PILLARS REPORT", small),
         Paragraph(_safe(report.title), title),
+        Paragraph(f"대상: {_safe(report.subject_name)}", small),
         Paragraph(_safe(report.executive_summary), body),
         Spacer(1, 8 * mm),
         Paragraph("계산 요약", heading),
