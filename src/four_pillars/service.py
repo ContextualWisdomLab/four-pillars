@@ -17,6 +17,20 @@ from .quality import ReportQualityError
 from .reporting import write_artifacts
 from .settings import Settings
 
+ARTIFACT_NAMES = frozenset(
+    {
+        "chart.json",
+        "daewoon.json",
+        "annual.json",
+        "monthly.json",
+        "report.json",
+        "traces.json",
+        "manifest.json",
+        "report.html",
+        "report.pdf",
+    }
+)
+
 
 class ReportRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -106,27 +120,29 @@ class ReportService:
                 await asyncio.sleep(poll_seconds)
 
     def artifact(self, job_id: str, filename: str) -> Path:
-        allowed = {
-            "chart.json",
-            "daewoon.json",
-            "annual.json",
-            "monthly.json",
-            "report.json",
-            "traces.json",
-            "manifest.json",
-            "report.html",
-            "report.pdf",
-        }
-        if filename not in allowed:
+        if filename not in ARTIFACT_NAMES:
             raise ValueError("Unsupported artifact name")
         job = self.store.get(job_id)
         if job is None or job.artifact_dir is None:
             raise FileNotFoundError(job_id)
+        configured_root = self.settings.artifact_dir.resolve()
         root = Path(job.artifact_dir).resolve()
+        if root.parent != configured_root or root.name != job.id:
+            raise FileNotFoundError(job_id)
         candidate = (root / filename).resolve()
         if candidate.parent != root or not candidate.is_file():
             raise FileNotFoundError(filename)
         return candidate
+
+    def available_artifacts(self, job_id: str) -> list[str]:
+        available: list[str] = []
+        for filename in sorted(ARTIFACT_NAMES):
+            try:
+                self.artifact(job_id, filename)
+            except FileNotFoundError:
+                continue
+            available.append(filename)
+        return available
 
 
 def default_request(subject_name: str, birth: BirthInput) -> ReportRequest:
