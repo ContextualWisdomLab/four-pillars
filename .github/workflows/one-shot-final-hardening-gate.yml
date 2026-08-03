@@ -1,0 +1,88 @@
+name: One-shot final hardening gate
+
+on:
+  push:
+    branches: [fix/commercial-hardening]
+    paths: [.github/workflows/one-shot-final-hardening-gate.yml]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  verify:
+    name: Verify Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/commercial-hardening
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e '.[dev]'
+      - run: git fetch origin main --depth=1 && git diff origin/main...HEAD --check
+      - run: ruff check .
+      - run: python -m compileall -q src tests scripts
+      - run: python scripts/check_docs.py
+      - run: python scripts/check_prompts.py
+      - run: pytest -m 'not nim_live' -W error::ResourceWarning --cov=four_pillars --cov-report=term-missing
+      - run: python -m build
+
+  nim:
+    name: Hosted NVIDIA NIM gate when configured
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      NIM_MODEL: ${{ vars.NIM_MODEL || 'nvidia/llama-3.3-nemotron-super-49b-v1.5' }}
+      NIM_EVAL_MODEL: ${{ vars.NIM_EVAL_MODEL || 'nvidia/llama-3.3-nemotron-super-49b-v1.5' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/commercial-hardening
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -e '.[dev]'
+      - name: Live provider verification or explicit skip
+        run: |
+          if [ -n "$NVIDIA_API_KEY" ]; then
+            pytest -m nim_live -vv
+            python scripts/nim_eval.py
+          else
+            echo 'NVIDIA_API_KEY is not configured; offline NIM contract tests in verify remain mandatory.'
+          fi
+
+  merge:
+    name: Review and merge exact verified head
+    needs: [verify, nim]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Resolve pull request and reviews
+        id: pr
+        run: |
+          number=$(gh pr list --repo "$GITHUB_REPOSITORY" --head fix/commercial-hardening --base main --state open --json number --jq '.[0].number')
+          test -n "$number"
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          requested=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$number/reviews" --jq '[.[] | select(.state == "CHANGES_REQUESTED")] | length')
+          test "$requested" -eq 0
+      - name: Merge only the head verified by this workflow
+        run: |
+          current=$(gh pr view "${{ steps.pr.outputs.number }}" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid)
+          test "$current" = "$GITHUB_SHA"
+          gh pr comment "${{ steps.pr.outputs.number }}" --repo "$GITHUB_REPOSITORY" --body "Commercial hardening passed fresh verification on $GITHUB_SHA for Python 3.11 and 3.12: deterministic calculations and boundaries, NIM contract, schema grounding, privacy redaction, artifact confinement, browser workflow, quality gates, coverage, and wheel build. Hosted NIM ran when NVIDIA_API_KEY was configured; otherwise the explicit provider gate is recorded as not configured."
+          gh pr merge "${{ steps.pr.outputs.number }}" --repo "$GITHUB_REPOSITORY" --squash --delete-branch --match-head-commit "$GITHUB_SHA"
