@@ -113,20 +113,21 @@ def calculate_monthly_luck(chart: Chart, year: int, month: int) -> LuckSnapshot:
         (term for term in candidates if term.occurs_at > starts.occurs_at),
         key=lambda term: term.occurs_at,
     )
-    annual_index = (year - 1984) % 60
+    li_chun = current_terms[1].occurs_at
+    effective_year = year - 1 if starts.occurs_at < li_chun else year
+    annual_index = (effective_year - 1984) % 60
     annual_stem = annual_index % 10
     branch = starts.month_branch_index
     offset = (branch - 2) % 12
     stem = (annual_stem * 2 + 2 + offset) % 10
     pillar = make_pillar(sexagenary_index(stem, branch), chart.day.stem_index)
-    warnings: list[str] = []
     return LuckSnapshot(
         label=f"{year}년 {month}월 월운",
         starts_at=starts.occurs_at,
         ends_at=ends.occurs_at,
         pillar=pillar,
         interactions=_luck_interactions(chart, pillar),
-        boundary_warnings=warnings,
+        boundary_warnings=[],
     )
 
 
