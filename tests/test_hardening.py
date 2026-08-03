@@ -6,6 +6,7 @@ from pathlib import Path
 import httpx
 import pytest
 from pydantic import BaseModel, ConfigDict, ValidationError
+from test_quality import valid_report
 
 from four_pillars.analysis import PracticalSkillsDraft, SynthesisDraft
 from four_pillars.calendar import calculate_chart
@@ -16,8 +17,6 @@ from four_pillars.nim import NimClient, NimError
 from four_pillars.quality import validate_report
 from four_pillars.service import ReportService
 from four_pillars.settings import Settings
-
-from test_quality import valid_report
 
 
 class Answer(BaseModel):
