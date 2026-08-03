@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     report_retention_days: int = Field(default=30, ge=1, le=3650)
     api_key_sha256: str | None = None
 
-    nvidia_api_key: str | None = None
+    nvidia_nim_api_key: str | None = None
     nim_base_url: str = "https://integrate.api.nvidia.com/v1"
     nim_model: str = "nvidia/llama-3.3-nemotron-super-49b-v1.5"
     nim_eval_model: str = "nvidia/llama-3.3-nemotron-super-49b-v1.5"
