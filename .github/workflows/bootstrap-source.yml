@@ -1,0 +1,33 @@
+name: Materialize commercial platform source
+
+on:
+  push:
+    paths:
+      - ".bootstrap/READY"
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.ref == 'refs/heads/feat/commercial-platform'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reconstruct verified source archive
+        run: |
+          cat .bootstrap/source.b64.* | base64 --decode > /tmp/four-pillars-source.tar.gz
+          echo "de281e4d73cc7ac89e53a5378b8c25c6d9cb3ed05543d0cec5476d00949ac3e2  /tmp/four-pillars-source.tar.gz" | sha256sum --check --strict
+      - name: Replace bootstrap tree with project source
+        run: |
+          git rm -r --ignore-unmatch .
+          tar -xzf /tmp/four-pillars-source.tar.gz
+          git add --all
+          git diff --cached --check
+      - name: Commit materialized source
+        run: |
+          git config user.name "four-pillars-release-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "feat: deliver commercial Four Pillars platform"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
