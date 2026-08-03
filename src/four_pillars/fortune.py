@@ -109,7 +109,10 @@ def calculate_monthly_luck(chart: Chart, year: int, month: int) -> LuckSnapshot:
         [*current_terms, *jie_terms(year + 1, chart.timezone)],
         key=lambda term: term.occurs_at,
     )
-    ends = min(term for term in candidates if term.occurs_at > starts.occurs_at)
+    ends = min(
+        (term for term in candidates if term.occurs_at > starts.occurs_at),
+        key=lambda term: term.occurs_at,
+    )
     annual_index = (year - 1984) % 60
     annual_stem = annual_index % 10
     branch = starts.month_branch_index
