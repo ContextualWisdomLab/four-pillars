@@ -17,7 +17,7 @@ class Answer(BaseModel):
 
 def settings(**updates):
     values = {
-        "nvidia_api_key": "test-key",
+        "nvidia_nim_api_key": "test-key",
         "nim_base_url": "https://nim.test/v1",
         "nim_model": "free-test-model",
         "nim_max_retries": 2,
@@ -100,6 +100,6 @@ async def test_rate_limit_is_retried() -> None:
     assert trace.attempts == 2
 
 
-def test_missing_nvidia_key_fails_without_provider_fallback() -> None:
-    with pytest.raises(NimError, match="NVIDIA_API_KEY"):
-        NimClient(settings(nvidia_api_key=None))
+def test_missing_nvidia_nim_key_fails_without_provider_fallback() -> None:
+    with pytest.raises(NimError, match="NVIDIA_NIM_API_KEY"):
+        NimClient(settings(nvidia_nim_api_key=None))
