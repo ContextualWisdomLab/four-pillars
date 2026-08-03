@@ -14,7 +14,7 @@ class Answer(BaseModel):
 
 def config(**updates):
     data = {
-        "nvidia_api_key": "key",
+        "nvidia_nim_api_key": "key",
         "nim_base_url": "https://nim.test/v1",
         "nim_model": "model",
         "nim_max_retries": 0,
