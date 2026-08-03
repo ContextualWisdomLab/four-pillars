@@ -1,0 +1,121 @@
+@startuml
+skinparam backgroundColor #FBFAF6
+skinparam classBackgroundColor #FFFFFF
+skinparam classBorderColor #315A84
+skinparam classFontColor #17263F
+hide empty methods
+
+class BirthInput {
+  +birth: datetime
+  +timezone: str
+  +gender: Gender
+  +calendar: CalendarKind
+  +birth_time_known: bool
+  +longitude: float?
+  +time_basis: TimeBasis
+  +day_boundary: DayBoundary
+}
+
+class Chart {
+  +normalized_birth: datetime
+  +year: Pillar
+  +month: Pillar
+  +day: Pillar
+  +hour: Pillar?
+  +day_master: str
+  +element_balance: map
+  +boundary_warnings: list
+  +fingerprint: str
+}
+
+class Pillar {
+  +stem_index: int
+  +branch_index: int
+  +hanja: str
+  +korean: str
+  +ten_god: str?
+  +hidden_stems: tuple
+  +growth_stage: str?
+}
+
+class SolarTerm {
+  +name_ko: str
+  +longitude: float
+  +occurs_at: datetime
+  +month_branch_index: int
+}
+
+class DaewoonResult {
+  +scenarios: list<DaewoonScenario>
+}
+
+class DaewoonScenario {
+  +direction: forward|reverse
+  +start_age: float
+  +periods: list<LuckPeriod>
+  +warning: str?
+}
+
+class LuckPeriod {
+  +pillar: Pillar
+  +start_age: float
+  +end_age: float
+  +starts_at: date
+  +ends_at: date
+}
+
+class LuckSnapshot {
+  +label: str
+  +starts_at: datetime
+  +ends_at: datetime
+  +pillar: Pillar
+}
+
+class ReportRequest {
+  +subject_name: str
+  +birth: BirthInput
+  +annual_year: int
+  +monthly_year: int
+  +monthly_month: int
+  +user_context: str
+}
+
+class ReportDocument {
+  +executive_summary: str
+  +calculation_fingerprint: str
+  +sections: map<ReportSection>
+  +practical_skills: list
+  +disclaimer: str
+  +model: str
+  +prompt_versions: map
+}
+
+class ReportJob {
+  +id: UUID
+  +status: JobStatus
+  +request: JSON
+  +artifact_dir: str?
+  +error: str?
+}
+
+class NimClient
+class QualityGate
+class ArtifactRenderer
+
+BirthInput --> Chart : calculate
+Chart *-- "3..4" Pillar
+Chart *-- SolarTerm
+Chart --> DaewoonResult
+DaewoonResult *-- DaewoonScenario
+DaewoonScenario *-- LuckPeriod
+LuckPeriod --> Pillar
+Chart --> LuckSnapshot
+LuckSnapshot --> Pillar
+ReportRequest --> BirthInput
+ReportRequest --> ReportJob : enqueue
+ReportJob --> NimClient : process
+NimClient --> ReportDocument : generate JSON
+ReportDocument --> QualityGate : validate
+QualityGate --> ArtifactRenderer : approved
+ArtifactRenderer --> ReportJob : complete
+@enduml
