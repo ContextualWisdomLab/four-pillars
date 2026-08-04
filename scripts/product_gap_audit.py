@@ -38,6 +38,7 @@ REQUIRED_DOCUMENTS = (
     "docs/standards/TRACEABILITY.md",
     "docs/uml/architecture.md",
     "docs/uml/domain.puml",
+    "docs/adr/0003-explicit-contextual-orchestrator-backend.md",
 )
 REQUIRED_WORKFLOWS = (
     ".github/workflows/hourly-product-loop.yml",
@@ -68,7 +69,11 @@ INTERPRETATION_CONTRACTS = (
     ("src/four_pillars/settings.py", "contextual_orchestrator_token"),
     (".env.example", "INTERPRETATION_BACKEND=nvidia_nim"),
     (".env.example", "CONTEXTUAL_ORCHESTRATOR_TOKEN="),
-    ("docs/operations/NIM.md", "No implicit fallback"),
+    ("docs/operations/NIM.md", "never silently routes"),
+    (
+        "docs/adr/0003-explicit-contextual-orchestrator-backend.md",
+        "No implicit fallback",
+    ),
 )
 STANDARDS_CONTRACTS = (
     ("docs/standards/REFERENCES.md", "APA 7th"),
