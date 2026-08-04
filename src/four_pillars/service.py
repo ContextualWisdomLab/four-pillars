@@ -63,7 +63,6 @@ class CalculationBundle(BaseModel):
     chart: Chart
     daewoon: DaewoonResult
     annual: LuckSnapshot
-
     monthly: LuckSnapshot
 
 
