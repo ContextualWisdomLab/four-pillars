@@ -1,3 +1,5 @@
+"""Expose deterministic calculations, report jobs, and generated artifacts through FastAPI."""
+
 from __future__ import annotations
 
 import hashlib
@@ -25,6 +27,8 @@ app = FastAPI(
 
 
 class LuckRequest(BaseModel):
+    """Validated birth input and target year or month for temporary luck calculations."""
+
     model_config = ConfigDict(extra="forbid")
 
     birth: BirthInput
@@ -33,6 +37,8 @@ class LuckRequest(BaseModel):
 
 
 class ReportJobView(BaseModel):
+    """Public report-job status without the stored birth request or raw model text."""
+
     model_config = ConfigDict(extra="forbid")
 
     id: str
@@ -45,6 +51,7 @@ class ReportJobView(BaseModel):
 
 @lru_cache(maxsize=1)
 def get_service() -> ReportService:
+    """Return the process-wide report service configured from the environment."""
     return ReportService(get_settings())
 
 
@@ -52,6 +59,7 @@ def require_api_key(
     settings: Settings = Depends(get_settings),
     x_api_key: str | None = Header(default=None),
 ) -> None:
+    """Enforce optional SHA-256 API-key authentication with constant-time comparison."""
     expected = settings.api_key_sha256
     if not expected:
         return
@@ -76,16 +84,19 @@ def _job_view(job: ReportJob, service: ReportService) -> ReportJobView:
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 def index() -> str:
+    """Render the browser-based calculation and report studio."""
     return render_home()
 
 
 @app.get("/health")
 def health() -> dict[str, str]:
+    """Report process liveness and the served API version."""
     return {"status": "ok", "version": app.version}
 
 
 @app.get("/ready")
 def ready(service: ReportService = Depends(get_service)) -> dict[str, str]:
+    """Verify writable artifact storage and readable job storage before serving traffic."""
     service.settings.artifact_dir.mkdir(parents=True, exist_ok=True)
     probe = service.settings.artifact_dir / ".ready"
     probe.write_text("ok", encoding="utf-8")
@@ -96,22 +107,26 @@ def ready(service: ReportService = Depends(get_service)) -> dict[str, str]:
 
 @app.post("/v1/chart", response_model=Chart, dependencies=[Depends(require_api_key)])
 def chart(request: BirthInput) -> Chart:
+    """Calculate one immutable natal Four Pillars chart."""
     return calculate_chart(request)
 
 
 @app.post("/v1/luck/daewoon", response_model=DaewoonResult, dependencies=[Depends(require_api_key)])
 def daewoon(request: BirthInput) -> DaewoonResult:
+    """Calculate the direction, start age, and periods of daewoon luck."""
     calculated = calculate_chart(request)
     return calculate_daewoon(calculated, request.gender)
 
 
 @app.post("/v1/luck/annual", response_model=LuckSnapshot, dependencies=[Depends(require_api_key)])
 def annual(request: LuckRequest) -> LuckSnapshot:
+    """Calculate the solar-term-bounded annual luck snapshot for one year."""
     return calculate_annual_luck(calculate_chart(request.birth), request.year)
 
 
 @app.post("/v1/luck/monthly", response_model=LuckSnapshot, dependencies=[Depends(require_api_key)])
 def monthly(request: LuckRequest) -> LuckSnapshot:
+    """Calculate one solar-term-bounded monthly luck snapshot."""
     return calculate_monthly_luck(calculate_chart(request.birth), request.year, request.month)
 
 
@@ -125,6 +140,7 @@ def create_report(
     request: ReportRequest,
     service: ReportService = Depends(get_service),
 ) -> ReportJobView:
+    """Persist a validated report request and return its queued job view."""
     return _job_view(service.enqueue(request), service)
 
 
@@ -134,6 +150,7 @@ def create_report(
     dependencies=[Depends(require_api_key)],
 )
 def get_report(job_id: str, service: ReportService = Depends(get_service)) -> ReportJobView:
+    """Return the current public status and artifacts for one report job."""
     job = service.store.get(job_id)
     if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report job not found")
@@ -147,6 +164,7 @@ def get_artifact(
     download: bool = Query(default=True),
     service: ReportService = Depends(get_service),
 ) -> FileResponse:
+    """Serve one allow-listed report artifact after path-boundary validation."""
     try:
         path = service.artifact(job_id, filename)
     except (FileNotFoundError, ValueError) as exc:
@@ -161,6 +179,7 @@ def get_artifact(
 
 @app.delete("/v1/reports/{job_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_api_key)])
 def delete_report(job_id: str, service: ReportService = Depends(get_service)) -> None:
+    """Delete a terminal job and only its validated UUID artifact directory."""
     job = service.store.get(job_id)
     if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report job not found")
