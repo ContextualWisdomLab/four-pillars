@@ -7,7 +7,7 @@ This document maps applicable international standards, public frameworks, and pe
 Four Pillars has four deliberately separate trust boundaries:
 
 1. **Deterministic calculation:** validated birth input produces immutable chart and luck evidence with a SHA-256 fingerprint.
-2. **Interpretation:** direct NVIDIA NIM or the optional Contextual Orchestrator explains that evidence through versioned prompts and strict Pydantic schemas.
+2. **Interpretation:** direct NVIDIA NIM or the optional Contextual Orchestrator explains that evidence through versioned prompts and strict Pydantic schemas. `StructuredGenerationClient` is the structural model-client port and `ContextualOrchestratorClient` is the organization-gateway implementation.
 3. **Quality:** deterministic and editorial rules reject unsupported pillars, missing sections, warning-only relationship copy, vague language, medical directions, coercive decisions, false authority, and event certainty.
 4. **Delivery:** only approved reports become JSON, HTML, PDF, trace, and manifest artifacts under random job identifiers.
 
@@ -130,6 +130,7 @@ Peer-reviewed EMNLP 2024 research reports that judge models can be manipulated b
 
 | Contract | Code | Test/evidence |
 |---|---|---|
+| Structural generation port | `StructuredGenerationClient` in `generation.py` | protocol import and staged-analysis compatibility tests |
 | Explicit backend selection | `Settings.interpretation_backend` | invalid/default/explicit selection tests |
 | Standalone default | `build_report_interpreter` returns `NimReportInterpreter` | backend-factory test |
 | Organization gateway | `ContextualOrchestratorReportInterpreter` | adapter evidence-forwarding test |
