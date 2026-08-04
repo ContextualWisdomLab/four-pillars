@@ -1,3 +1,5 @@
+"""Coordinate calculation, NIM generation, job processing, and artifact access."""
+
 from __future__ import annotations
 
 import asyncio
@@ -33,6 +35,8 @@ ARTIFACT_NAMES = frozenset(
 
 
 class ReportRequest(BaseModel):
+    """Validated request for deterministic evidence and one generated report."""
+
     model_config = ConfigDict(extra="forbid")
 
     subject_name: str = Field(min_length=1, max_length=80)
@@ -44,6 +48,8 @@ class ReportRequest(BaseModel):
 
 
 class CalculationBundle(BaseModel):
+    """Immutable natal, daewoon, annual, and monthly evidence for report generation."""
+
     chart: Chart
     daewoon: DaewoonResult
     annual: LuckSnapshot
@@ -51,6 +57,7 @@ class CalculationBundle(BaseModel):
 
 
 def calculate_bundle(request: ReportRequest) -> CalculationBundle:
+    """Calculate all deterministic evidence required by the report prompts."""
     chart = calculate_chart(request.birth)
     daewoon = calculate_daewoon(chart, request.birth.gender)
     annual = calculate_annual_luck(chart, request.annual_year)
@@ -59,15 +66,20 @@ def calculate_bundle(request: ReportRequest) -> CalculationBundle:
 
 
 class ReportService:
+    """Provide the application boundary for durable asynchronous report generation."""
+
     def __init__(self, settings: Settings, store: JobStore | None = None) -> None:
+        """Create a service with configured storage and an optional injected job store."""
         self.settings = settings
         self.settings.artifact_dir.mkdir(parents=True, exist_ok=True)
         self.store = store or JobStore(settings.sqlite_path)
 
     def enqueue(self, request: ReportRequest) -> ReportJob:
+        """Persist one validated report request as a queued job."""
         return self.store.create(request.model_dump(mode="json"))
 
     async def generate(self, request: ReportRequest) -> tuple[CalculationBundle, GeneratedReport]:
+        """Calculate immutable evidence and generate a validated report through NVIDIA NIM."""
         bundle = calculate_bundle(request)
         async with NimClient(self.settings) as client:
             generated = await generate_report(
@@ -82,6 +94,7 @@ class ReportService:
         return bundle, generated
 
     async def process(self, job: ReportJob) -> ReportJob:
+        """Generate one claimed job and atomically publish or fail its artifacts."""
         request = ReportRequest.model_validate(job.request)
         temporary = self.settings.artifact_dir / f".{job.id}.tmp"
         final = self.settings.artifact_dir / job.id
@@ -108,18 +121,21 @@ class ReportService:
             return self.store.fail(job.id, f"{type(exc).__name__}: {exc}")
 
     async def process_next(self) -> ReportJob | None:
+        """Claim and process the next queued job, or return ``None`` when idle."""
         job = self.store.claim_next()
         if job is None:
             return None
         return await self.process(job)
 
     async def worker(self, poll_seconds: float = 1.0) -> None:
+        """Continuously process queued jobs and sleep only while the queue is empty."""
         while True:
             processed = await self.process_next()
             if processed is None:
                 await asyncio.sleep(poll_seconds)
 
     def artifact(self, job_id: str, filename: str) -> Path:
+        """Resolve one allow-listed artifact while enforcing its configured UUID boundary."""
         if filename not in ARTIFACT_NAMES:
             raise ValueError("Unsupported artifact name")
         job = self.store.get(job_id)
@@ -135,6 +151,7 @@ class ReportService:
         return candidate
 
     def available_artifacts(self, job_id: str) -> list[str]:
+        """Return the sorted allow-listed artifact names that safely exist for a job."""
         available: list[str] = []
         for filename in sorted(ARTIFACT_NAMES):
             try:
@@ -146,6 +163,7 @@ class ReportService:
 
 
 def default_request(subject_name: str, birth: BirthInput) -> ReportRequest:
+    """Create a report request targeting the current local year and month."""
     now = datetime.now()
     return ReportRequest(
         subject_name=subject_name,
