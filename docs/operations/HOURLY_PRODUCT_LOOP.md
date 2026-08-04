@@ -4,7 +4,7 @@ The hourly product loop is the repository's autonomous release-readiness sentine
 
 ## Schedule
 
-GitHub Actions runs `.github/workflows/hourly-product-loop.yml` at minute 17 of every hour. The non-zero minute avoids the busiest boundary of the public scheduler while preserving an hourly interval. Operators can also use `workflow_dispatch` to run the same revision immediately after an incident, dependency update, infrastructure change, or repository restoration.
+GitHub Actions runs `.github/workflows/hourly-product-loop.yml` at minute 17 of every hour. The non-zero minute avoids the busiest boundary of the public scheduler while preserving an hourly interval. Operators can also use `workflow_dispatch` to run the same revision immediately after an incident, dependency update, infrastructure change, standards review, or repository restoration.
 
 The workflow uses one concurrency group and does not cancel an in-progress run. A slow verification therefore finishes with coherent evidence instead of being replaced by the next scheduled invocation.
 
@@ -16,7 +16,7 @@ Each invocation installs the hash-locked Python 3.12 CI environment and executes
 2. the deterministic product-gap audit;
 3. Ruff, including production docstring enforcement;
 4. Python bytecode compilation;
-5. required-document validation;
+5. required-document and standards-traceability validation;
 6. versioned-prompt validation;
 7. all non-hosted tests with the 100% statement and branch coverage floor; and
 8. source-distribution and wheel construction.
@@ -25,17 +25,37 @@ Every command writes a bounded log excerpt to `artifacts/hourly-product-loop.md`
 
 ## Product-gap audit
 
-`scripts/product_gap_audit.py` is an offline and deterministic audit. It checks product and technical documentation, release-version consistency, the 100% coverage floor, prompt semantic versions and SHA-256 digests, exclusive use of `NVIDIA_NIM_API_KEY`, deterministic-core dependency boundaries, the presence of the scheduled loop, and database object naming.
+`scripts/product_gap_audit.py` is offline and deterministic. It checks:
 
-Database application objects must use at least two words in `snake_case`, `camelCase`, or `PascalCase`. The current SQLite objects are `report_jobs` and `idx_report_jobs_status_created`; SQLite-owned names beginning with `sqlite_` are outside the application naming policy.
+- product, technical, security, operations, UML, ADR, and standards documentation;
+- package/runtime/changelog version consistency;
+- the exactly 100% statement and branch coverage floor;
+- prompt semantic versions and SHA-256 digests;
+- direct `NVIDIA_NIM_API_KEY` and optional `CONTEXTUAL_ORCHESTRATOR_TOKEN` boundaries;
+- explicit interpretation backend selection and no implicit fallback;
+- Contextual Orchestrator adapter, attribution, and structural-generation contracts;
+- ISO, NIST, IETF, W3C, and peer-reviewed APA 7th reference traceability;
+- deterministic-core dependency boundaries;
+- the presence of the hourly and reusable release workflows; and
+- every application-owned database object name.
 
-The audit is deliberately independent of GitHub APIs and hosted services. It can be run before a commit with:
+Database application objects must use at least two words in `snake_case`, `camelCase`, or `PascalCase`. `snake_case` is preferred. The current SQLite schema includes `report_jobs`, `idx_report_jobs_status_created`, `idx_report_jobs_idempotency_key_digest`, `idx_report_jobs_created_id`, and `idx_report_jobs_status_created_id`. SQLite-owned names beginning with `sqlite_` are outside the application naming policy.
+
+The audit is independent of GitHub APIs and hosted services. It can be run before a commit with:
 
 ```bash
 PYTHONPATH=src python scripts/product_gap_audit.py
 ```
 
 A successful run emits a Markdown PASS report and exits with status zero. Each detected gap includes a stable code, severity, path, and remediation-oriented message.
+
+## Standards and research review
+
+`docs/standards/REFERENCES.md` records current engineering standards and peer-reviewed LLM-evaluation evidence using APA 7th entries. `docs/standards/TRACEABILITY.md` maps those sources to code, tests, workflows, limitations, and future gaps.
+
+The hourly loop verifies required references and control tokens but does not automatically change behavior when a standard or paper changes. A material update must be researched against the authoritative source, documented, implemented with a failing regression test, reviewed, and released through the normal pull-request process.
+
+The standards map is an engineering control record. It is not an ISO certification or scientific validation of traditional Four Pillars interpretation.
 
 ## Failure issue lifecycle
 
@@ -45,13 +65,15 @@ The workflow has read-only repository-content permission and issue write permiss
 - On recovery, it closes the same open issue with the verified commit SHA.
 - It never creates one issue per gate or per hour, preventing alert floods while preserving a chronological incident record.
 
-The issue is evidence and coordination, not an automated source-code change. Remediation still follows the normal branch, test-first pull request, review, check, and merge process.
+The issue is evidence and coordination, not an automated source-code change. Remediation follows the normal branch, test-first pull request, review, check, and merge process.
 
 ## Security and NIM boundary
 
-The hourly loop never calls hosted NVIDIA NIM and does not receive `NVIDIA_NIM_API_KEY`. Hosted generation and NIM-as-judge evaluation remain opt-in workflows with their own explicit secret boundary. User birth data, report prompts, generated prose, API authentication values, and artifact content are not uploaded by the hourly loop.
+The hourly loop never calls direct hosted NVIDIA NIM or Contextual Orchestrator and receives neither `NVIDIA_NIM_API_KEY` nor `CONTEXTUAL_ORCHESTRATOR_TOKEN`. Hosted generation and LLM-as-a-judge evaluation remain opt-in workflows with separate secret boundaries.
 
-Actions are pinned to immutable commit SHAs. Dependencies are installed from the hash-locked CI requirements. The GitHub token is scoped to repository metadata and issues required by the incident lifecycle.
+User birth data, notes, report prompts, generated prose, API authentication values, provider credentials, gateway attribution, and artifact content are not uploaded by the hourly loop. The scheduled audit verifies configuration names and source contracts only.
+
+Actions are pinned to immutable commit SHAs. Dependencies are installed from hash-locked CI requirements. The GitHub token is scoped to repository metadata and issues required by the incident lifecycle.
 
 ## Manual recovery
 
@@ -59,10 +81,11 @@ When the workflow fails:
 
 1. open the single regression issue and identify every failed gate;
 2. reproduce the commands locally against the exact failing commit;
-3. create a focused branch and a failing regression test;
+3. create a focused branch and a failing realistic regression test;
 4. fix the root cause without weakening the gate;
-5. obtain pull request review and rerun CI, Security Scan, and Semgrep;
-6. merge only the exact green head; and
-7. manually dispatch the hourly workflow when immediate recovery confirmation is needed.
+5. update standards traceability or operations doctoring when the failure changes a control;
+6. obtain pull request review and rerun CI, Security Scan, and Semgrep;
+7. merge only the exact green head; and
+8. manually dispatch the hourly workflow when immediate recovery confirmation is needed.
 
 If issue synchronization itself fails, inspect repository issue permissions and GitHub CLI output. Do not grant content write permission to the scheduled workflow merely to repair issue management.
