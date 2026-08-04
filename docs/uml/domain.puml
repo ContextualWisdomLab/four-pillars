@@ -98,7 +98,18 @@ class ReportJob {
   +error: str?
 }
 
+interface ReportInterpreter {
+  +generate(subject_name, chart, daewoon, annual, monthly, user_context)
+}
+
+interface StructuredGenerationClient {
+  +generate(system_prompt, user_payload, response_model, model, temperature, max_tokens)
+}
+
+class NimReportInterpreter
+class ContextualOrchestratorReportInterpreter
 class NimClient
+class ContextualOrchestratorClient
 class QualityGate
 class ArtifactRenderer
 
@@ -113,8 +124,15 @@ Chart --> LuckSnapshot
 LuckSnapshot --> Pillar
 ReportRequest --> BirthInput
 ReportRequest --> ReportJob : enqueue
-ReportJob --> NimClient : process
-NimClient --> ReportDocument : generate JSON
+ReportJob --> ReportInterpreter : process
+ReportInterpreter <|.. NimReportInterpreter
+ReportInterpreter <|.. ContextualOrchestratorReportInterpreter
+StructuredGenerationClient <|.. NimClient
+StructuredGenerationClient <|.. ContextualOrchestratorClient
+NimReportInterpreter --> NimClient
+ContextualOrchestratorReportInterpreter --> ContextualOrchestratorClient
+NimClient --> ReportDocument : validated JSON
+ContextualOrchestratorClient --> ReportDocument : validated JSON
 ReportDocument --> QualityGate : validate
 QualityGate --> ArtifactRenderer : approved
 ArtifactRenderer --> ReportJob : complete
