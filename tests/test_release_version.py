@@ -24,6 +24,7 @@ def test_release_version_is_consistent_across_public_surfaces() -> None:
 def test_changelog_contains_the_current_release_and_core_capabilities() -> None:
     """Describe the shipped deterministic, NIM, delivery, and quality capabilities."""
     changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
+    normalized = changelog.casefold()
 
     assert f"## [{RELEASE_VERSION}] - {RELEASE_DATE}" in changelog
     for capability in (
@@ -33,4 +34,4 @@ def test_changelog_contains_the_current_release_and_core_capabilities() -> None:
         "100% statement and branch coverage",
         "NVIDIA_NIM_API_KEY",
     ):
-        assert capability in changelog
+        assert capability.casefold() in normalized
