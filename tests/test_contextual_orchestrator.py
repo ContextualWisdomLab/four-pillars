@@ -176,7 +176,9 @@ async def test_invalid_first_response_gets_one_orchestrator_schema_repair() -> N
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_retries_rate_limit_then_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_orchestrator_retries_rate_limit_then_succeeds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Honor transient throttling without exceeding the configured retry budget."""
     calls = 0
     sleeps: list[float] = []
@@ -184,7 +186,7 @@ async def test_orchestrator_retries_rate_limit_then_succeeds(monkeypatch: pytest
     async def fake_sleep(delay: float) -> None:
         sleeps.append(delay)
 
-    monkeypatch.setattr("four_pillars.contextual_orchestrator.asyncio.sleep", fake_sleep)
+    monkeypatch.setattr("four_pillars.nim.asyncio.sleep", fake_sleep)
 
     def handler(request: httpx.Request) -> httpx.Response:
         nonlocal calls
@@ -272,8 +274,13 @@ async def test_orchestrator_exhausts_schema_repairs() -> None:
 
 def test_missing_orchestrator_token_fails_without_provider_fallback() -> None:
     """Reject a missing orchestrator credential instead of calling direct NIM."""
-    with pytest.raises(ContextualOrchestratorError, match="CONTEXTUAL_ORCHESTRATOR_TOKEN"):
-        ContextualOrchestratorClient(settings(contextual_orchestrator_token=None))
+    with pytest.raises(
+        ContextualOrchestratorError,
+        match="CONTEXTUAL_ORCHESTRATOR_TOKEN",
+    ):
+        ContextualOrchestratorClient(
+            settings(contextual_orchestrator_token=None)
+        )
 
 
 def test_settings_reject_unknown_interpretation_backend() -> None:
