@@ -12,6 +12,8 @@ import pytest
 WORKFLOW = Path(".github/workflows/hourly-product-loop.yml")
 AUDIT_SCRIPT = Path("scripts/product_gap_audit.py")
 RUNBOOK = Path("docs/operations/HOURLY_PRODUCT_LOOP.md")
+REFERENCES = Path("docs/standards/REFERENCES.md")
+TRACEABILITY = Path("docs/standards/TRACEABILITY.md")
 
 
 def load_audit_module() -> ModuleType:
@@ -53,6 +55,8 @@ def test_hourly_workflow_runs_the_full_release_gate_and_manages_one_issue() -> N
     assert "gh issue create" in text
     assert "gh issue comment" in text
     assert "gh issue close" in text
+    assert "NVIDIA_NIM_API_KEY" not in text
+    assert "CONTEXTUAL_ORCHESTRATOR_TOKEN" not in text
 
 
 def test_hourly_issue_sync_treats_setup_or_loop_skips_as_failures() -> None:
@@ -65,36 +69,97 @@ def test_hourly_issue_sync_treats_setup_or_loop_skips_as_failures() -> None:
 
 
 def test_product_gap_audit_passes_the_repository_contract() -> None:
-    """Report no statically detectable release, documentation, prompt, or naming gaps."""
+    """Report no release, interpretation, standards, prompt, or naming gaps."""
     module = load_audit_module()
 
     assert module.audit_repository(Path(".")) == []
 
 
-def test_report_history_contract_audit_detects_missing_tokens(tmp_path: Path) -> None:
-    """Keep history code, indexes, API, and modular documentation in one audited unit."""
+def assert_token_contract_detects_missing_entries(
+    tmp_path: Path,
+    contracts: tuple[tuple[str, str], ...],
+    audit_name: str,
+) -> None:
+    """Exercise one token-based contract with valid, missing-file, and missing-token cases."""
     module = load_audit_module()
-    root = tmp_path / "repository"
-    for relative, token in module.HISTORY_CONTRACTS:
+    audit = getattr(module, audit_name)
+    root = tmp_path / audit_name
+    for relative, token in contracts:
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         current = path.read_text(encoding="utf-8") if path.is_file() else ""
         path.write_text(f"{current}\n{token}\n", encoding="utf-8")
 
-    assert module.audit_history_contract(root) == []
+    assert audit(root) == []
 
-    first_relative, first_token = module.HISTORY_CONTRACTS[0]
+    first_relative, first_token = contracts[0]
     first_path = root / first_relative
     first_path.unlink()
-    missing_file = module.audit_history_contract(root)
+    missing_file = audit(root)
     assert any(gap.path == first_relative for gap in missing_file)
 
     first_path.write_text("different contract", encoding="utf-8")
-    missing_token = module.audit_history_contract(root)
+    missing_token = audit(root)
     assert any(
         gap.path == first_relative and first_token in gap.message
         for gap in missing_token
     )
+
+
+def test_report_history_contract_audit_detects_missing_tokens(tmp_path: Path) -> None:
+    """Keep history code, indexes, API, and modular doctoring in one audited unit."""
+    module = load_audit_module()
+    assert_token_contract_detects_missing_entries(
+        tmp_path,
+        module.HISTORY_CONTRACTS,
+        "audit_history_contract",
+    )
+
+
+def test_interpretation_contract_audit_detects_missing_tokens(tmp_path: Path) -> None:
+    """Keep backend selection, credentials, adapters, and operations doctoring aligned."""
+    module = load_audit_module()
+    assert_token_contract_detects_missing_entries(
+        tmp_path,
+        module.INTERPRETATION_CONTRACTS,
+        "audit_interpretation_contract",
+    )
+
+
+def test_standards_contract_audit_detects_missing_tokens(tmp_path: Path) -> None:
+    """Keep APA references and standards traceability inside the hourly gate."""
+    module = load_audit_module()
+    assert_token_contract_detects_missing_entries(
+        tmp_path,
+        module.STANDARDS_CONTRACTS,
+        "audit_standards_contract",
+    )
+
+
+def test_standards_doctoring_contains_authoritative_and_peer_reviewed_sources() -> None:
+    """Document current software, AI, HTTP, tracing, and LLM-evaluation evidence."""
+    references = REFERENCES.read_text(encoding="utf-8")
+    traceability = TRACEABILITY.read_text(encoding="utf-8")
+
+    for token in (
+        "APA 7th",
+        "ISO/IEC 25010:2023",
+        "ISO/IEC 42001:2023",
+        "ISO/IEC 23894:2023",
+        "NIST AI 600-1",
+        "RFC 9457",
+        "W3C Recommendation",
+        "10.18653/v1/2024.emnlp-main.427",
+        "10.18653/v1/2024.emnlp-main.474",
+    ):
+        assert token in references
+    for token in (
+        "StructuredGenerationClient",
+        "ContextualOrchestratorClient",
+        "traditional interpretation",
+        "100% statement and branch coverage",
+    ):
+        assert token in traceability
 
 
 @pytest.mark.parametrize(
