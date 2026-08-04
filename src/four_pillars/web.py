@@ -1,7 +1,10 @@
+"""Render the self-contained browser studio used to review calculations and request reports."""
+
 from __future__ import annotations
 
 
 def render_home() -> str:
+    """Return the accessible single-page Korean report studio as static HTML."""
     return """<!doctype html>
 <html lang="ko">
 <head>
