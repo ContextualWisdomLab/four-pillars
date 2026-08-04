@@ -38,11 +38,13 @@ The default `NimReportInterpreter` in `adapters.py` opens a NIM client only when
 
 `service.py` composes calculation, interpretation, quality validation, job state, and artifact publishing. `ReportService` accepts three independent structural ports from `ports.py`:
 
-- `ReportJobRepository` for durable normal or idempotent job creation, atomic claims, transitions, deletion, and retention;
+- `ReportJobRepository` for durable job creation, atomic claims, transitions, deletion, and retention;
 - `ReportInterpreter` for turning immutable evidence into a validated `GeneratedReport`; and
 - `ArtifactPublisher` for publishing approved artifacts into an isolated staging directory.
 
-If no ports are supplied, the service creates the standalone `JobStore`, `NimReportInterpreter`, and `FilesystemArtifactPublisher` adapters. An integration may replace one adapter without replacing the others.
+`IdempotentReportJobRepository` is a separate runtime-checkable capability layered on the repository boundary. It intentionally does not extend the required base port, so an existing organization adapter remains compatible with unkeyed report creation. Keyed requests require that optional capability and fail explicitly with HTTP 501 when it is absent; the service never substitutes process-local locking for a distributed atomicity guarantee.
+
+If no ports are supplied, the service creates the standalone `JobStore`, `NimReportInterpreter`, and `FilesystemArtifactPublisher` adapters. `JobStore` implements both the base repository port and the optional idempotent capability. An integration may replace one adapter without replacing the others.
 
 ```python
 from four_pillars.service import ReportService
@@ -59,9 +61,9 @@ The injected implementations are structurally typed. They do not need to inherit
 
 ### Infrastructure adapters
 
-`jobs.py` is the single-node SQLite implementation of `ReportJobRepository`. `adapters.py` contains the default hosted-NIM interpreter and filesystem artifact publisher. `reporting.py` owns the atomic JSON, HTML, PDF, trace, and manifest writer. `api.py`, `web.py`, and `cli.py` are delivery adapters. None of these redefine chart or report schemas.
+`jobs.py` is the single-node SQLite implementation of `ReportJobRepository` and `IdempotentReportJobRepository`. `adapters.py` contains the default hosted-NIM interpreter and filesystem artifact publisher. `reporting.py` owns the atomic JSON, HTML, PDF, trace, and manifest writer. `api.py`, `web.py`, and `cli.py` are delivery adapters. None of these redefine chart or report schemas.
 
-A multi-node deployment should substitute a PostgreSQL or managed-queue repository and object storage behind the same application ports. It must preserve atomic claim semantics, terminal-state deletion, idempotent enqueue semantics, allow-listed artifact names, content hashes, and calculation fingerprints.
+A multi-node deployment should substitute a PostgreSQL or managed-queue repository and object storage behind the same application ports. It must preserve atomic claim semantics, terminal-state deletion, allow-listed artifact names, content hashes, and calculation fingerprints. To accept `Idempotency-Key`, its repository must additionally implement the optional capability with a database-enforced uniqueness invariant.
 
 ## Deployment forms
 
@@ -73,17 +75,22 @@ The shipped container can run an API command or a worker command against a share
 
 Another Python service can import the package and call deterministic functions directly. No global application object, database, HTTP client, or filesystem directory is created by importing `four_pillars`.
 
-The top-level package also exports the three structural port contracts for integration type annotations:
+The top-level package exports the structural port contracts and optional idempotency capability for integration type annotations:
 
 ```python
-from four_pillars import ArtifactPublisher, ReportInterpreter, ReportJobRepository
+from four_pillars import (
+    ArtifactPublisher,
+    IdempotentReportJobRepository,
+    ReportInterpreter,
+    ReportJobRepository,
+)
 ```
 
 ### Internal MSA service
 
 A platform can deploy the API and worker independently, front them with organization authentication, and replace local storage adapters. Versioned JSON and Pydantic contracts remain the compatibility boundary. Calls across services should carry the calculation version, prompt versions, and fingerprint so provenance is preserved end to end.
 
-A remote repository adapter must keep claim, idempotent creation, and transition operations atomic. A remote artifact publisher must finish all files in the staging location before returning, because the application service publishes the completed directory only after the port returns successfully.
+A remote repository adapter must keep claim and transition operations atomic. If it implements `IdempotentReportJobRepository`, keyed creation must also be atomic across all API instances. A remote artifact publisher must finish all files in the staging location before returning, because the application service publishes the completed directory only after the port returns successfully.
 
 ### Central workflow consumption
 
@@ -105,7 +112,11 @@ The repository remains the source of product-specific policy. Central workflows 
 
 ### Report job repository
 
-The repository owns durable lifecycle state. `create_idempotent` must compare the supplied key digest and canonical request fingerprint and atomically return either the first job or a replay indicator; the same key with a different fingerprint must be rejected without creating a row. A unique database constraint must make this invariant safe across processes and nodes. Raw client keys must never be persisted. `claim_next` must atomically move at most one queued job to running. `finish` and `fail` must either update exactly one known job or report that the job does not exist. `delete` removes terminal jobs only. `purge` returns removed identifiers so the caller can clean corresponding artifacts. Deleting or purging a job also expires its idempotency digest.
+The base repository owns durable lifecycle state. `claim_next` must atomically move at most one queued job to running. `finish` and `fail` must either update exactly one known job or report that the job does not exist. `delete` removes terminal jobs only. `purge` returns removed identifiers so the caller can clean corresponding artifacts.
+
+### Optional idempotent report-job repository
+
+`create_idempotent` must compare the supplied key digest and canonical request fingerprint and atomically return either the first job or a replay indicator. The same key with a different fingerprint must be rejected without creating a row. A unique database constraint must make this invariant safe across processes and nodes. Raw client keys must never be persisted. Deleting or purging a job also expires its idempotency digest.
 
 ### Report interpreter
 
@@ -125,7 +136,7 @@ Public files and messages use UUID job identifiers rather than subject names. Ar
 
 Package and API versions follow Semantic Versioning. The changelog records user-visible and integration-visible changes. Calculation and prompt versions are independently recorded because a compatible application release may update one without changing the other.
 
-A breaking calculation-policy change requires a new calculation version and new golden fixtures. A breaking report, port, or API schema change requires a major package version. Prompt wording changes require a prompt semantic-version update and evaluation evidence.
+A breaking calculation-policy change requires a new calculation version and new golden fixtures. A breaking report, port, or API schema change requires a major package version. Prompt wording changes require a prompt semantic-version update and evaluation evidence. Optional capabilities may be added in a minor version when the existing required port remains unchanged and unsupported use fails explicitly.
 
 ## Integration acceptance criteria
 
@@ -135,7 +146,8 @@ An integration is conformant when:
 - hosted interpretation receives immutable evidence as untrusted input;
 - no provider fallback occurs under the NVIDIA NIM model label;
 - report quality validation runs before publication;
-- normal and idempotent queue creation plus queue claims are atomic, and terminal states are distinguishable;
+- normal queue creation and queue claims are atomic, and terminal states are distinguishable;
+- keyed creation is accepted only when the repository implements `IdempotentReportJobRepository` atomically;
 - raw idempotency keys are not persisted and key reuse with a different payload is rejected;
 - artifact paths, names, hashes, retention, and deletion remain enforced;
 - supplied adapters satisfy the public structural ports without application forks;
