@@ -8,8 +8,30 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ### Planned
 
-- Multi-node job-store adapters and horizontally scalable report workers.
+- PostgreSQL and object-storage adapters for horizontally scalable multi-node deployments.
 - Additional independent golden-chart fixtures near solar-term boundaries.
+
+## [0.3.0] - 2026-08-04
+
+### Added
+
+- Runtime-checkable modular service ports for report-job repositories, report interpreters, and artifact publishers, with standalone SQLite, NVIDIA NIM, and filesystem adapters retained as defaults.
+- Constructor injection in `ReportService`, allowing organization platforms and MSA deployments to replace persistence, hosted interpretation, or artifact delivery independently without forking deterministic calculation code.
+- An hourly product-quality loop that runs the complete release gate and deterministic product-gap audit, enforces database object naming and modularity contracts, and maintains one idempotent regression issue.
+- A reusable release workflow for `main` pushes, manual dispatch, and organization-level `workflow_call` validation, with curated changelog notes, versioned source and wheel artifacts, and SHA-256 checksums.
+- Standalone/MSA modularity and hourly-loop operational runbooks.
+
+### Changed
+
+- Package and API versions advance to `0.3.0`.
+- Protocol declarations fail explicitly on accidental direct invocation, while structural implementations remain inheritance-free.
+- The full gate continues to enforce 100% statement and branch coverage and complete public API docstrings.
+
+### Security
+
+- Release publication uses a dedicated least-privilege job with `contents: write`; validation jobs remain read-only.
+- Scheduled product checks and release validation never receive `NVIDIA_NIM_API_KEY`; hosted NVIDIA NIM evaluation remains a separate opt-in workflow.
+- Release creation is idempotent and will not overwrite an existing version tag or release.
 
 ## [0.2.0] - 2026-08-04
 
@@ -34,5 +56,6 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 - Calculation data is the immutable source of truth; model output may interpret but cannot replace pillars, date boundaries, Ten Gods, interactions, or the calculation fingerprint.
 - Hosted model and evaluation model identifiers remain deployment configuration so operators can choose a currently available free NVIDIA NIM model.
 
-[Unreleased]: https://github.com/ContextualWisdomLab/four-pillars/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/ContextualWisdomLab/four-pillars/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/ContextualWisdomLab/four-pillars/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ContextualWisdomLab/four-pillars/releases/tag/v0.2.0
