@@ -1,3 +1,5 @@
+"""Validate that required project documentation is complete and publishable."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -21,6 +23,7 @@ FORBIDDEN = ("TBD", "TODO", "implement later", "fill in details")
 
 
 def main() -> None:
+    """Fail when a required document is missing, too short, or contains placeholders."""
     failures: list[str] = []
     for name in REQUIRED:
         path = Path(name)

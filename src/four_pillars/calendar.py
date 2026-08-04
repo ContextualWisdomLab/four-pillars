@@ -1,3 +1,5 @@
+"""Calculate deterministic Korean Four Pillars charts and solar-term boundaries."""
+
 from __future__ import annotations
 
 import hashlib
@@ -68,7 +70,6 @@ def apparent_solar_longitude(moment: datetime) -> float:
     error is normally much smaller than the six-hour warning window used by this
     service. The algorithm is deterministic and does not require a remote ephemeris.
     """
-
     jd = _julian_date(moment)
     t = (jd - 2451545.0) / 36525.0
     mean_longitude = _normalize_angle(280.46646 + 36000.76983 * t + 0.0003032 * t * t)
@@ -87,6 +88,7 @@ def apparent_solar_longitude(moment: datetime) -> float:
 
 @lru_cache(maxsize=1024)
 def solar_term_utc(year: int, longitude: float) -> datetime:
+    """Locate one supported month-changing solar term in UTC by bisection."""
     spec = next((item for item in JIE_TERMS if item[2] == longitude), None)
     if spec is None:
         raise ValueError(f"Unsupported month-changing solar longitude: {longitude}")
@@ -108,6 +110,7 @@ def solar_term_utc(year: int, longitude: float) -> datetime:
 
 
 def jie_terms(year: int, timezone: str) -> list[SolarTerm]:
+    """Return all twelve month-changing solar terms in an IANA time zone."""
     zone = ZoneInfo(timezone)
     return [
         SolarTerm(
@@ -161,6 +164,7 @@ def _equation_of_time_minutes(moment: datetime) -> float:
 
 
 def normalize_birth(value: BirthInput) -> datetime:
+    """Convert validated birth input into the effective timezone-aware birth moment."""
     wall_clock = (
         _convert_lunar_to_solar(value)
         if value.calendar is CalendarKind.LUNAR
@@ -183,6 +187,7 @@ def normalize_birth(value: BirthInput) -> datetime:
 
 
 def sexagenary_index(stem_index: int, branch_index: int) -> int:
+    """Return the unique sexagenary-cycle index for a compatible stem and branch."""
     for index in range(60):
         if index % 10 == stem_index and index % 12 == branch_index:
             return index
@@ -190,6 +195,7 @@ def sexagenary_index(stem_index: int, branch_index: int) -> int:
 
 
 def ten_god(day_stem: int, target_stem: int) -> str:
+    """Return the Korean Ten God relationship from a day stem to a target stem."""
     day_element = STEM_ELEMENT[day_stem]
     target_element = STEM_ELEMENT[target_stem]
     day_element_index = ELEMENTS.index(day_element)
@@ -209,12 +215,14 @@ def ten_god(day_stem: int, target_stem: int) -> str:
 
 
 def growth_stage(day_stem: int, branch_index: int) -> str:
+    """Return the Twelve Growth Stage for a day stem at one earthly branch."""
     start = GROWTH_START_BRANCH[day_stem]
     offset = (branch_index - start) % 12 if day_stem % 2 == 0 else (start - branch_index) % 12
     return GROWTH_STAGES[offset]
 
 
 def make_pillar(index: int, day_master_stem: int | None = None) -> Pillar:
+    """Build one immutable pillar with hidden stems and optional day-master relations."""
     index %= 60
     stem_index = index % 10
     branch_index = index % 12
@@ -255,6 +263,7 @@ def _interaction(kind: str, left: Pillar, right: Pillar) -> Interaction:
 
 
 def interactions_between(pillars: list[Pillar]) -> list[Interaction]:
+    """Return supported stem and branch interactions among the supplied pillars."""
     result: list[Interaction] = []
     for left, right in combinations(pillars, 2):
         stem_pair = frozenset((left.stem_index, right.stem_index))
@@ -318,6 +327,7 @@ def _hour_index(moment: datetime, day_stem: int) -> int:
 
 
 def calculate_chart(value: BirthInput) -> Chart:
+    """Calculate one immutable chart, warnings, interactions, and evidence fingerprint."""
     moment = normalize_birth(value)
     year_index, lichun = _year_index(moment)
     month_index, current_jie, next_jie = _month_index(moment, year_index % 10)

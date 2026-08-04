@@ -1,3 +1,5 @@
+"""Derive daewoon, annual luck, and monthly luck from an immutable natal chart."""
+
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
@@ -72,6 +74,7 @@ def _scenario(chart: Chart, direction: str, count: int) -> DaewoonScenario:
 
 
 def calculate_daewoon(chart: Chart, gender: Gender, count: int = 8) -> DaewoonResult:
+    """Calculate one or both daewoon scenarios with bounded ten-year periods."""
     if count < 1 or count > 12:
         raise ValueError("count must be between 1 and 12")
     if gender is Gender.UNSPECIFIED:
@@ -85,6 +88,7 @@ def calculate_daewoon(chart: Chart, gender: Gender, count: int = 8) -> DaewoonRe
 
 
 def calculate_annual_luck(chart: Chart, year: int) -> LuckSnapshot:
+    """Calculate a Li-Chun-bounded annual luck pillar and natal interactions."""
     zone = chart.normalized_birth.tzinfo
     if zone is None:
         raise ValueError("chart birth must be timezone-aware")
@@ -101,6 +105,7 @@ def calculate_annual_luck(chart: Chart, year: int) -> LuckSnapshot:
 
 
 def calculate_monthly_luck(chart: Chart, year: int, month: int) -> LuckSnapshot:
+    """Calculate one month-changing-solar-term luck period and its interactions."""
     if month < 1 or month > 12:
         raise ValueError("month must be between 1 and 12")
     current_terms = jie_terms(year, chart.timezone)
@@ -132,5 +137,6 @@ def calculate_monthly_luck(chart: Chart, year: int, month: int) -> LuckSnapshot:
 
 
 def current_period(periods: list[LuckPeriod], on_date: date | None = None) -> LuckPeriod | None:
+    """Return the luck period containing a date, or ``None`` when no period matches."""
     target = on_date or date.today()
     return next((period for period in periods if period.starts_at <= target <= period.ends_at), None)

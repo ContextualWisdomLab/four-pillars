@@ -1,3 +1,5 @@
+"""Define validated and serializable contracts for calculations, reports, and jobs."""
+
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -8,28 +10,38 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class Gender(StrEnum):
+    """Supported gender inputs for traditional daewoon direction policy."""
+
     MALE = "male"
     FEMALE = "female"
     UNSPECIFIED = "unspecified"
 
 
 class CalendarKind(StrEnum):
+    """Supported civil input calendar systems."""
+
     SOLAR = "solar"
     LUNAR = "lunar"
 
 
 class TimeBasis(StrEnum):
+    """Supported policies for interpreting the supplied wall-clock birth time."""
+
     CIVIL = "civil"
     MEAN_SOLAR = "mean_solar"
     APPARENT_SOLAR = "apparent_solar"
 
 
 class DayBoundary(StrEnum):
+    """Supported day-pillar rollover policies around the late Zi hour."""
+
     MIDNIGHT = "midnight"
     LATE_ZI = "late_zi"
 
 
 class BirthInput(BaseModel):
+    """User-supplied birth facts and explicit calendar calculation policies."""
+
     model_config = ConfigDict(extra="forbid")
 
     birth: datetime
@@ -45,12 +57,15 @@ class BirthInput(BaseModel):
     @field_validator("birth")
     @classmethod
     def reject_timezone_on_wall_clock(cls, value: datetime) -> datetime:
+        """Normalize birth input to a timezone-naive local wall clock."""
         if value.tzinfo is not None:
             return value.replace(tzinfo=None)
         return value
 
 
 class Pillar(BaseModel):
+    """Immutable heavenly-stem and earthly-branch calculation result."""
+
     model_config = ConfigDict(frozen=True)
 
     stem_index: int = Field(ge=0, le=9)
@@ -67,6 +82,8 @@ class Pillar(BaseModel):
 
 
 class SolarTerm(BaseModel):
+    """Immutable month-changing solar-term boundary in a requested time zone."""
+
     model_config = ConfigDict(frozen=True)
 
     name_ko: str
@@ -77,6 +94,8 @@ class SolarTerm(BaseModel):
 
 
 class Interaction(BaseModel):
+    """Supported combination, clash, or harm between two calculated pillars."""
+
     kind: Literal["stem_combine", "stem_clash", "branch_combine", "branch_clash", "branch_harm"]
     left: str
     right: str
@@ -84,6 +103,8 @@ class Interaction(BaseModel):
 
 
 class Chart(BaseModel):
+    """Complete deterministic natal chart and its immutable evidence fingerprint."""
+
     model_config = ConfigDict(extra="forbid")
 
     normalized_birth: datetime
@@ -107,6 +128,8 @@ class Chart(BaseModel):
 
 
 class LuckPeriod(BaseModel):
+    """One bounded ten-year daewoon period and its natal interactions."""
+
     sequence: int
     direction: Literal["forward", "reverse"]
     pillar: Pillar
@@ -118,6 +141,8 @@ class LuckPeriod(BaseModel):
 
 
 class DaewoonScenario(BaseModel):
+    """One forward or reverse sequence of daewoon periods."""
+
     label: str
     direction: Literal["forward", "reverse"]
     start_age: float
@@ -126,10 +151,14 @@ class DaewoonScenario(BaseModel):
 
 
 class DaewoonResult(BaseModel):
+    """Calculated daewoon scenarios, including both directions when gender is unspecified."""
+
     scenarios: list[DaewoonScenario]
 
 
 class LuckSnapshot(BaseModel):
+    """One date-bounded annual or monthly luck pillar and its interactions."""
+
     label: str
     starts_at: datetime
     ends_at: datetime
@@ -139,6 +168,8 @@ class LuckSnapshot(BaseModel):
 
 
 class ReportSection(BaseModel):
+    """Structured Korean analysis chapter with evidence and practical guidance."""
+
     model_config = ConfigDict(extra="forbid")
 
     title: str
@@ -151,6 +182,8 @@ class ReportSection(BaseModel):
 
 
 class PracticalSkill(BaseModel):
+    """Repeatable real-world practice derived from the interpreted evidence."""
+
     model_config = ConfigDict(extra="forbid")
 
     name: str
@@ -160,6 +193,8 @@ class PracticalSkill(BaseModel):
 
 
 class ReportDocument(BaseModel):
+    """Publishable report with immutable calculation provenance and prompt versions."""
+
     model_config = ConfigDict(extra="forbid")
 
     subject_name: str
@@ -176,6 +211,8 @@ class ReportDocument(BaseModel):
 
 
 class JobStatus(StrEnum):
+    """Durable report-job lifecycle states."""
+
     QUEUED = "queued"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -184,6 +221,8 @@ class JobStatus(StrEnum):
 
 
 class ReportJob(BaseModel):
+    """Internal durable job record including request, status, error, and artifact location."""
+
     id: str
     status: JobStatus
     request: dict[str, Any]

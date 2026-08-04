@@ -1,3 +1,5 @@
+"""Persist and atomically transition report jobs in a single-node SQLite queue."""
+
 from __future__ import annotations
 
 import json
@@ -11,7 +13,10 @@ from .models import JobStatus, ReportJob
 
 
 class JobStore:
+    """Manage durable report-job lifecycle state in the ``report_jobs`` table."""
+
     def __init__(self, database_path: Path) -> None:
+        """Initialize the SQLite database path, schema, and queue index."""
         self.database_path = database_path
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
         self._initialize()
@@ -57,6 +62,7 @@ class JobStore:
         )
 
     def create(self, request: dict[str, Any]) -> ReportJob:
+        """Create and return one queued job containing a JSON-serializable request."""
         now = datetime.now(UTC)
         job = ReportJob(
             id=str(uuid.uuid4()),
@@ -79,11 +85,13 @@ class JobStore:
         return job
 
     def get(self, job_id: str) -> ReportJob | None:
+        """Return one job by UUID or ``None`` when no matching row exists."""
         with self._connect() as connection:
             row = connection.execute("SELECT * FROM report_jobs WHERE id=?", (job_id,)).fetchone()
         return self._row(row)
 
     def claim_next(self) -> ReportJob | None:
+        """Atomically claim the oldest queued job for a worker."""
         now = datetime.now(UTC).isoformat()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -104,9 +112,11 @@ class JobStore:
         return self.get(row["id"])
 
     def finish(self, job_id: str, artifact_dir: Path) -> ReportJob:
+        """Mark a job completed and record its published artifact directory."""
         return self._transition(job_id, JobStatus.COMPLETED, artifact_dir=str(artifact_dir))
 
     def fail(self, job_id: str, error: str, *, quality: bool = False) -> ReportJob:
+        """Mark a job failed, optionally distinguishing deterministic quality failure."""
         status = JobStatus.QUALITY_FAILED if quality else JobStatus.FAILED
         return self._transition(job_id, status, error=error[:4000])
 
@@ -132,6 +142,7 @@ class JobStore:
         return result
 
     def delete(self, job_id: str) -> bool:
+        """Delete one terminal job and report whether a row was removed."""
         with self._connect() as connection:
             cursor = connection.execute(
                 "DELETE FROM report_jobs WHERE id=? AND status IN (?,?,?)",
@@ -145,6 +156,7 @@ class JobStore:
         return cursor.rowcount == 1
 
     def purge(self, retention_days: int) -> list[str]:
+        """Delete expired terminal rows and return their job UUIDs for artifact cleanup."""
         cutoff = (datetime.now(UTC) - timedelta(days=retention_days)).isoformat()
         with self._connect() as connection:
             rows = connection.execute(

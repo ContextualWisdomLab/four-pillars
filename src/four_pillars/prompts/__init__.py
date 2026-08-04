@@ -1,3 +1,5 @@
+"""Load versioned report prompts and expose their immutable provenance metadata."""
+
 from __future__ import annotations
 
 import hashlib
@@ -9,6 +11,8 @@ from importlib.resources import files  # nosemgrep
 
 @dataclass(frozen=True)
 class PromptTemplate:
+    """Versioned prompt body and its SHA-256 digest."""
+
     name: str
     version: str
     body: str
@@ -28,6 +32,7 @@ PROMPT_NAMES = (
 
 
 def load_prompt(name: str) -> PromptTemplate:
+    """Load one allow-listed prompt and verify its semantic version header."""
     if name not in PROMPT_NAMES:
         raise KeyError(f"Unknown prompt: {name}")
     body = files(__package__).joinpath(f"{name}.md").read_text(encoding="utf-8")
@@ -40,6 +45,7 @@ def load_prompt(name: str) -> PromptTemplate:
 
 
 def prompt_manifest() -> dict[str, dict[str, str]]:
+    """Return prompt versions and digests without exposing prompt bodies."""
     return {
         name: {"version": prompt.version, "sha256": prompt.sha256}
         for name in PROMPT_NAMES
