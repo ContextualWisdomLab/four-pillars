@@ -52,6 +52,21 @@ def test_history_cursor_round_trips_utc_timestamp_and_uuid() -> None:
     assert decode_history_cursor(cursor) == (created_at, job_id)
 
 
+def test_history_cursor_rejects_noncanonical_base64url_unused_bits() -> None:
+    cursor = encode_history_cursor(
+        datetime(2026, 8, 4, 5, 6, 7, 123456, tzinfo=UTC),
+        str(uuid.uuid4()),
+    )
+    version, encoded = cursor.split(".", maxsplit=1)
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+    assert len(encoded) % 4 == 2
+    index = alphabet.index(encoded[-1])
+    noncanonical = encoded[:-1] + alphabet[(index & 0b110000) | 0b000001]
+
+    with pytest.raises(HistoryCursorError, match="Invalid report-history cursor"):
+        decode_history_cursor(f"{version}.{noncanonical}")
+
+
 @pytest.mark.parametrize(
     "cursor",
     [
