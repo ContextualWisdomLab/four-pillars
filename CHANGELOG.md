@@ -6,21 +6,32 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ## [Unreleased]
 
-### Added
-
-- An authenticated `GET /v1/reports` collection endpoint with optional lifecycle-status filtering, deterministic newest-first keyset pagination, and the existing privacy-safe public job view.
-- A separate runtime-checkable `ReportJobHistoryRepository` capability, preserving compatibility for organization adapters that implement only the required report-job repository port.
-- Versioned strict report-history cursors and two compliant SQLite indexes, `idx_report_jobs_created_id` and `idx_report_jobs_status_created_id`, for stable unfiltered and status-filtered traversal.
-
-### Security
-
-- Report-history items and cursors exclude subject labels, birth data, user context, stored requests, fingerprints, idempotency material, generated copy, model traces, and artifact paths.
-- Malformed or unsupported cursors fail closed with HTTP 400, and legacy adapters fail explicitly with HTTP 501 instead of maintaining unsafe process-local history.
-
 ### Planned
 
 - PostgreSQL and object-storage adapters for horizontally scalable multi-node deployments.
 - Additional independent golden-chart fixtures near solar-term boundaries.
+
+## [0.5.0] - 2026-08-04
+
+### Added
+
+- An authenticated `GET /v1/reports` collection endpoint with optional lifecycle-status filtering, deterministic newest-first keyset pagination, and the existing privacy-safe public job view.
+- A separate runtime-checkable `ReportJobHistoryRepository` capability, preserving compatibility for organization adapters that implement only the required report-job repository port.
+- Versioned strict report-history cursors and the two compliant SQLite indexes `idx_report_jobs_created_id` and `idx_report_jobs_status_created_id` for stable unfiltered and status-filtered traversal.
+- Product, API, technical, modularity, and hourly-audit contracts for recoverable recent work after a browser refresh, client restart, or operational handoff.
+
+### Changed
+
+- Package and API versions advance to `0.5.0`; deterministic calculation-policy and prompt versions remain unchanged.
+- Report-history traversal uses `(created_at DESC, id DESC)` with a UUID tie-breaker and exclusive `limit + 1` continuation, avoiding offset drift and duplicate rows during a stable traversal.
+- The full release gate continues to require complete public API docstrings and 100% statement and branch coverage on Python 3.11 and 3.12.
+
+### Security
+
+- Report-history items and cursors exclude subject labels, birth data, user context, stored requests, fingerprints, idempotency material, generated copy, model traces, and artifact paths.
+- Cursors are bounded and fail closed on malformed, unsupported, noncanonical base64url, non-UTC timestamp, extra-field, or invalid-UUID input with HTTP 400.
+- Legacy adapters fail explicitly with HTTP 501 instead of maintaining unsafe process-local history, and all SQLite history queries use static parameterized statements.
+- Release validation, scheduled product checks, and history traversal never receive or read `NVIDIA_NIM_API_KEY`; hosted NVIDIA NIM remains an explicit interpretation boundary.
 
 ## [0.4.0] - 2026-08-04
 
@@ -88,7 +99,8 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 - Calculation data is the immutable source of truth; model output may interpret but cannot replace pillars, date boundaries, Ten Gods, interactions, or the calculation fingerprint.
 - Hosted model and evaluation model identifiers remain deployment configuration so operators can choose a currently available free NVIDIA NIM model.
 
-[Unreleased]: https://github.com/ContextualWisdomLab/four-pillars/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/ContextualWisdomLab/four-pillars/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/ContextualWisdomLab/four-pillars/releases/tag/v0.5.0
 [0.4.0]: https://github.com/ContextualWisdomLab/four-pillars/releases/tag/v0.4.0
 [0.3.0]: https://github.com/ContextualWisdomLab/four-pillars/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ContextualWisdomLab/four-pillars/releases/tag/v0.2.0
