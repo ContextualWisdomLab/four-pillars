@@ -48,4 +48,4 @@ jobs:
       - name: Verify runtime imports and application metadata
         run: >-
           docker run --rm four-pillars:pr python -c
-          "import four_pillars; from four_pillars.api import app; assert app.version == '0.1.0'"
+          "import four_pillars; from four_pillars.api import app; assert app.version == four_pillars.__version__; assert app.version"
