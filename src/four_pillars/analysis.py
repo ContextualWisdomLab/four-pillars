@@ -1,4 +1,4 @@
-"""Orchestrate staged NVIDIA NIM interpretation over immutable calculation evidence."""
+"""Orchestrate staged interpretation over immutable calculation evidence."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .generation import StructuredGenerationClient
 from .models import (
     Chart,
     DaewoonResult,
@@ -15,7 +16,7 @@ from .models import (
     ReportDocument,
     ReportSection,
 )
-from .nim import NimClient, NimTrace
+from .nim import NimTrace
 from .prompts import PROMPT_NAMES, PromptTemplate, load_prompt
 from .quality import ReportQualityError, assert_report_quality
 
@@ -78,7 +79,7 @@ def _trace_payload(trace: NimTrace, prompt: PromptTemplate) -> dict[str, Any]:
 
 async def generate_report(
     *,
-    client: NimClient,
+    client: StructuredGenerationClient,
     subject_name: str,
     chart: Chart,
     daewoon: DaewoonResult,
