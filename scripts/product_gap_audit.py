@@ -1,4 +1,4 @@
-"""Audit release, modularity, prompt, credential, and database naming contracts."""
+"""Audit release automation, modularity, prompts, credentials, and database naming."""
 
 from __future__ import annotations
 
@@ -36,6 +36,10 @@ REQUIRED_DOCUMENTS = (
     "docs/operations/HOURLY_PRODUCT_LOOP.md",
     "docs/uml/architecture.md",
     "docs/uml/domain.puml",
+)
+REQUIRED_WORKFLOWS = (
+    ".github/workflows/hourly-product-loop.yml",
+    ".github/workflows/release.yml",
 )
 TEXT_SUFFIXES = {".md", ".py", ".toml", ".yaml", ".yml"}
 IGNORED_PARTS = {
@@ -103,6 +107,10 @@ def audit_repository(root: Path) -> list[ProductGap]:
         elif len(path.read_text(encoding="utf-8").strip()) < 120:
             gaps.append(_gap("thin_document", relative, "Required document is too short to be operationally useful."))
 
+    for relative in REQUIRED_WORKFLOWS:
+        if not (root / relative).is_file():
+            gaps.append(_gap("missing_workflow", relative, "Required governance workflow is missing."))
+
     pyproject_path = root / "pyproject.toml"
     version_path = root / "src/four_pillars/version.py"
     changelog_path = root / "CHANGELOG.md"
@@ -160,11 +168,26 @@ def audit_repository(root: Path) -> list[ProductGap]:
                     )
                 )
 
-    workflow = root / ".github/workflows/hourly-product-loop.yml"
-    if workflow.is_file():
-        workflow_text = workflow.read_text(encoding="utf-8")
+    hourly_workflow = root / ".github/workflows/hourly-product-loop.yml"
+    if hourly_workflow.is_file():
+        workflow_text = hourly_workflow.read_text(encoding="utf-8")
         if "cron: '17 * * * *'" not in workflow_text or "workflow_dispatch:" not in workflow_text:
-            gaps.append(_gap("hourly_schedule", workflow.relative_to(root).as_posix(), "Hourly schedule or manual dispatch is missing."))
+            gaps.append(_gap("hourly_schedule", hourly_workflow.relative_to(root).as_posix(), "Hourly schedule or manual dispatch is missing."))
+
+    release_workflow = root / ".github/workflows/release.yml"
+    if release_workflow.is_file():
+        workflow_text = release_workflow.read_text(encoding="utf-8")
+        required_release_tokens = (
+            "workflow_call:",
+            "contents: write",
+            "python scripts/release_notes.py",
+            "gh release view",
+            "gh release create",
+        )
+        if not all(token in workflow_text for token in required_release_tokens):
+            gaps.append(_gap("release_workflow", release_workflow.relative_to(root).as_posix(), "Release workflow is incomplete or not reusable."))
+        if "NVIDIA_NIM_API_KEY" in workflow_text:
+            gaps.append(_gap("release_secret_boundary", release_workflow.relative_to(root).as_posix(), "Release workflow must not receive the hosted NIM credential."))
 
     return sorted(gaps, key=lambda item: (item.severity, item.code, item.path, item.message))
 
