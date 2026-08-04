@@ -72,6 +72,18 @@ def test_browser_history_discards_stale_requests_and_respects_reduced_motion() -
     assert "behavior:reduced?'auto':'smooth'" in page
 
 
+def test_browser_polling_discards_stale_jobs_and_clears_auth_context() -> None:
+    page = render_home()
+
+    assert "pollRequest" in page
+    assert "const requestId=++pollRequest" in page
+    assert "requestId!==pollRequest" in page
+    assert "function clearCurrentJob" in page
+    assert "pollRequest+=1" in page
+    assert "apiKey.addEventListener('change',()=>{clearCurrentJob();loadHistory({reset:true})})" in page
+    assert "message('입력을 초기화했습니다.');clearCurrentJob();loadHistory({reset:true})" in page
+
+
 def test_browser_history_uses_authenticated_downloads_and_bounded_error_copy() -> None:
     page = render_home()
 
