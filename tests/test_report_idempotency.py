@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from test_modular_service_ports import LegacyRepository
 
 from four_pillars.api import app, get_service
 from four_pillars.idempotency import parse_idempotency_key, request_fingerprint
@@ -184,6 +185,30 @@ def test_api_rejects_invalid_or_reused_keys_and_keeps_header_optional(tmp_path: 
     assert "different payload" in reused.json()["detail"]
     assert without_key_one.json()["id"] != without_key_two.json()["id"]
     assert "Idempotency-Replayed" not in without_key_one.headers
+
+
+def test_api_reports_when_an_injected_repository_lacks_idempotency(tmp_path: Path) -> None:
+    """Return 501 rather than breaking legacy adapters or emulating unsafe atomicity."""
+    settings = Settings(
+        artifact_dir=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'report_jobs.sqlite3'}",
+    )
+    service = ReportService(
+        settings,
+        LegacyRepository(JobStore(settings.sqlite_path)),
+    )
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_service] = lambda: service
+
+    with TestClient(app) as http:
+        response = http.post(
+            "/v1/reports",
+            json=REPORT,
+            headers={"Idempotency-Key": KEY},
+        )
+
+    assert response.status_code == 501
+    assert "does not support idempotent creation" in response.json()["detail"]
 
 
 def test_browser_reuses_one_generated_key_until_enqueue_succeeds() -> None:
