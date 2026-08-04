@@ -9,7 +9,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .adapters import FilesystemArtifactPublisher, NimReportInterpreter
+from .adapters import FilesystemArtifactPublisher, build_report_interpreter
 from .analysis import GeneratedReport
 from .calendar import calculate_chart
 from .fortune import calculate_annual_luck, calculate_daewoon, calculate_monthly_luck
@@ -95,7 +95,9 @@ class ReportService:
         self.settings.artifact_dir.mkdir(parents=True, exist_ok=True)
         self.store = store if store is not None else JobStore(settings.sqlite_path)
         self.interpreter = (
-            interpreter if interpreter is not None else NimReportInterpreter(settings)
+            interpreter
+            if interpreter is not None
+            else build_report_interpreter(settings)
         )
         self.publisher = (
             publisher if publisher is not None else FilesystemArtifactPublisher()
