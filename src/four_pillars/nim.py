@@ -108,9 +108,7 @@ class NimClient:
     def _json_object(content: str) -> dict[str, Any]:
         cleaned = content.strip()
         if cleaned.startswith("```"):
-            lines = cleaned.splitlines()
-            if lines and lines[0].startswith("```"):
-                lines = lines[1:]
+            lines = cleaned.splitlines()[1:]
             if lines and lines[-1].strip() == "```":
                 lines = lines[:-1]
             cleaned = "\n".join(lines)
