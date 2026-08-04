@@ -90,6 +90,19 @@ class ReportService:
         """Persist one validated report request as a queued job."""
         return self.store.create(request.model_dump(mode="json"))
 
+    def enqueue_idempotent(
+        self,
+        request: ReportRequest,
+        idempotency_key_digest: str,
+        fingerprint: str,
+    ) -> tuple[ReportJob, bool]:
+        """Persist or replay one validated report request through the repository port."""
+        return self.store.create_idempotent(
+            request.model_dump(mode="json"),
+            idempotency_key_digest,
+            fingerprint,
+        )
+
     async def generate(self, request: ReportRequest) -> tuple[CalculationBundle, GeneratedReport]:
         """Calculate immutable evidence and invoke the configured interpretation port."""
         bundle = calculate_bundle(request)
