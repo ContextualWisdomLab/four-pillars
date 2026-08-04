@@ -1,3 +1,5 @@
+"""Orchestrate staged NVIDIA NIM interpretation over immutable calculation evidence."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -19,12 +21,16 @@ from .quality import ReportQualityError, assert_report_quality
 
 
 class PracticalSkillsDraft(BaseModel):
+    """Schema for practical habits proposed from annual and monthly evidence."""
+
     model_config = ConfigDict(extra="forbid")
 
     practical_skills: list[PracticalSkill] = Field(min_length=1, max_length=8)
 
 
 class SynthesisDraft(BaseModel):
+    """Schema for the model-produced report synthesis before immutable metadata is attached."""
+
     model_config = ConfigDict(extra="forbid")
 
     executive_summary: str
@@ -33,6 +39,8 @@ class SynthesisDraft(BaseModel):
 
 
 class GeneratedReport(BaseModel):
+    """Validated report document paired with privacy-safe generation trace metadata."""
+
     model_config = ConfigDict(extra="forbid")
 
     report: ReportDocument
@@ -78,6 +86,7 @@ async def generate_report(
     monthly: LuckSnapshot,
     user_context: str = "",
 ) -> GeneratedReport:
+    """Generate, validate, and optionally repair one complete report from calculation evidence."""
     immutable = {
         "chart": chart.model_dump(mode="json"),
         "daewoon": daewoon.model_dump(mode="json"),
