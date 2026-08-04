@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from .history import decode_history_cursor, encode_history_cursor
 from .idempotency import request_fingerprint
 from .models import JobStatus, ReportJob
 
@@ -83,6 +84,18 @@ class JobStore:
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_report_jobs_idempotency_key_digest
                 ON report_jobs(idempotency_key_digest)
                 WHERE idempotency_key_digest IS NOT NULL
+                """
+            )
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_report_jobs_created_id
+                ON report_jobs(created_at DESC, id DESC)
+                """
+            )
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_report_jobs_status_created_id
+                ON report_jobs(status, created_at DESC, id DESC)
                 """
             )
             connection.execute("COMMIT")
@@ -210,6 +223,42 @@ class JobStore:
         with self._connect() as connection:
             row = connection.execute("SELECT * FROM report_jobs WHERE id=?", (job_id,)).fetchone()
         return self._row(row)
+
+    def list_jobs(
+        self,
+        *,
+        limit: int,
+        cursor: str | None = None,
+        status: JobStatus | None = None,
+    ) -> tuple[list[ReportJob], str | None]:
+        """Return one stable newest-first page of report jobs and its continuation."""
+        if not 1 <= limit <= 100:
+            raise ValueError("Report history limit must be between 1 and 100")
+        clauses: list[str] = []
+        parameters: list[str | int] = []
+        if status is not None:
+            clauses.append("status=?")
+            parameters.append(status.value)
+        if cursor is not None:
+            created_at, job_id = decode_history_cursor(cursor)
+            boundary = created_at.isoformat()
+            clauses.append("(created_at < ? OR (created_at = ? AND id < ?))")
+            parameters.extend((boundary, boundary, job_id))
+        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        parameters.append(limit + 1)
+        with self._connect() as connection:
+            rows = connection.execute(
+                f"SELECT * FROM report_jobs{where} ORDER BY created_at DESC, id DESC LIMIT ?",
+                parameters,
+            ).fetchall()
+        has_more = len(rows) > limit
+        jobs = [self._row(row) for row in rows[:limit]]
+        page = [job for job in jobs if job is not None]
+        next_cursor = None
+        if has_more and page:
+            last = page[-1]
+            next_cursor = encode_history_cursor(last.created_at, last.id)
+        return page, next_cursor
 
     def claim_next(self) -> ReportJob | None:
         """Atomically claim the oldest queued job for a worker."""
