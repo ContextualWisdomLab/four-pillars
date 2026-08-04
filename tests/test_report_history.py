@@ -6,16 +6,16 @@ import base64
 import json
 import sqlite3
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+
 from four_pillars.history import (
     HistoryCursorError,
     decode_history_cursor,
     encode_history_cursor,
 )
-
 from four_pillars.jobs import JobStore
 from four_pillars.models import JobStatus
 
@@ -109,7 +109,15 @@ def test_history_cursor_rejects_noncanonical_or_invalid_input(cursor: str) -> No
     [
         (datetime(2026, 8, 4, 5, 6, 7), str(uuid.uuid4())),
         (
-            datetime(2026, 8, 4, 14, 6, 7, tzinfo=timedelta(hours=9)),
+            datetime(
+                2026,
+                8,
+                4,
+                14,
+                6,
+                7,
+                tzinfo=timezone(timedelta(hours=9)),
+            ),
             str(uuid.uuid4()),
         ),
         (
