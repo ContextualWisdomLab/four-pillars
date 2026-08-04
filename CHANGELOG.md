@@ -6,6 +6,17 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ## [Unreleased]
 
+### Added
+
+- An authenticated `GET /v1/reports` collection endpoint with optional lifecycle-status filtering, deterministic newest-first keyset pagination, and the existing privacy-safe public job view.
+- A separate runtime-checkable `ReportJobHistoryRepository` capability, preserving compatibility for organization adapters that implement only the required report-job repository port.
+- Versioned strict report-history cursors and two compliant SQLite indexes, `idx_report_jobs_created_id` and `idx_report_jobs_status_created_id`, for stable unfiltered and status-filtered traversal.
+
+### Security
+
+- Report-history items and cursors exclude subject labels, birth data, user context, stored requests, fingerprints, idempotency material, generated copy, model traces, and artifact paths.
+- Malformed or unsupported cursors fail closed with HTTP 400, and legacy adapters fail explicitly with HTTP 501 instead of maintaining unsafe process-local history.
+
 ### Planned
 
 - PostgreSQL and object-storage adapters for horizontally scalable multi-node deployments.

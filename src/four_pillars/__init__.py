@@ -7,6 +7,7 @@ from .ports import (
     ArtifactPublisher,
     IdempotentReportJobRepository,
     ReportInterpreter,
+    ReportJobHistoryRepository,
     ReportJobRepository,
 )
 from .version import __version__
@@ -18,6 +19,7 @@ __all__ = [
     "Gender",
     "IdempotentReportJobRepository",
     "ReportInterpreter",
+    "ReportJobHistoryRepository",
     "ReportJobRepository",
     "__version__",
     "calculate_annual_luck",

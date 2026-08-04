@@ -35,9 +35,11 @@ Consumes a `Chart` and creates daewoon scenarios, annual snapshots, and monthly 
 
 The quality gate compares calculation fingerprints, verifies required chapters, requires opportunity/caution/action lists, tests constructive relationship guidance, scans forbidden/vague copy, rejects deterministic event certainty and medical directions, and validates the disclaimer. Failure becomes a `quality_failed` job after the bounded repair attempt.
 
-### 3.5 `jobs.py`, `service.py`, and `api.py`
+### 3.5 `jobs.py`, `history.py`, `service.py`, and `api.py`
 
-SQLite stores queued, running, completed, failed, and quality-failed jobs. `BEGIN IMMEDIATE` provides an atomic claim operation for one or more workers. The service calculates, calls NIM, writes to a temporary artifact directory, and atomically renames it. FastAPI exposes calculation, queue, status, deletion, and allow-listed artifact endpoints.
+SQLite stores queued, running, completed, failed, and quality-failed jobs. `BEGIN IMMEDIATE` provides atomic keyed creation and claim operations. `history.py` encodes strict versioned continuation cursors containing only a UTC timestamp and random UUID. `JobStore` implements indexed `(created_at DESC, id DESC)` keyset traversal with exact optional status filtering. The service calculates, calls NIM, writes to a temporary artifact directory, and atomically renames it. FastAPI exposes calculation, enqueue, redacted history, individual status, deletion, and allow-listed artifact endpoints.
+
+The required `ReportJobRepository` remains backward compatible. Atomic keyed creation and history traversal are separate runtime-checkable capabilities, so an existing organization or MSA adapter can continue serving required operations and fails explicitly only when an unsupported optional endpoint is invoked.
 
 ### 3.6 `reporting.py`
 
@@ -54,6 +56,7 @@ The renderer escapes HTML, uses fixed semantic colors, builds searchable Korean 
 7. Optional editorial repair changes copy but cannot change calculations.
 8. Renderer writes JSON, HTML, PDF, traces, and manifest to a temporary UUID directory.
 9. Successful generation atomically publishes the directory and marks the job completed.
+10. Authenticated history reads return only redacted job summaries and an opaque exclusive keyset boundary; they never read or serialize stored report requests.
 
 ## 5. Calculation policy
 
@@ -67,9 +70,13 @@ The API key is supplied only through the `NVIDIA_NIM_API_KEY` environment variab
 
 The queue persists before LLM work begins. Workers claim one job atomically. Partial artifact directories are hidden with a dot prefix and deleted after failure. Terminal errors are truncated before database storage. A worker restart leaves already-running jobs visible for operational inspection; a future recovery command may requeue them after an operator confirms that no worker owns them. Calculation and quality errors are distinguished from network/model errors.
 
+History pages fetch one more row than requested and emit a cursor only when another row exists. Equal timestamps use the UUID as a deterministic tie-breaker. New concurrent inserts appear on a future first-page read rather than inside an existing continuation sequence. Unsupported cursor versions and malformed payloads fail closed.
+
 ## 8. Security and privacy
 
 Birth context is untrusted data enclosed in a JSON input boundary. API keys use digest comparison. Artifact names are allow-listed and path-resolved. HTML is escaped. UUIDs avoid personal filenames. Container execution uses a non-root account. Production must use TLS, restricted artifact storage, secret management, log redaction, and retention/deletion procedures.
+
+Report-history responses and cursors exclude subject labels, birth data, user notes, request fingerprints, idempotency material, generated copy, model traces, and artifact paths. The history cursor is not an authorization credential; the same optional API-key dependency protects the endpoint.
 
 ## 9. Observability
 
@@ -77,8 +84,8 @@ Health checks prove process availability; readiness verifies artifact writes and
 
 ## 10. Test strategy
 
-Unit tests cover known pillars, solar-term boundaries, time policies, ten gods, daewoon direction, monthly period dates, queue transitions, quality rules, report rendering, and API authentication. NIM contract tests use `httpx.MockTransport`; live hosted-NIM tests are marked and skipped without `NVIDIA_NIM_API_KEY`. CI compiles the source, validates documents/prompts, runs Ruff and coverage, and builds an installable wheel.
+Unit tests cover known pillars, solar-term boundaries, time policies, ten gods, daewoon direction, monthly period dates, queue transitions, idempotent creation, strict history cursors, stable multi-page traversal, privacy redaction, optional adapter behavior, quality rules, report rendering, and API authentication. NIM contract tests use `httpx.MockTransport`; live hosted-NIM tests are marked and skipped without `NVIDIA_NIM_API_KEY`. CI compiles the source, validates documents/prompts, runs Ruff, enforces exactly 100 percent statement and branch coverage, builds distributions, and verifies the pinned runtime container.
 
 ## 11. Deployment
 
-The same image runs API or worker commands. Docker Compose mounts one shared artifact volume. SQLite is appropriate for a single-node deployment; a multi-node edition should replace `JobStore` with PostgreSQL or a managed queue while preserving the application interface. NIM base URL and model are configuration because free hosted model availability can change.
+The same image runs API or worker commands. Docker Compose mounts one shared artifact volume. SQLite is appropriate for a single-node deployment; a multi-node edition should replace `JobStore` with PostgreSQL or a managed queue while preserving required and optional application interfaces. A history-capable remote adapter must preserve deterministic exclusive keyset ordering across every API instance. NIM base URL and model are configuration because free hosted model availability can change.

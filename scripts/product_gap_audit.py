@@ -1,4 +1,4 @@
-"""Audit release automation, modularity, prompts, credentials, and database naming."""
+"""Audit release, modularity, history, prompts, credentials, and database naming."""
 
 from __future__ import annotations
 
@@ -40,6 +40,17 @@ REQUIRED_DOCUMENTS = (
 REQUIRED_WORKFLOWS = (
     ".github/workflows/hourly-product-loop.yml",
     ".github/workflows/release.yml",
+)
+HISTORY_CONTRACTS = (
+    ("src/four_pillars/ports.py", "class ReportJobHistoryRepository"),
+    ("src/four_pillars/jobs.py", "idx_report_jobs_created_id"),
+    ("src/four_pillars/jobs.py", "idx_report_jobs_status_created_id"),
+    ("src/four_pillars/api.py", "class ReportJobPageView"),
+    ("docs/technical/API.md", "### Report history"),
+    (
+        "docs/technical/MODULARITY.md",
+        "### Optional report-job history repository",
+    ),
 )
 TEXT_SUFFIXES = {".md", ".py", ".toml", ".yaml", ".yml"}
 IGNORED_PARTS = {
@@ -95,6 +106,23 @@ def _database_names() -> list[str]:
             ]
 
 
+def audit_history_contract(root: Path) -> list[ProductGap]:
+    """Return gaps in the optional report-history code and documentation contract."""
+    gaps: list[ProductGap] = []
+    for relative, token in HISTORY_CONTRACTS:
+        path = root / relative
+        text = path.read_text(encoding="utf-8") if path.is_file() else ""
+        if token not in text:
+            gaps.append(
+                _gap(
+                    "report_history_contract",
+                    relative,
+                    f"Report-history contract is missing {token!r}.",
+                )
+            )
+    return gaps
+
+
 def audit_repository(root: Path) -> list[ProductGap]:
     """Return all release-quality gaps that can be verified without network access."""
     root = root.resolve()
@@ -103,13 +131,33 @@ def audit_repository(root: Path) -> list[ProductGap]:
     for relative in REQUIRED_DOCUMENTS:
         path = root / relative
         if not path.is_file():
-            gaps.append(_gap("missing_document", relative, "Required product or operations document is missing."))
+            gaps.append(
+                _gap(
+                    "missing_document",
+                    relative,
+                    "Required product or operations document is missing.",
+                )
+            )
         elif len(path.read_text(encoding="utf-8").strip()) < 120:
-            gaps.append(_gap("thin_document", relative, "Required document is too short to be operationally useful."))
+            gaps.append(
+                _gap(
+                    "thin_document",
+                    relative,
+                    "Required document is too short to be operationally useful.",
+                )
+            )
 
     for relative in REQUIRED_WORKFLOWS:
         if not (root / relative).is_file():
-            gaps.append(_gap("missing_workflow", relative, "Required governance workflow is missing."))
+            gaps.append(
+                _gap(
+                    "missing_workflow",
+                    relative,
+                    "Required governance workflow is missing.",
+                )
+            )
+
+    gaps.extend(audit_history_contract(root))
 
     pyproject_path = root / "pyproject.toml"
     version_path = root / "src/four_pillars/version.py"
@@ -117,9 +165,20 @@ def audit_repository(root: Path) -> list[ProductGap]:
     if pyproject_path.is_file():
         pyproject = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
         project_version = str(pyproject.get("project", {}).get("version", ""))
-        coverage_floor = pyproject.get("tool", {}).get("coverage", {}).get("report", {}).get("fail_under")
+        coverage_floor = (
+            pyproject.get("tool", {})
+            .get("coverage", {})
+            .get("report", {})
+            .get("fail_under")
+        )
         if coverage_floor != 100:
-            gaps.append(_gap("coverage_floor", "pyproject.toml", "Statement and branch coverage must fail below 100%."))
+            gaps.append(
+                _gap(
+                    "coverage_floor",
+                    "pyproject.toml",
+                    "Statement and branch coverage must fail below 100%.",
+                )
+            )
         if version_path.is_file():
             match = re.search(
                 r'^__version__\s*=\s*["\']([^"\']+)["\']',
@@ -128,9 +187,25 @@ def audit_repository(root: Path) -> list[ProductGap]:
             )
             runtime_version = match.group(1) if match else ""
             if runtime_version != project_version:
-                gaps.append(_gap("version_mismatch", "src/four_pillars/version.py", "Runtime and package versions differ."))
-        if changelog_path.is_file() and f"## [{project_version}]" not in changelog_path.read_text(encoding="utf-8"):
-            gaps.append(_gap("missing_release_notes", "CHANGELOG.md", "Current package version has no changelog entry."))
+                gaps.append(
+                    _gap(
+                        "version_mismatch",
+                        "src/four_pillars/version.py",
+                        "Runtime and package versions differ.",
+                    )
+                )
+        if (
+            changelog_path.is_file()
+            and f"## [{project_version}]"
+            not in changelog_path.read_text(encoding="utf-8")
+        ):
+            gaps.append(
+                _gap(
+                    "missing_release_notes",
+                    "CHANGELOG.md",
+                    "Current package version has no changelog entry.",
+                )
+            )
 
     legacy_key = "NVIDIA_" + "API_KEY"
     for path in _text_files(root):
@@ -145,16 +220,40 @@ def audit_repository(root: Path) -> list[ProductGap]:
 
     manifest = prompt_manifest()
     if set(manifest) != set(PROMPT_NAMES):
-        gaps.append(_gap("prompt_manifest", "src/four_pillars/prompts", "Prompt manifest is incomplete."))
+        gaps.append(
+            _gap(
+                "prompt_manifest",
+                "src/four_pillars/prompts",
+                "Prompt manifest is incomplete.",
+            )
+        )
     for name, metadata in manifest.items():
         if not re.fullmatch(r"\d+\.\d+\.\d+", metadata["version"]):
-            gaps.append(_gap("prompt_version", f"src/four_pillars/prompts/{name}.md", "Prompt version is not semantic."))
+            gaps.append(
+                _gap(
+                    "prompt_version",
+                    f"src/four_pillars/prompts/{name}.md",
+                    "Prompt version is not semantic.",
+                )
+            )
         if not re.fullmatch(r"[0-9a-f]{64}", metadata["sha256"]):
-            gaps.append(_gap("prompt_digest", f"src/four_pillars/prompts/{name}.md", "Prompt digest is not SHA-256."))
+            gaps.append(
+                _gap(
+                    "prompt_digest",
+                    f"src/four_pillars/prompts/{name}.md",
+                    "Prompt digest is not SHA-256.",
+                )
+            )
 
     for name in _database_names():
         if not is_valid_database_identifier(name):
-            gaps.append(_gap("database_identifier", "src/four_pillars/jobs.py", f"Database object {name!r} violates the naming policy."))
+            gaps.append(
+                _gap(
+                    "database_identifier",
+                    "src/four_pillars/jobs.py",
+                    f"Database object {name!r} violates the naming policy.",
+                )
+            )
 
     for relative in ("src/four_pillars/calendar.py", "src/four_pillars/fortune.py"):
         text = (root / relative).read_text(encoding="utf-8")
@@ -171,8 +270,17 @@ def audit_repository(root: Path) -> list[ProductGap]:
     hourly_workflow = root / ".github/workflows/hourly-product-loop.yml"
     if hourly_workflow.is_file():
         workflow_text = hourly_workflow.read_text(encoding="utf-8")
-        if "cron: '17 * * * *'" not in workflow_text or "workflow_dispatch:" not in workflow_text:
-            gaps.append(_gap("hourly_schedule", hourly_workflow.relative_to(root).as_posix(), "Hourly schedule or manual dispatch is missing."))
+        if (
+            "cron: '17 * * * *'" not in workflow_text
+            or "workflow_dispatch:" not in workflow_text
+        ):
+            gaps.append(
+                _gap(
+                    "hourly_schedule",
+                    hourly_workflow.relative_to(root).as_posix(),
+                    "Hourly schedule or manual dispatch is missing.",
+                )
+            )
 
     release_workflow = root / ".github/workflows/release.yml"
     if release_workflow.is_file():
@@ -185,11 +293,26 @@ def audit_repository(root: Path) -> list[ProductGap]:
             "gh release create",
         )
         if not all(token in workflow_text for token in required_release_tokens):
-            gaps.append(_gap("release_workflow", release_workflow.relative_to(root).as_posix(), "Release workflow is incomplete or not reusable."))
+            gaps.append(
+                _gap(
+                    "release_workflow",
+                    release_workflow.relative_to(root).as_posix(),
+                    "Release workflow is incomplete or not reusable.",
+                )
+            )
         if "NVIDIA_NIM_API_KEY" in workflow_text:
-            gaps.append(_gap("release_secret_boundary", release_workflow.relative_to(root).as_posix(), "Release workflow must not receive the hosted NIM credential."))
+            gaps.append(
+                _gap(
+                    "release_secret_boundary",
+                    release_workflow.relative_to(root).as_posix(),
+                    "Release workflow must not receive the hosted NIM credential.",
+                )
+            )
 
-    return sorted(gaps, key=lambda item: (item.severity, item.code, item.path, item.message))
+    return sorted(
+        gaps,
+        key=lambda item: (item.severity, item.code, item.path, item.message),
+    )
 
 
 def render_markdown(gaps: list[ProductGap]) -> str:
@@ -202,12 +325,19 @@ def render_markdown(gaps: list[ProductGap]) -> str:
         "",
     ]
     if not gaps:
-        lines.append("All deterministic release, modularity, prompt, credential, and database naming contracts passed.")
+        lines.append(
+            "All deterministic release, modularity, history, prompt, credential, "
+            "and database naming contracts passed."
+        )
     else:
-        lines.extend(("| Severity | Code | Path | Finding |", "|---|---|---|---|"))
+        lines.extend(
+            ("| Severity | Code | Path | Finding |", "|---|---|---|---|")
+        )
         for gap in gaps:
             message = gap.message.replace("|", "\\|")
-            lines.append(f"| {gap.severity} | `{gap.code}` | `{gap.path}` | {message} |")
+            lines.append(
+                f"| {gap.severity} | `{gap.code}` | `{gap.path}` | {message} |"
+            )
     return "\n".join(lines) + "\n"
 
 

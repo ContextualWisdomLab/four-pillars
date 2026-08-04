@@ -56,8 +56,10 @@ def test_health_and_chart_golden_case(tmp_path: Path) -> None:
 def test_optional_api_key_uses_sha256_digest(tmp_path: Path) -> None:
     with client(tmp_path, api_key="secret") as http:
         assert http.post("/v1/chart", json=BIRTH).status_code == 401
+        assert http.get("/v1/reports").status_code == 401
         assert http.post("/v1/chart", json=BIRTH, headers={"X-API-Key": "wrong"}).status_code == 401
         assert http.post("/v1/chart", json=BIRTH, headers={"X-API-Key": "secret"}).status_code == 200
+        assert http.get("/v1/reports", headers={"X-API-Key": "secret"}).status_code == 200
 
 
 def test_report_request_is_queued_durably_without_echoing_sensitive_input(tmp_path: Path) -> None:

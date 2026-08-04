@@ -26,7 +26,7 @@ The studio generates one UUID idempotency key when report enqueueing starts. A n
 
 `POST /v1/reports` validates a report request and returns HTTP 202 with a queued job. The body contains `subject_name`, `birth`, `annual_year`, `monthly_year`, `monthly_month`, and optional `user_context`. The request is durable before NIM is called.
 
-`POST /v1/reports` and `GET /v1/reports/{job_id}` return only the job ID, public status, timestamps, bounded error text, and available artifact filenames. They never echo birth data, context notes, the stored request, or an internal artifact path.
+`POST /v1/reports`, `GET /v1/reports`, and `GET /v1/reports/{job_id}` return only job identifiers, public status, timestamps, bounded error text, and available artifact filenames. They never echo birth data, subject labels, context notes, stored requests, request fingerprints, idempotency material, generated report text, model traces, or internal artifact paths.
 
 A separate worker started with `four-pillars worker` claims jobs. This avoids tying long NIM calls to an HTTP request and allows the API to restart independently.
 
@@ -48,6 +48,22 @@ The idempotency record has the same lifecycle as its report job. It remains repl
 
 Idempotency is an optional repository capability so existing custom adapters remain compatible with normal report creation. An injected adapter that implements only `ReportJobRepository` continues to serve requests without the header. If a keyed request reaches an adapter that does not also implement `IdempotentReportJobRepository`, the API returns HTTP 501 rather than emulating unsafe process-local atomicity.
 
+### Report history
+
+`GET /v1/reports` returns a privacy-safe newest-first page of report jobs. It accepts:
+
+- `limit`, default `20`, with a minimum of `1` and maximum of `100`;
+- optional `status`, which must be one of the public `JobStatus` values; and
+- optional `cursor`, which must be the opaque continuation token from the preceding response.
+
+The response contains `items` and `next_cursor`. Each item has exactly the same redacted shape as `GET /v1/reports/{job_id}`. `next_cursor` is `null` when no later page exists.
+
+Rows are ordered by `(created_at DESC, id DESC)`. The UUID is a deterministic tie-breaker for jobs created at the same timestamp. Pagination uses a keyset boundary rather than a numeric offset, so a continuation sequence does not repeat or skip its existing rows when new jobs are inserted. A new job created after the first page appears on a future first-page request, not inside an already-issued continuation sequence. Deleted and retention-purged rows naturally disappear.
+
+The cursor is `v1.` followed by unpadded RFC 4648 base64url encoding of compact JSON containing only a UTC RFC 3339 timestamp and random job UUID. It is neither an authorization credential nor an encrypted token. Unknown versions, malformed base64url, invalid JSON, extra fields, non-UTC timestamps, and invalid UUIDs return HTTP 400. The same optional API-key authentication used by other report endpoints protects the collection.
+
+History traversal is a separate optional repository capability. Existing adapters that implement only `ReportJobRepository` remain compatible with creation, lookup, processing, retention, and deletion. A history request against an adapter without `ReportJobHistoryRepository` returns HTTP 501 instead of maintaining unsafe process-local state.
+
 ## Artifacts
 
 `GET /v1/reports/{job_id}/artifacts/{filename}` accepts only `chart.json`, `daewoon.json`, `annual.json`, `monthly.json`, `report.json`, `traces.json`, `manifest.json`, `report.html`, or `report.pdf`. The optional `download=false` omits the attachment filename. Any path traversal or unknown name returns 404.
@@ -64,7 +80,7 @@ The service resolves the database path and requires it to be the direct UUID chi
 
 ## Error behavior
 
-Pydantic validation returns HTTP 422. Missing resources return 404. Authentication failures return 401. Non-terminal deletion returns 409. A malformed `Idempotency-Key` returns 400, reuse for a different payload returns 422, and a keyed request against a legacy repository adapter without the optional capability returns 501. Calculation policy errors are returned synchronously by calculation endpoints; report-generation failures are stored on the job. NIM content that remains schema-invalid after the bounded repair becomes a failed job. Report copy that remains unsafe or contains a sexagenary pillar absent from the deterministic evidence after editorial repair becomes `quality_failed` and is not published as a completed PDF.
+Pydantic validation returns HTTP 422. Missing resources return 404. Authentication failures return 401. Non-terminal deletion returns 409. A malformed `Idempotency-Key` returns 400, reuse for a different payload returns 422, and a keyed request against a legacy repository adapter without the optional capability returns 501. A malformed report-history cursor returns 400, invalid history limits or statuses return 422, and a history request against a legacy repository without `ReportJobHistoryRepository` returns 501. Calculation policy errors are returned synchronously by calculation endpoints; report-generation failures are stored on the job. NIM content that remains schema-invalid after the bounded repair becomes a failed job. Report copy that remains unsafe or contains a sexagenary pillar absent from the deterministic evidence after editorial repair becomes `quality_failed` and is not published as a completed PDF.
 
 ## Example
 

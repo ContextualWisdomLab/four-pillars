@@ -7,8 +7,8 @@ Four Pillars converts verified birth data into a transparent Korean manse calend
 ## 2. Users
 
 - **Individual reader:** wants a clear natal, ten-year, annual, or monthly report without having to learn technical terminology.
-- **Professional consultant:** needs reproducible calculations, editable context, consistent report structure, and exportable files.
-- **Platform integrator:** needs an authenticated API, job status, deterministic JSON, report artifacts, and traceable prompt/model versions.
+- **Professional consultant:** needs reproducible calculations, editable context, consistent report structure, recoverable recent work, and exportable files.
+- **Platform integrator:** needs an authenticated API, job status and history, deterministic JSON, report artifacts, and traceable prompt/model versions.
 - **Operator:** needs health checks, retention, deletion, audit-friendly manifests, safe failure states, and NIM cost visibility.
 
 ## 3. Core jobs to be done
@@ -18,7 +18,8 @@ Four Pillars converts verified birth data into a transparent Korean manse calend
 3. Inspect daewoon, annual luck, and monthly luck without confusing Gregorian month boundaries with solar terms.
 4. Generate a Korean report whose claims remain consistent with the calculation.
 5. Receive constructive possibilities, cautions, decision criteria, and practical techniques rather than a list of warnings.
-6. Download JSON, HTML, PDF, and a generation manifest, then delete the job when it is no longer needed.
+6. Recover a recent durable report job after a page refresh, client restart, or operational handoff without exposing stored birth information in the collection response.
+7. Download JSON, HTML, PDF, and a generation manifest, then delete the job when it is no longer needed.
 
 ## 4. Functional requirements
 
@@ -42,13 +43,17 @@ Every required chapter shall contain a summary, constructive possibilities, caut
 
 The service shall provide FastAPI endpoints, a CLI, a durable SQLite job queue, a worker, calculation JSON, report JSON, searchable Korean HTML and A4 PDF, model/prompt traces, and SHA-256 file manifests. Artifacts shall be stored under random job identifiers without personal data in filenames.
 
+The authenticated report API shall provide a redacted newest-first job collection with exact lifecycle-status filtering and opaque keyset continuation. Collection items and cursors shall exclude subject labels, birth input, user notes, stored requests, request fingerprints, idempotency material, generated report text, model traces, and artifact paths. The required repository contract shall remain backward compatible; history traversal shall be a separate optional capability for standalone and MSA adapters.
+
 ## 5. Non-functional requirements
 
 - Deterministic calculation p95 under 250 ms for modern dates on one CPU core.
 - Report job state remains recoverable after API restart.
+- Report-history traversal remains stable for equal timestamps and does not repeat existing rows when new jobs are inserted during a continuation sequence.
 - Offline CI never requires an external LLM key.
 - Live NIM tests are opt-in and use a repository secret.
-- Test coverage remains at or above 85 percent.
+- Production statement and branch coverage remain exactly 100 percent.
+- Every public production API has a complete docstring.
 - API authentication can be enabled with a SHA-256 API-key digest.
 - Logs exclude raw birth context and generated report text by default.
 - Report retention defaults to 30 days and terminal jobs can be deleted immediately.
@@ -61,6 +66,8 @@ The service shall provide FastAPI endpoints, a CLI, a durable SQLite job queue, 
 - At least 95 percent schema-valid first-pass NIM responses in the evaluation set.
 - At least 90 percent of evaluated reports score 3 or higher on completeness, balance, clarity, safety, and actionability, with deterministic fidelity fixed at 4.
 - Less than 1 percent report-generation jobs end in an unclassified failure.
+- 0 personal-data fields in report-history items and cursors.
+- 0 duplicate job identifiers while traversing a stable continuation sequence.
 - User can identify the relevant calculation evidence and one practical next step from each major chapter.
 
 ## 7. Release scope
@@ -69,4 +76,4 @@ Version 0.1 includes one-person natal and luck reporting, Korean output, NIM int
 
 ## 8. Risks and mitigations
 
-Approximate solar longitude can be least reliable at a boundary, so the product emits a six-hour warning and records the policy. NIM availability can vary, so the client retries transient errors and never falls back to a different provider silently. Symbolic text can sound deterministic, so quality checks require conditional language and real-world decision disclaimers. Personal data can persist in output, so storage uses UUIDs, retention, explicit deletion, and restricted logs.
+Approximate solar longitude can be least reliable at a boundary, so the product emits a six-hour warning and records the policy. NIM availability can vary, so the client retries transient errors and never falls back to a different provider silently. Symbolic text can sound deterministic, so quality checks require conditional language and real-world decision disclaimers. Personal data can persist in output, so storage uses UUIDs, retention, explicit deletion, restricted logs, redacted history items, and cursors containing only UTC timestamps and random job UUIDs.

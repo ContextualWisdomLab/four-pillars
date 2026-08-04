@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 from .models import (
     Chart,
     DaewoonResult,
+    JobStatus,
     LuckSnapshot,
     ReportDocument,
     ReportJob,
@@ -61,6 +62,21 @@ class IdempotentReportJobRepository(Protocol):
         fingerprint: str,
     ) -> tuple[ReportJob, bool]:
         """Create or replay one queued job for a key and request fingerprint."""
+        raise NotImplementedError  # pragma: no cover - protocol declaration
+
+
+@runtime_checkable
+class ReportJobHistoryRepository(Protocol):
+    """Add stable report-job history traversal without changing the base port."""
+
+    def list_jobs(
+        self,
+        *,
+        limit: int,
+        cursor: str | None = None,
+        status: JobStatus | None = None,
+    ) -> tuple[list[ReportJob], str | None]:
+        """Return one newest-first page and its opaque continuation cursor."""
         raise NotImplementedError  # pragma: no cover - protocol declaration
 
 
