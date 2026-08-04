@@ -6,20 +6,31 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ## [Unreleased]
 
-### Added
-
-- Optional RFC 8941 structured-string `Idempotency-Key` support for `POST /v1/reports`, with canonical request fingerprints, durable replay, browser retry reuse, and explicit replay response headers.
-- A separate `IdempotentReportJobRepository` capability for atomic keyed creation, preserving compatibility for existing adapters that implement only the original repository port.
-
-### Security
-
-- Raw idempotency keys are never stored; only SHA-256 key digests and canonical request fingerprints are persisted, and reuse with a different payload is rejected.
-- Keyed requests against legacy adapters fail explicitly instead of using unsafe process-local locking in a potentially multi-node deployment.
-
 ### Planned
 
 - PostgreSQL and object-storage adapters for horizontally scalable multi-node deployments.
 - Additional independent golden-chart fixtures near solar-term boundaries.
+
+## [0.4.0] - 2026-08-04
+
+### Added
+
+- Optional RFC 8941 structured-string `Idempotency-Key` support for `POST /v1/reports`, with canonical request fingerprints, durable replay across process restarts, browser retry reuse, and explicit `Idempotency-Replayed` response headers.
+- A separate runtime-checkable `IdempotentReportJobRepository` capability for atomic keyed creation, preserving compatibility for organization adapters that implement only the original repository port.
+- Automatic migration of existing v0.3 SQLite job databases with canonical request fingerprint backfills and the two-word snake-case unique index `idx_report_jobs_idempotency_key_digest`.
+- Published API and modularity contracts for malformed keys, different-payload reuse, key expiration, legacy-adapter behavior, and multi-node database atomicity.
+
+### Changed
+
+- Package and API versions advance to `0.4.0`; deterministic calculation-policy and prompt versions remain unchanged.
+- Browser report retries keep one key only in page memory until durable enqueueing succeeds, then clear it; changing reviewed inputs invalidates the pending key.
+- The full release gate continues to require complete public API docstrings and 100% statement and branch coverage on Python 3.11 and 3.12.
+
+### Security
+
+- Raw idempotency keys are never stored; only SHA-256 key digests and canonical request fingerprints are persisted, and one key reused with a different payload is rejected.
+- Keyed requests against legacy adapters fail explicitly with HTTP 501 instead of using unsafe process-local locking in a potentially multi-node deployment.
+- Release validation, scheduled product checks, and idempotency handling never receive or read `NVIDIA_NIM_API_KEY`; hosted NVIDIA NIM remains an explicit interpretation boundary.
 
 ## [0.3.0] - 2026-08-04
 
@@ -66,6 +77,7 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 - Calculation data is the immutable source of truth; model output may interpret but cannot replace pillars, date boundaries, Ten Gods, interactions, or the calculation fingerprint.
 - Hosted model and evaluation model identifiers remain deployment configuration so operators can choose a currently available free NVIDIA NIM model.
 
-[Unreleased]: https://github.com/ContextualWisdomLab/four-pillars/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/ContextualWisdomLab/four-pillars/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/ContextualWisdomLab/four-pillars/releases/tag/v0.4.0
 [0.3.0]: https://github.com/ContextualWisdomLab/four-pillars/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ContextualWisdomLab/four-pillars/releases/tag/v0.2.0
