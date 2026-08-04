@@ -9,9 +9,9 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from four_pillars.idempotency import parse_idempotency_key, request_fingerprint
 
 from four_pillars.api import app, get_service
-from four_pillars.idempotency import parse_idempotency_key, request_fingerprint
 from four_pillars.jobs import IdempotencyKeyReuseError, JobStore
 from four_pillars.models import JobStatus
 from four_pillars.service import ReportService
