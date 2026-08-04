@@ -1,3 +1,5 @@
+"""Validate versioned prompt metadata and mandatory trust-boundary language."""
+
 from __future__ import annotations
 
 import re
@@ -9,6 +11,7 @@ REQUIRED_PHRASES = ("Immutable", "Output")
 
 
 def main() -> None:
+    """Fail when a committed AI prompt violates the repository prompt contract."""
     failures: list[str] = []
     for name in PROMPT_NAMES:
         prompt = load_prompt(name)
