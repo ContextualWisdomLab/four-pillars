@@ -13,9 +13,15 @@ from .adapters import FilesystemArtifactPublisher, NimReportInterpreter
 from .analysis import GeneratedReport
 from .calendar import calculate_chart
 from .fortune import calculate_annual_luck, calculate_daewoon, calculate_monthly_luck
+from .idempotency import request_fingerprint
 from .jobs import JobStore
 from .models import BirthInput, Chart, DaewoonResult, LuckSnapshot, ReportJob
-from .ports import ArtifactPublisher, ReportInterpreter, ReportJobRepository
+from .ports import (
+    ArtifactPublisher,
+    IdempotentReportJobRepository,
+    ReportInterpreter,
+    ReportJobRepository,
+)
 from .quality import ReportQualityError
 from .settings import Settings
 
@@ -32,6 +38,10 @@ ARTIFACT_NAMES = frozenset(
         "report.pdf",
     }
 )
+
+
+class IdempotencyNotSupportedError(RuntimeError):
+    """Signal that an injected legacy repository lacks atomic keyed creation."""
 
 
 class ReportRequest(BaseModel):
@@ -89,6 +99,29 @@ class ReportService:
     def enqueue(self, request: ReportRequest) -> ReportJob:
         """Persist one validated report request as a queued job."""
         return self.store.create(request.model_dump(mode="json"))
+
+    def enqueue_idempotent(
+        self,
+        request: ReportRequest,
+        idempotency_key_digest: str,
+    ) -> tuple[ReportJob, bool]:
+        """Persist or replay through the repository's optional atomic capability.
+
+        Raises:
+            IdempotencyNotSupportedError: When an injected legacy repository does
+                not implement ``IdempotentReportJobRepository``.
+        """
+        repository = self.store
+        if not isinstance(repository, IdempotentReportJobRepository):
+            raise IdempotencyNotSupportedError(
+                "The configured report repository does not support idempotent creation"
+            )
+        payload = request.model_dump(mode="json")
+        return repository.create_idempotent(
+            payload,
+            idempotency_key_digest,
+            request_fingerprint(payload),
+        )
 
     async def generate(self, request: ReportRequest) -> tuple[CalculationBundle, GeneratedReport]:
         """Calculate immutable evidence and invoke the configured interpretation port."""

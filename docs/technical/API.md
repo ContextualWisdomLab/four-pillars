@@ -10,6 +10,8 @@ The browser studio never writes the API key to `localStorage`, `sessionStorage`,
 
 `GET /` serves an accessible responsive workflow that separates calculation review from AI generation. The user enters birth information, reviews the deterministic pillars, adjacent solar-term boundary and fingerprint, and then explicitly submits the same input for report generation. The page polls the redacted job endpoint and renders only artifact filenames supplied by the server.
 
+The studio generates one UUID idempotency key when report enqueueing starts. A network failure keeps that key in page memory for the retry; a successful HTTP 202 response clears it. Changing any reviewed report input invalidates both the reviewed chart and the pending key. The key is never persisted by the browser.
+
 ## Calculation endpoints
 
 `POST /v1/chart` accepts a `BirthInput` object with local ISO `birth`, IANA `timezone`, `gender`, `calendar`, `lunar_leap_month`, `birth_time_known`, optional `longitude`, `time_basis`, and `day_boundary`. It returns the normalized moment, four pillars, day master, element balance, interactions, adjacent solar terms, warnings, policy version, and fingerprint.
@@ -28,6 +30,24 @@ The browser studio never writes the API key to `localStorage`, `sessionStorage`,
 
 A separate worker started with `four-pillars worker` claims jobs. This avoids tying long NIM calls to an HTTP request and allows the API to restart independently.
 
+### Idempotent report creation
+
+Clients may send an optional `Idempotency-Key` header when calling `POST /v1/reports`. The experimental contract follows `draft-ietf-httpapi-idempotency-key-header-07`: the field is an RFC 8941 **structured string**, not an unquoted token. The decoded value must contain 8 through 128 printable ASCII characters; only `\"` and `\\` string escapes are accepted. A quoted UUID is recommended, for example:
+
+```http
+Idempotency-Key: "8e03978e-40d5-43e8-bc93-6894a57f9324"
+```
+
+The service canonicalizes the validated JSON request with sorted object keys and compact separators, then computes a SHA-256 request fingerprint. It decodes the structured string and stores only its SHA-256 digest, never the raw client key.
+
+The first key-and-fingerprint pair creates a durable queued job. Repeating the same key with the same payload returns HTTP 202 and the **same job**, including while that asynchronous job is queued or running. The `Idempotency-Replayed` response header is `false` for the first enqueue and `true` for a replay. Durable job creation is the completed HTTP operation; report generation remains a separately observable worker lifecycle.
+
+A malformed field returns HTTP 400. Reusing the key with a different request fingerprint returns **HTTP 422** and does not create another job. Omitting the header preserves legacy behavior and creates a distinct job for each request.
+
+The idempotency record has the same lifecycle as its report job. It remains replayable across process restarts, and it expires only when the terminal job is **deleted or purged** under the configured retention policy. Deleting or purging the row removes the stored key digest and permits a future request to use that value again. Multi-node repository adapters must enforce the key lookup, fingerprint comparison, and first insert atomically with a unique database constraint.
+
+Idempotency is an optional repository capability so existing custom adapters remain compatible with normal report creation. An injected adapter that implements only `ReportJobRepository` continues to serve requests without the header. If a keyed request reaches an adapter that does not also implement `IdempotentReportJobRepository`, the API returns HTTP 501 rather than emulating unsafe process-local atomicity.
+
 ## Artifacts
 
 `GET /v1/reports/{job_id}/artifacts/{filename}` accepts only `chart.json`, `daewoon.json`, `annual.json`, `monthly.json`, `report.json`, `traces.json`, `manifest.json`, `report.html`, or `report.pdf`. The optional `download=false` omits the attachment filename. Any path traversal or unknown name returns 404.
@@ -44,7 +64,7 @@ The service resolves the database path and requires it to be the direct UUID chi
 
 ## Error behavior
 
-Pydantic validation returns HTTP 422. Missing resources return 404. Authentication failures return 401. Non-terminal deletion returns 409. Calculation policy errors are returned synchronously by calculation endpoints; report-generation failures are stored on the job. NIM content that remains schema-invalid after the bounded repair becomes a failed job. Report copy that remains unsafe or contains a sexagenary pillar absent from the deterministic evidence after editorial repair becomes `quality_failed` and is not published as a completed PDF.
+Pydantic validation returns HTTP 422. Missing resources return 404. Authentication failures return 401. Non-terminal deletion returns 409. A malformed `Idempotency-Key` returns 400, reuse for a different payload returns 422, and a keyed request against a legacy repository adapter without the optional capability returns 501. Calculation policy errors are returned synchronously by calculation endpoints; report-generation failures are stored on the job. NIM content that remains schema-invalid after the bounded repair becomes a failed job. Report copy that remains unsafe or contains a sexagenary pillar absent from the deterministic evidence after editorial repair becomes `quality_failed` and is not published as a completed PDF.
 
 ## Example
 

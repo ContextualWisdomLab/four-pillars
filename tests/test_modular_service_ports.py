@@ -22,8 +22,17 @@ from four_pillars.models import (
     ReportDocument,
     ReportJob,
 )
-from four_pillars.ports import ArtifactPublisher, ReportInterpreter, ReportJobRepository
-from four_pillars.service import ReportRequest, ReportService
+from four_pillars.ports import (
+    ArtifactPublisher,
+    IdempotentReportJobRepository,
+    ReportInterpreter,
+    ReportJobRepository,
+)
+from four_pillars.service import (
+    IdempotencyNotSupportedError,
+    ReportRequest,
+    ReportService,
+)
 from four_pillars.settings import Settings
 
 
@@ -96,6 +105,41 @@ class RecordingPublisher:
         return {"report.json": "fixture-digest"}
 
 
+class LegacyRepository:
+    """Forward the original repository contract without idempotent creation."""
+
+    def __init__(self, delegate: JobStore) -> None:
+        self.delegate = delegate
+
+    def create(self, request: dict[str, Any]) -> ReportJob:
+        """Create one queued job through the legacy contract."""
+        return self.delegate.create(request)
+
+    def get(self, job_id: str) -> ReportJob | None:
+        """Return one stored legacy job."""
+        return self.delegate.get(job_id)
+
+    def claim_next(self) -> ReportJob | None:
+        """Claim the next legacy job."""
+        return self.delegate.claim_next()
+
+    def finish(self, job_id: str, artifact_dir: Path) -> ReportJob:
+        """Finish one legacy job."""
+        return self.delegate.finish(job_id, artifact_dir)
+
+    def fail(self, job_id: str, error: str, *, quality: bool = False) -> ReportJob:
+        """Fail one legacy job."""
+        return self.delegate.fail(job_id, error, quality=quality)
+
+    def delete(self, job_id: str) -> bool:
+        """Delete one terminal legacy job."""
+        return self.delegate.delete(job_id)
+
+    def purge(self, retention_days: int) -> list[str]:
+        """Purge expired legacy jobs."""
+        return self.delegate.purge(retention_days)
+
+
 def request() -> ReportRequest:
     """Return a complete report request with integration context."""
     return ReportRequest(
@@ -136,8 +180,22 @@ def test_concrete_adapters_satisfy_runtime_port_contracts(tmp_path: Path) -> Non
     publisher = RecordingPublisher()
 
     assert isinstance(store, ReportJobRepository)
+    assert isinstance(store, IdempotentReportJobRepository)
     assert isinstance(interpreter, ReportInterpreter)
     assert isinstance(publisher, ArtifactPublisher)
+
+
+def test_idempotency_is_optional_for_existing_repository_adapters(tmp_path: Path) -> None:
+    """Keep legacy adapters usable and fail keyed enqueueing explicitly."""
+    configured = settings(tmp_path)
+    repository = LegacyRepository(JobStore(configured.sqlite_path))
+    service = ReportService(configured, store=repository)
+
+    assert isinstance(repository, ReportJobRepository)
+    assert not isinstance(repository, IdempotentReportJobRepository)
+    assert service.enqueue(request()).status is JobStatus.QUEUED
+    with pytest.raises(IdempotencyNotSupportedError, match="idempotent"):
+        service.enqueue_idempotent(request(), "0" * 64)
 
 
 @pytest.mark.asyncio

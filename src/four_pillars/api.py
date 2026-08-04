@@ -8,14 +8,20 @@ from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, status
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from .calendar import calculate_chart
 from .fortune import calculate_annual_luck, calculate_daewoon, calculate_monthly_luck
+from .idempotency import parse_idempotency_key
+from .jobs import IdempotencyKeyReuseError
 from .models import BirthInput, Chart, DaewoonResult, JobStatus, LuckSnapshot, ReportJob
-from .service import ReportRequest, ReportService
+from .service import (
+    IdempotencyNotSupportedError,
+    ReportRequest,
+    ReportService,
+)
 from .settings import Settings, get_settings
 from .version import __version__
 from .web import render_home
@@ -139,10 +145,35 @@ def monthly(request: LuckRequest) -> LuckSnapshot:
 )
 def create_report(
     request: ReportRequest,
+    response: Response,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     service: ReportService = Depends(get_service),
 ) -> ReportJobView:
-    """Persist a validated report request and return its queued job view."""
-    return _job_view(service.enqueue(request), service)
+    """Persist or safely replay a validated report request as a queued job."""
+    if idempotency_key is None:
+        return _job_view(service.enqueue(request), service)
+    try:
+        canonical_key = parse_idempotency_key(idempotency_key)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    key_digest = hashlib.sha256(canonical_key.encode("utf-8")).hexdigest()
+    try:
+        job, replayed = service.enqueue_idempotent(request, key_digest)
+    except IdempotencyKeyReuseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    except IdempotencyNotSupportedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=str(exc),
+        ) from exc
+    response.headers["Idempotency-Replayed"] = "true" if replayed else "false"
+    return _job_view(job, service)
 
 
 @app.get(

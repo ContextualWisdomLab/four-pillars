@@ -221,12 +221,14 @@ class JobStatus(StrEnum):
 
 
 class ReportJob(BaseModel):
-    """Internal durable job record including request, status, error, and artifact location."""
+    """Internal durable job record including request, status, and retry provenance."""
 
     id: str
     status: JobStatus
     request: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+    request_fingerprint: str | None = None
+    idempotency_key_digest: str | None = None
     error: str | None = None
     artifact_dir: str | None = None

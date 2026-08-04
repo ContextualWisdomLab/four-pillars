@@ -51,6 +51,20 @@ class ReportJobRepository(Protocol):
 
 
 @runtime_checkable
+class IdempotentReportJobRepository(Protocol):
+    """Add atomic idempotent creation without changing the base repository port."""
+
+    def create_idempotent(
+        self,
+        request: dict[str, Any],
+        idempotency_key_digest: str,
+        fingerprint: str,
+    ) -> tuple[ReportJob, bool]:
+        """Create or replay one queued job for a key and request fingerprint."""
+        raise NotImplementedError  # pragma: no cover - protocol declaration
+
+
+@runtime_checkable
 class ReportInterpreter(Protocol):
     """Interpret immutable chart and luck evidence into one validated report."""
 
