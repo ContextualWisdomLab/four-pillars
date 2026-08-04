@@ -1,3 +1,5 @@
+"""Run the opt-in hosted NVIDIA NIM report-quality evaluation fixture."""
+
 from __future__ import annotations
 
 import asyncio
@@ -14,12 +16,15 @@ from four_pillars.settings import Settings
 
 
 class JudgeResult(BaseModel):
+    """Structured scores and findings returned by the NIM quality judge."""
+
     scores: dict[str, int]
     passed: bool
     findings: list[str]
 
 
 def fixture_report() -> ReportDocument:
+    """Build a deterministic Korean report fixture for hosted judge evaluation."""
     keys = ("natal", "daewoon", "annual", "monthly", "work", "money", "relationships", "daily_rhythm")
     sections = {
         key: ReportSection(
@@ -54,6 +59,7 @@ def fixture_report() -> ReportDocument:
 
 
 async def main() -> None:
+    """Call the configured hosted judge and exit unsuccessfully when it rejects the fixture."""
     if not os.getenv("NVIDIA_NIM_API_KEY"):
         raise SystemExit("NVIDIA_NIM_API_KEY is required for live NIM evaluation")
     settings = Settings()
