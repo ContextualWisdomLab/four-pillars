@@ -1,3 +1,5 @@
+"""Define immutable stems, branches, relationships, solar terms, and editorial rules."""
+
 from __future__ import annotations
 
 STEMS_HANJA = ("甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸")
