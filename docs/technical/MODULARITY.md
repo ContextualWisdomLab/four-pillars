@@ -28,21 +28,40 @@ from four_pillars import (
 
 This boundary owns solar and lunar normalization, solar terms, pillars, Ten Gods, hidden stems, Twelve Growth Stages, interactions, luck periods, warnings, and the evidence fingerprint. A platform must treat these outputs as immutable facts for the selected calculation policy.
 
-### Interpretation adapter
+### Interpretation boundary
 
 `nim.py`, `prompts/`, and `analysis.py` own the hosted NVIDIA NIM request contract, schema validation, bounded repair, staged interpretation, and prompt provenance. They consume serialized calculation evidence and cannot overwrite deterministic values.
 
-The adapter requires `NVIDIA_NIM_API_KEY` only when interpretation is invoked. Calculation-only imports and endpoints have no hosted-service credential requirement.
+The default `NimReportInterpreter` in `adapters.py` opens a NIM client only when interpretation is invoked. It requires `NVIDIA_NIM_API_KEY` at that point. Calculation-only imports and endpoints have no hosted-service credential requirement.
 
 ### Application orchestration
 
-`service.py` composes calculation, interpretation, quality validation, job state, and artifact publishing. It is the seam for a future dependency-injected application container. A larger platform may wrap this service or provide alternate repositories and publishers while preserving `ReportRequest`, `CalculationBundle`, and `GeneratedReport` semantics.
+`service.py` composes calculation, interpretation, quality validation, job state, and artifact publishing. `ReportService` accepts three independent structural ports from `ports.py`:
+
+- `ReportJobRepository` for durable job creation, atomic claims, transitions, deletion, and retention;
+- `ReportInterpreter` for turning immutable evidence into a validated `GeneratedReport`; and
+- `ArtifactPublisher` for publishing approved artifacts into an isolated staging directory.
+
+If no ports are supplied, the service creates the standalone `JobStore`, `NimReportInterpreter`, and `FilesystemArtifactPublisher` adapters. An integration may replace one adapter without replacing the others.
+
+```python
+from four_pillars.service import ReportService
+
+service = ReportService(
+    settings,
+    store=postgres_report_repository,
+    interpreter=internal_nim_interpreter,
+    publisher=object_storage_publisher,
+)
+```
+
+The injected implementations are structurally typed. They do not need to inherit product base classes, but their behavior must satisfy the documented protocol and integration acceptance criteria.
 
 ### Infrastructure adapters
 
-`jobs.py` is the single-node SQLite queue adapter. `reporting.py` is the filesystem artifact publisher. `api.py`, `web.py`, and `cli.py` are delivery adapters. None of these redefine chart or report schemas.
+`jobs.py` is the single-node SQLite implementation of `ReportJobRepository`. `adapters.py` contains the default hosted-NIM interpreter and filesystem artifact publisher. `reporting.py` owns the atomic JSON, HTML, PDF, trace, and manifest writer. `api.py`, `web.py`, and `cli.py` are delivery adapters. None of these redefine chart or report schemas.
 
-A multi-node deployment should substitute a PostgreSQL or managed-queue adapter and object storage behind the application seam. It must preserve atomic claim semantics, terminal-state deletion, allow-listed artifact names, content hashes, and calculation fingerprints.
+A multi-node deployment should substitute a PostgreSQL or managed-queue repository and object storage behind the same application ports. It must preserve atomic claim semantics, terminal-state deletion, allow-listed artifact names, content hashes, and calculation fingerprints.
 
 ## Deployment forms
 
@@ -54,9 +73,17 @@ The shipped container can run an API command or a worker command against a share
 
 Another Python service can import the package and call deterministic functions directly. No global application object, database, HTTP client, or filesystem directory is created by importing `four_pillars`.
 
+The top-level package also exports the three structural port contracts for integration type annotations:
+
+```python
+from four_pillars import ArtifactPublisher, ReportInterpreter, ReportJobRepository
+```
+
 ### Internal MSA service
 
 A platform can deploy the API and worker independently, front them with organization authentication, and replace local storage adapters. Versioned JSON and Pydantic contracts remain the compatibility boundary. Calls across services should carry the calculation version, prompt versions, and fingerprint so provenance is preserved end to end.
+
+A remote repository adapter must keep claim and transition operations atomic. A remote artifact publisher must finish all files in the staging location before returning, because the application service publishes the completed directory only after the port returns successfully.
 
 ### Central workflow consumption
 
@@ -74,6 +101,20 @@ python -m build --no-isolation
 
 The repository remains the source of product-specific policy. Central workflows may add organization controls, attestations, deployment, or release promotion without copying the calculation and quality rules.
 
+## Port behavior contracts
+
+### Report job repository
+
+The repository owns durable lifecycle state. `claim_next` must atomically move at most one queued job to running. `finish` and `fail` must either update exactly one known job or report that the job does not exist. `delete` removes terminal jobs only. `purge` returns removed identifiers so the caller can clean corresponding artifacts.
+
+### Report interpreter
+
+The interpreter receives the subject label, natal chart, daewoon result, annual snapshot, monthly snapshot, and untrusted user context. It must return `GeneratedReport`; it must not mutate or recalculate deterministic evidence. Any hosted provider, model, prompt version, retry, and repair metadata remains traceable.
+
+### Artifact publisher
+
+The publisher receives a new staging path, the approved report, all deterministic evidence, and privacy-safe traces. It must create the staging directory and all intended files before returning. It must not publish outside the supplied path, and it returns content digests for observability even when the standalone service does not otherwise consume them.
+
 ## Data and naming contracts
 
 Database objects created by this product use at least two words in `snake_case`; `camelCase` and `PascalCase` are accepted for external systems that require them. One-word identifiers and mixed underscore/capital styles are rejected by the product-gap audit.
@@ -84,7 +125,7 @@ Public files and messages use UUID job identifiers rather than subject names. Ar
 
 Package and API versions follow Semantic Versioning. The changelog records user-visible and integration-visible changes. Calculation and prompt versions are independently recorded because a compatible application release may update one without changing the other.
 
-A breaking calculation-policy change requires a new calculation version and new golden fixtures. A breaking report or API schema change requires a major package version. Prompt wording changes require a prompt semantic-version update and evaluation evidence.
+A breaking calculation-policy change requires a new calculation version and new golden fixtures. A breaking report, port, or API schema change requires a major package version. Prompt wording changes require a prompt semantic-version update and evaluation evidence.
 
 ## Integration acceptance criteria
 
@@ -96,6 +137,7 @@ An integration is conformant when:
 - report quality validation runs before publication;
 - queue claims are atomic and terminal states are distinguishable;
 - artifact paths, names, hashes, retention, and deletion remain enforced;
+- supplied adapters satisfy the public structural ports without application forks;
 - the canonical NIM credential is `NVIDIA_NIM_API_KEY`;
 - database object names satisfy the repository naming policy; and
 - the full repository gate remains at 100% statement and branch coverage.
