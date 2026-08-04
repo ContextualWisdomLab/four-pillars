@@ -46,6 +46,8 @@ A malformed field returns HTTP 400. Reusing the key with a different request fin
 
 The idempotency record has the same lifecycle as its report job. It remains replayable across process restarts, and it expires only when the terminal job is **deleted or purged** under the configured retention policy. Deleting or purging the row removes the stored key digest and permits a future request to use that value again. Multi-node repository adapters must enforce the key lookup, fingerprint comparison, and first insert atomically with a unique database constraint.
 
+Idempotency is an optional repository capability so existing custom adapters remain compatible with normal report creation. An injected adapter that implements only `ReportJobRepository` continues to serve requests without the header. If a keyed request reaches an adapter that does not also implement `IdempotentReportJobRepository`, the API returns HTTP 501 rather than emulating unsafe process-local atomicity.
+
 ## Artifacts
 
 `GET /v1/reports/{job_id}/artifacts/{filename}` accepts only `chart.json`, `daewoon.json`, `annual.json`, `monthly.json`, `report.json`, `traces.json`, `manifest.json`, `report.html`, or `report.pdf`. The optional `download=false` omits the attachment filename. Any path traversal or unknown name returns 404.
@@ -62,7 +64,7 @@ The service resolves the database path and requires it to be the direct UUID chi
 
 ## Error behavior
 
-Pydantic validation returns HTTP 422. Missing resources return 404. Authentication failures return 401. Non-terminal deletion returns 409. A malformed `Idempotency-Key` returns 400, and reuse for a different payload returns 422. Calculation policy errors are returned synchronously by calculation endpoints; report-generation failures are stored on the job. NIM content that remains schema-invalid after the bounded repair becomes a failed job. Report copy that remains unsafe or contains a sexagenary pillar absent from the deterministic evidence after editorial repair becomes `quality_failed` and is not published as a completed PDF.
+Pydantic validation returns HTTP 422. Missing resources return 404. Authentication failures return 401. Non-terminal deletion returns 409. A malformed `Idempotency-Key` returns 400, reuse for a different payload returns 422, and a keyed request against a legacy repository adapter without the optional capability returns 501. Calculation policy errors are returned synchronously by calculation endpoints; report-generation failures are stored on the job. NIM content that remains schema-invalid after the bounded repair becomes a failed job. Report copy that remains unsafe or contains a sexagenary pillar absent from the deterministic evidence after editorial repair becomes `quality_failed` and is not published as a completed PDF.
 
 ## Example
 
