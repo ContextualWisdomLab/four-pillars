@@ -91,8 +91,11 @@ def test_browser_history_uses_authenticated_downloads_and_bounded_error_copy() -
     assert "fetch(`/v1/reports/${jobId}/artifacts/${name}`,{headers:headers()})" in page
     assert "URL.createObjectURL" in page
     assert "link.download=name" in page
+    assert "setTimeout(()=>URL.revokeObjectURL(url),1000)" in page
     assert "function boundedHistoryDetail" in page
     assert "slice(0,239)" in page
+    assert "historyMessage(boundedHistoryDetail(text),true)" in page
+    assert "message(boundedHistoryDetail(error.message),true)" in page
 
 
 def test_browser_history_uses_safe_dom_and_ephemeral_state_only() -> None:
