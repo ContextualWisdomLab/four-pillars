@@ -107,7 +107,7 @@ def assert_token_contract_detects_missing_entries(
 
 
 def test_report_history_contract_audit_detects_missing_tokens(tmp_path: Path) -> None:
-    """Keep history code, indexes, API, and modular doctoring in one audited unit."""
+    """Keep history code, indexes, API, and modular documentation in one audited unit."""
     module = load_audit_module()
     assert_token_contract_detects_missing_entries(
         tmp_path,
@@ -117,7 +117,7 @@ def test_report_history_contract_audit_detects_missing_tokens(tmp_path: Path) ->
 
 
 def test_interpretation_contract_audit_detects_missing_tokens(tmp_path: Path) -> None:
-    """Keep backend selection, credentials, adapters, and operations doctoring aligned."""
+    """Keep backend selection, credentials, adapters, and operations documentation aligned."""
     module = load_audit_module()
     assert_token_contract_detects_missing_entries(
         tmp_path,
@@ -148,7 +148,7 @@ def test_standards_doctoring_contains_authoritative_and_peer_reviewed_sources() 
         "ISO/IEC 23894:2023",
         "NIST AI 600-1",
         "RFC 9457",
-        "W3C Recommendation",
+        "W3C recommendation",
         "10.18653/v1/2024.emnlp-main.427",
         "10.18653/v1/2024.emnlp-main.474",
     ):
