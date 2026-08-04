@@ -2,17 +2,22 @@
 
 ## Start and stop
 
-Create `.env` from `.env.example`, set secrets outside source control, and run `docker compose up -d --build`. The API listens on port 8000 and the worker shares the `artifacts` volume. Stop with `docker compose down`; add `-v` only when the operator intentionally deletes the SQLite database and all artifacts.
+Create `.env` from `.env.example`, choose exactly one `INTERPRETATION_BACKEND`, set secrets outside source control, and run `docker compose up -d --build`. The API listens on port 8000 and the worker shares the `artifacts` volume. Stop with `docker compose down`; add `-v` only when intentionally deleting the SQLite database and all artifacts.
+
+Direct standalone generation uses `INTERPRETATION_BACKEND=nvidia_nim` and `NVIDIA_NIM_API_KEY`. Organization routing uses `INTERPRETATION_BACKEND=contextual_orchestrator`, `CONTEXTUAL_ORCHESTRATOR_BASE_URL`, and `CONTEXTUAL_ORCHESTRATOR_TOKEN`. Do not configure automatic failover between them.
 
 ## Readiness checklist
 
 1. `GET /health` returns `ok` and the expected version.
 2. `GET /ready` returns `ready` and produces no permission error.
-3. A golden chart request returns the committed pillar fixture and a fingerprint.
+3. A golden chart request returns the committed pillar fixture and fingerprint.
 4. A queued report changes to running when the worker is available.
-5. A NIM-enabled smoke job completes and its manifest hashes match the files.
-6. PDF text can be selected and Korean glyphs display correctly.
-7. API authentication rejects an incorrect key when enabled.
+5. A selected-backend smoke job completes and its manifest hashes match files.
+6. `traces.json` records model, attempts, repairs, prompt versions, and prompt hashes without credentials or raw prompt content.
+7. PDF text can be selected and Korean glyphs display correctly.
+8. API authentication rejects an incorrect key when enabled.
+9. Contextual Orchestrator deployments show `service=four-pillars` in the shared usage ledger and no personal data in attribution.
+10. `python scripts/product_gap_audit.py` and `python scripts/check_docs.py` pass, including standards traceability.
 
 ## Common incidents
 
@@ -22,28 +27,67 @@ Check that the worker container is running, points to the same `DATABASE_URL` an
 
 ### Jobs remain running after a crash
 
-Confirm that no worker owns the job. Preserve the database and temporary directory for evidence. The current release does not automatically requeue running jobs because duplicate hosted NIM calls can create inconsistent charges and artifacts. Operators may recreate the request as a new job after recording the incident.
+Confirm that no worker owns the job. Preserve the database and temporary directory for evidence. The current release does not automatically requeue running jobs because duplicate model calls can create inconsistent charges and artifacts. Operators may recreate the request as a new idempotent job after recording the incident.
 
-### NIM returns 429 or 5xx
+### Direct NVIDIA NIM returns 429 or 5xx
 
-Inspect `traces.json` or job error for attempt count, verify account quota and model availability, and reduce concurrent workers. Retry only after the service's bounded retries finish. Do not add an undocumented provider fallback.
+Confirm `INTERPRETATION_BACKEND=nvidia_nim`, inspect the bounded job error/trace, verify account quota and model availability, and reduce concurrent workers. Retry only after the service's bounded retries finish. Do not add an undocumented provider fallback. Use `NVIDIA_NIM_API_KEY` exclusively for this path.
+
+### Contextual Orchestrator is unavailable
+
+Confirm `INTERPRETATION_BACKEND=contextual_orchestrator`, gateway DNS/TLS, `/v1/chat/completions`, Bearer token scope, selected orchestrator model, route capacity, and downstream worker health. Compare Four Pillars attempts with the gateway request/cost ledger. Do not expose or forward `NVIDIA_NIM_API_KEY` from Four Pillars to the gateway and do not switch to direct NIM under the same job.
+
+### Contextual Orchestrator rejects structured requests
+
+Confirm that its deployed version accepts OpenAI-compatible `response_format`, `attribution`, and `routing`. Four Pillars intentionally uses `response_format={"type":"json_object"}` to preserve schema-oriented provider behavior. Reproduce with the offline mock contract and the orchestrator's passthrough tests before changing either side.
+
+### Attribution or cost records are incorrect
+
+Expected attribution always includes `service=four-pillars`; account, team, group, and company are optional deployment labels. It must not include subject names, birth data, notes, fingerprints, prompt/generated content, artifact paths, or credentials. Correct configuration or orchestrator ledger logic in a reviewed PR. Do not add sensitive labels to aid debugging.
 
 ### Quality failures increase
 
-Compare the model, prompt versions, and failed findings. Run offline fixtures and the live judge suite against the candidate model. Repair prompts or model configuration in a pull request; never weaken deterministic fingerprint checks to increase completion rate.
+Compare selected backend, actual model, route, prompt versions, and failed findings. Run deterministic fixtures and the supplementary live judge suite where authorized. Repair prompts, routing, or model configuration in a pull request; never weaken fingerprint, allowed-pillar, medical, coercion, relationship-balance, or event-certainty controls to increase completion rate.
 
 ### PDF generation fails
 
-Verify ReportLab is installed, the artifact volume is writable, and CJK CID font registration succeeds. Preserve `report.json` to reproduce locally. A PDF failure must not mark the job completed.
+Verify ReportLab, artifact-volume permissions, and CJK CID font registration. Preserve `report.json` to reproduce locally. A PDF failure must not mark the job completed.
+
+### Standards or hourly checks fail
+
+Read the single `[hourly-product-loop] release-quality regression` issue and attached logs. Restore missing APA references, traceability mappings, docstrings, coverage, database naming, or build evidence rather than suppressing the gate. A standard revision triggers review; it does not silently change production behavior.
 
 ## Backups and recovery
 
-For a single-node deployment, stop the worker briefly or use SQLite's online backup API, then copy the database and completed artifact directories to encrypted storage. Restore both the database and matching UUID directories. Manifests allow file-integrity verification after restore. NIM keys and API-key digests are restored from secret management, not backup archives.
+For a single-node deployment, stop the worker briefly or use SQLite's online backup API, then copy the database and completed artifact directories to encrypted storage. Restore both database and matching UUID directories. Manifests permit integrity verification. API keys, NIM keys, and orchestrator tokens come from secret management, not backup archives.
+
+A multi-node integration must document transaction guarantees, backup/restore point objectives, object-version recovery, idempotency uniqueness, and deterministic history ordering behind the same structural ports.
 
 ## Retention and deletion
 
-The default retention is 30 days. `four-pillars cleanup` deletes terminal database rows older than the configured period and their UUID directories. An authenticated DELETE endpoint removes an individual terminal job immediately. Logs must not retain raw report contents after artifacts are deleted.
+Default retention is 30 days. `four-pillars cleanup` deletes terminal database rows older than the configured period and their UUID directories. An authenticated DELETE endpoint removes an individual terminal job immediately. Logs and gateway metadata must not retain raw report contents after authorized deletion beyond documented provider obligations.
+
+## Security response
+
+1. Revoke exposed API, NIM, or orchestrator credentials immediately.
+2. Preserve bounded audit evidence without copying private report payloads into tickets.
+3. Identify affected job IDs, model routes, prompts, artifacts, and time window.
+4. Suspend generation while deterministic calculation endpoints remain available when safe.
+5. Correct the root cause through tests and a reviewed PR.
+6. Re-run Security Scan, Semgrep, the complete offline gate, and authorized hosted smoke tests.
+7. Rotate credentials and restore service from an immutable release.
+8. Document residual risk and user notification obligations.
 
 ## Release procedure
 
-Run document/prompt validation, Ruff, compileall, offline tests with coverage, and package build. Review the PR, inspect CI and NIM evaluation when applicable, merge, deploy the immutable commit, run readiness checks, and record model/prompt/calculation versions. Roll back to the previous image if calculation fixtures, schema validation, quality pass rate, or output integrity regress.
+1. Update `CHANGELOG.md` for user-visible, integration-visible, security, and standards changes.
+2. Run dependency, product-gap, Ruff/docstring, compileall, document, prompt, all offline tests with exactly 100% statement/branch coverage, package, container, Security Scan, and Semgrep gates.
+3. Review the complete diff, issue comments, review submissions, code-scanning findings, and inline threads.
+4. Merge only the exact head whose checks passed.
+5. For a releaseable change, advance package/runtime/API version together and publish wheel, source distribution, and `SHA256SUMS` through the least-privilege release workflow.
+6. Deploy the immutable commit, run readiness, and record calculation, prompt, model, route, and artifact versions.
+7. Roll back to the previous image if deterministic fixtures, schema validation, quality pass rate, privacy, or output integrity regress.
+
+## Evidence and standards
+
+`docs/standards/REFERENCES.md` contains APA 7th entries for the current engineering standards and peer-reviewed evaluation research. `docs/standards/TRACEABILITY.md` maps them to controls, tests, workflows, and residual gaps. The mapping supports continual improvement but is not an ISO certification or scientific validation of traditional Four Pillars interpretation.
