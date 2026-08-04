@@ -1,3 +1,5 @@
+"""Reject ungrounded, unsafe, incomplete, or editorially weak report documents."""
+
 from __future__ import annotations
 
 import json
@@ -37,13 +39,18 @@ PILLAR_PATTERN = re.compile(f"[{''.join(STEMS_HANJA)}][{''.join(BRANCHES_HANJA)}
 
 @dataclass(frozen=True)
 class QualityIssue:
+    """One machine-readable report-quality violation and its document path."""
+
     code: str
     message: str
     path: str
 
 
 class ReportQualityError(ValueError):
+    """Aggregate deterministic report-quality violations into one exception."""
+
     def __init__(self, issues: list[QualityIssue]) -> None:
+        """Store all issues and create a concise joined error message."""
         self.issues = issues
         super().__init__("; ".join(f"{issue.code}: {issue.message}" for issue in issues))
 
@@ -60,6 +67,7 @@ def validate_report(
     expected_fingerprint: str,
     allowed_pillars: set[str] | None = None,
 ) -> list[QualityIssue]:
+    """Return every deterministic grounding, safety, completeness, and copy violation."""
     issues: list[QualityIssue] = []
     if report.calculation_fingerprint != expected_fingerprint:
         issues.append(
@@ -139,6 +147,7 @@ def assert_report_quality(
     expected_fingerprint: str,
     allowed_pillars: set[str] | None = None,
 ) -> None:
+    """Raise ``ReportQualityError`` when deterministic validation finds any issue."""
     issues = validate_report(report, expected_fingerprint, allowed_pillars)
     if issues:
         raise ReportQualityError(issues)
