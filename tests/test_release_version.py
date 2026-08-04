@@ -8,7 +8,7 @@ from pathlib import Path
 from four_pillars import __version__
 from four_pillars.api import app
 
-RELEASE_VERSION = "0.2.0"
+RELEASE_VERSION = "0.3.0"
 RELEASE_DATE = "2026-08-04"
 
 
@@ -22,15 +22,15 @@ def test_release_version_is_consistent_across_public_surfaces() -> None:
 
 
 def test_changelog_contains_the_current_release_and_core_capabilities() -> None:
-    """Describe the shipped deterministic, NIM, delivery, and quality capabilities."""
+    """Describe the shipped modular, scheduled, and release-automation capabilities."""
     changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
     normalized = changelog.casefold()
 
     assert f"## [{RELEASE_VERSION}] - {RELEASE_DATE}" in changelog
     for capability in (
-        "deterministic Four Pillars calculation",
-        "NVIDIA NIM",
-        "HTML, PDF, and JSON",
+        "modular service ports",
+        "hourly product-quality loop",
+        "reusable release workflow",
         "100% statement and branch coverage",
         "NVIDIA_NIM_API_KEY",
     ):
