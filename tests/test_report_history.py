@@ -59,9 +59,12 @@ def test_history_cursor_rejects_noncanonical_base64url_unused_bits() -> None:
     )
     version, encoded = cursor.split(".", maxsplit=1)
     alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
-    assert len(encoded) % 4 == 2
+    remainder = len(encoded) % 4
+    assert remainder in {2, 3}
+    unused_mask = 0b001111 if remainder == 2 else 0b000011
     index = alphabet.index(encoded[-1])
-    noncanonical = encoded[:-1] + alphabet[(index & 0b110000) | 0b000001]
+    assert index & unused_mask == 0
+    noncanonical = encoded[:-1] + alphabet[index | 0b000001]
 
     with pytest.raises(HistoryCursorError, match="Invalid report-history cursor"):
         decode_history_cursor(f"{version}.{noncanonical}")
@@ -71,8 +74,10 @@ def test_history_cursor_rejects_noncanonical_base64url_unused_bits() -> None:
     "cursor",
     [
         "",
+        "v1.",
         "v2.invalid",
         "v1.not%base64",
+        "v1." + "A" * 300,
         "v1." + base64.urlsafe_b64encode(b"not-json").decode("ascii").rstrip("="),
         _cursor_payload(["not", "an", "object"]),
         _cursor_payload(
@@ -201,28 +206,38 @@ def test_job_history_is_stable_newest_first_without_duplicate_rows(tmp_path: Pat
     assert empty_cursor is None
 
 
-def test_job_history_filters_status_and_creates_supporting_indexes(tmp_path: Path) -> None:
+def test_job_history_filters_status_across_pages_and_creates_indexes(
+    tmp_path: Path,
+) -> None:
     database_path = tmp_path / "report_jobs.sqlite3"
     store = JobStore(database_path)
+    base = datetime(2026, 8, 4, 5, 0, tzinfo=UTC)
+    completed_old = store.create({"kind": "completed-old"})
     queued = store.create({"kind": "queued"})
-    completed = store.create({"kind": "completed"})
-    _set_job_metadata(
-        database_path,
-        queued.id,
-        created_at=datetime(2026, 8, 4, 5, 0, tzinfo=UTC),
-        status=JobStatus.QUEUED,
-    )
-    _set_job_metadata(
-        database_path,
-        completed.id,
-        created_at=datetime(2026, 8, 4, 5, 1, tzinfo=UTC),
+    completed_new = store.create({"kind": "completed-new"})
+    for job, minutes, status in (
+        (completed_old, 0, JobStatus.COMPLETED),
+        (queued, 1, JobStatus.QUEUED),
+        (completed_new, 2, JobStatus.COMPLETED),
+    ):
+        _set_job_metadata(
+            database_path,
+            job.id,
+            created_at=base + timedelta(minutes=minutes),
+            status=status,
+        )
+
+    first, first_cursor = store.list_jobs(limit=1, status=JobStatus.COMPLETED)
+    second, second_cursor = store.list_jobs(
+        limit=1,
+        cursor=first_cursor,
         status=JobStatus.COMPLETED,
     )
 
-    items, next_cursor = store.list_jobs(limit=100, status=JobStatus.COMPLETED)
-
-    assert [job.id for job in items] == [completed.id]
-    assert next_cursor is None
+    assert [job.id for job in first] == [completed_new.id]
+    assert first_cursor is not None
+    assert [job.id for job in second] == [completed_old.id]
+    assert second_cursor is None
     with sqlite3.connect(database_path) as connection:
         names = {
             row[0]

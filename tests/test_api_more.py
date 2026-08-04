@@ -200,6 +200,7 @@ def test_report_history_rejects_invalid_query_input(tmp_path: Path) -> None:
     http, _ = configured(tmp_path)
     with http:
         assert http.get("/v1/reports", params={"cursor": "v1.invalid"}).status_code == 400
+        assert http.get("/v1/reports", params={"cursor": "v1." + "A" * 300}).status_code == 400
         assert http.get("/v1/reports", params={"limit": 0}).status_code == 422
         assert http.get("/v1/reports", params={"limit": 101}).status_code == 422
         assert http.get("/v1/reports", params={"status": "unknown"}).status_code == 422

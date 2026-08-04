@@ -11,6 +11,7 @@ from datetime import UTC, datetime, timedelta
 
 _CURSOR_ERROR = "Invalid report-history cursor"
 _CURSOR_VERSION = "v1"
+_CURSOR_MAX_LENGTH = 256
 _CURSOR_TOKEN = re.compile(r"^[A-Za-z0-9_-]+$")
 _CURSOR_KEYS = frozenset({"created_at", "job_id"})
 
@@ -51,6 +52,8 @@ def encode_history_cursor(created_at: datetime, job_id: str) -> str:
 def decode_history_cursor(cursor: str) -> tuple[datetime, str]:
     """Decode one canonical report-history cursor or raise a stable validation error."""
     try:
+        if not isinstance(cursor, str) or not 4 <= len(cursor) <= _CURSOR_MAX_LENGTH:
+            raise ValueError
         version, encoded = cursor.split(".", maxsplit=1)
         if version != _CURSOR_VERSION or not encoded or not _CURSOR_TOKEN.fullmatch(encoded):
             raise ValueError
