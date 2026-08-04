@@ -1,3 +1,5 @@
+"""Render approved reports and atomically publish integrity-hashed artifacts."""
+
 from __future__ import annotations
 
 import hashlib
@@ -64,6 +66,7 @@ def render_html(
     annual: LuckSnapshot,
     monthly: LuckSnapshot,
 ) -> str:
+    """Render a self-contained, escaped, responsive Korean HTML report."""
     hour = chart.hour.hanja if chart.hour is not None else "미확정"
     sections = "".join(_section_html(section) for section in report.sections.values())
     skills = "".join(
@@ -120,6 +123,7 @@ def render_pdf(
     annual: LuckSnapshot,
     monthly: LuckSnapshot,
 ) -> None:
+    """Write a searchable A4 Korean PDF report with embedded document metadata."""
     regular, bold = _register_fonts()
     styles = getSampleStyleSheet()
     title = ParagraphStyle("KTitle", parent=styles["Title"], fontName=bold, fontSize=24, leading=32, textColor=NAVY, alignment=TA_LEFT, spaceAfter=16)
@@ -205,6 +209,7 @@ def write_artifacts(
     monthly: LuckSnapshot,
     traces: dict[str, dict[str, Any]],
 ) -> dict[str, str]:
+    """Publish JSON, HTML, PDF, traces, and a SHA-256 manifest into a new directory."""
     directory.mkdir(parents=True, exist_ok=False)
     payloads = {
         "chart.json": chart.model_dump_json(indent=2).encode(),
