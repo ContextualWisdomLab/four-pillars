@@ -6,6 +6,15 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ## [Unreleased]
 
+### Added
+
+- Optional RFC 8941 structured-string `Idempotency-Key` support for `POST /v1/reports`, with canonical request fingerprints, durable replay, browser retry reuse, and explicit replay response headers.
+- Atomic idempotent creation in the report-job repository port so standalone SQLite and future multi-node adapters share the same retry contract.
+
+### Security
+
+- Raw idempotency keys are never stored; only SHA-256 key digests and canonical request fingerprints are persisted, and reuse with a different payload is rejected.
+
 ### Planned
 
 - PostgreSQL and object-storage adapters for horizontally scalable multi-node deployments.
