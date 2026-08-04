@@ -4,13 +4,19 @@
 
 When `API_KEY_SHA256` is empty, development requests are accepted without a key. In production, store the lowercase SHA-256 digest of an API key and send the original key in `X-API-Key`. The service compares digests in constant time. Health and readiness endpoints remain unauthenticated for infrastructure probes.
 
-The browser studio never writes the API key to `localStorage`, `sessionStorage`, cookies, or report requests. It keeps the value only in the current page memory and sends it through the request header.
+The browser studio never writes the API key to `localStorage`, `sessionStorage`, cookies, or report requests. It keeps the value only in the current page memory and sends it through the request header. Calculation, history, polling, and artifact downloads all reuse that in-memory header. The browser fetches an artifact as a same-origin blob before initiating the local download, so protected deployments do not need to place credentials in a URL.
 
 ## Browser studio
 
 `GET /` serves an accessible responsive workflow that separates calculation review from AI generation. The user enters birth information, reviews the deterministic pillars, adjacent solar-term boundary and fingerprint, and then explicitly submits the same input for report generation. The page polls the redacted job endpoint and renders only artifact filenames supplied by the server.
 
 The studio generates one UUID idempotency key when report enqueueing starts. A network failure keeps that key in page memory for the retry; a successful HTTP 202 response clears it. Changing any reviewed report input invalidates both the reviewed chart and the pending key. The key is never persisted by the browser.
+
+A third browser section displays the newest 20 redacted report jobs. It supports exact lifecycle-status filtering, first-page refresh, and cursor-based loading of older pages. Queued and running rows can restore the existing current-job panel and resume polling. Completed rows expose only server-supplied allow-listed artifact actions. Failed rows display bounded public error text. A newly enqueued or newly terminal job refreshes the first page so it remains recoverable after the current page state is lost.
+
+History status changes are announced through a dedicated polite live region. Status remains visible as text rather than color alone. API-derived strings are inserted through `textContent` and created DOM nodes, never interpreted as markup. Every history request carries a sequence number; an older response that completes after a newer filter, credential, refresh, or enqueue request is ignored. The browser follows reduced-motion preferences when moving focus back to the current-job area.
+
+The editable product-design source is the Figma file `Four Pillars — Report History Studio`, desktop node `2:3` and mobile node `2:136`. The implementation extends the existing browser visual system and keeps the collection in one full-width panel beneath the calculation workflow.
 
 ## Calculation endpoints
 
@@ -81,6 +87,8 @@ The service resolves the database path and requires it to be the direct UUID chi
 ## Error behavior
 
 Pydantic validation returns HTTP 422. Missing resources return 404. Authentication failures return 401. Non-terminal deletion returns 409. A malformed `Idempotency-Key` returns 400, reuse for a different payload returns 422, and a keyed request against a legacy repository adapter without the optional capability returns 501. A malformed report-history cursor returns 400, invalid history limits or statuses return 422, and a history request against a legacy repository without `ReportJobHistoryRepository` returns 501. Calculation policy errors are returned synchronously by calculation endpoints; report-generation failures are stored on the job. NIM content that remains schema-invalid after the bounded repair becomes a failed job. Report copy that remains unsafe or contains a sexagenary pillar absent from the deterministic evidence after editorial repair becomes `quality_failed` and is not published as a completed PDF.
+
+The browser maps collection HTTP 401 to an API-key prompt and HTTP 501 to an unsupported-repository message. Other bounded API details are rendered as plain text in the history live region. A collection error never exposes hidden request fields or clears successfully loaded rows unless it occurred while resetting the first page.
 
 ## Example
 
