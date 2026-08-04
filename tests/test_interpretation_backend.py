@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from test_quality import valid_report
 
+import four_pillars
 import four_pillars.adapters as adapters_module
 from four_pillars.adapters import (
     ContextualOrchestratorReportInterpreter,
@@ -16,6 +16,7 @@ from four_pillars.adapters import (
     build_report_interpreter,
 )
 from four_pillars.analysis import GeneratedReport
+from four_pillars.generation import StructuredGenerationClient
 from four_pillars.models import BirthInput, Gender
 from four_pillars.ports import ReportInterpreter
 from four_pillars.service import (
@@ -24,6 +25,7 @@ from four_pillars.service import (
     calculate_bundle,
 )
 from four_pillars.settings import Settings
+from test_quality import valid_report
 
 
 def settings(tmp_path: Path, **updates: object) -> Settings:
@@ -49,6 +51,16 @@ def request() -> ReportRequest:
         monthly_year=2026,
         monthly_month=8,
         user_context="orchestrator adapter evidence",
+    )
+
+
+def test_top_level_package_exports_modular_interpretation_contract() -> None:
+    """Expose integration ports without requiring internal module imports."""
+    assert four_pillars.StructuredGenerationClient is StructuredGenerationClient
+    assert four_pillars.build_report_interpreter is build_report_interpreter
+    assert (
+        four_pillars.ContextualOrchestratorReportInterpreter
+        is ContextualOrchestratorReportInterpreter
     )
 
 
