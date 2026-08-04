@@ -6,6 +6,19 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ## [Unreleased]
 
+### Added
+
+- A responsive, accessible recent-report panel in the browser studio, backed by the authenticated v0.5 report-history API and the editable Figma desktop/mobile design.
+- Exact lifecycle-status filtering, refresh, cursor-based “load more,” active-job restoration and polling, completed artifact actions, explicit empty/error states, and stale-request suppression.
+
+### Changed
+
+- Browser artifact downloads now use authenticated in-memory fetch requests, so deployments protected by `X-API-Key` can download generated files without putting credentials in URLs or persistent browser storage.
+
+### Security
+
+- The browser renders every report-history field with safe DOM text APIs, truncates displayed operational errors, and never requests or reconstructs subject labels, birth data, context notes, fingerprints, idempotency material, generated copy, traces, or artifact paths.
+
 ### Planned
 
 - PostgreSQL and object-storage adapters for horizontally scalable multi-node deployments.
