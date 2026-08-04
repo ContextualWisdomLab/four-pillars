@@ -10,19 +10,32 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 - A responsive, accessible recent-report panel in the browser studio, backed by the authenticated v0.5 report-history API and the editable Figma desktop/mobile design.
 - Exact lifecycle-status filtering, refresh, cursor-based “load more,” active-job restoration and polling, completed artifact actions, explicit empty/error states, and stale-request suppression.
+- An optional `contextual_orchestrator` interpretation backend using the organization gateway's OpenAI-compatible chat-completions contract, schema-oriented passthrough, Bearer authentication, prompt-safe usage attribution, and explicit routing metadata.
+- A runtime-checkable `StructuredGenerationClient` port and settings-driven interpreter factory while preserving explicitly injected MSA interpreters.
+- APA 7th standards and research references plus a standards-to-code/test/workflow traceability matrix covering ISO/IEC 25010:2023, ISO/IEC 42001:2023, ISO/IEC 23894:2023, NIST AI RMF, NIST AI 600-1, RFC 9457, W3C Trace Context, and peer-reviewed LLM-judge research.
+- ADR 0003 documenting direct NIM as the standalone default, Contextual Orchestrator as an optional organization adapter, credential separation, and the no-fallback decision.
 
 ### Changed
 
 - Browser artifact downloads now use authenticated in-memory fetch requests, so deployments protected by `X-API-Key` can download generated files without putting credentials in URLs or persistent browser storage.
+- Staged interpretation now depends on a structural generation client rather than the concrete NIM client; both built-in adapters share bounded OpenAI-compatible JSON transport, retry, validation, and repair behavior.
+- `ReportService` selects the configured built-in interpreter only when a custom `ReportInterpreter` was not injected, preserving standalone and modular MSA composition.
+- Product, technical, API, modularity, security, operations, UML, hourly-loop, and environment documentation now describe both explicit interpretation backends and their trust boundaries.
+- The hourly product-gap and document audits now enforce interpretation, credential, standards, APA 7th, ADR, secret-exclusion, public-docstring, 100% coverage, and database-naming contracts.
 
 ### Security
 
 - The browser renders every report-history field with safe DOM text APIs, truncates displayed operational errors, and never requests or reconstructs subject labels, birth data, context notes, fingerprints, idempotency material, generated copy, traces, or artifact paths.
+- Direct model access continues to use only `NVIDIA_NIM_API_KEY`; the optional organization gateway uses only `CONTEXTUAL_ORCHESTRATOR_TOKEN`. A selected backend failure never triggers implicit fallback.
+- Contextual Orchestrator attribution contains only `service=four-pillars` and optional organization labels; personal data, prompt/report content, fingerprints, paths, API keys, and provider credentials are prohibited.
+- Hourly and release workflows receive neither model credential, and hosted evaluation remains opt-in.
+- LLM-as-a-judge output remains supplementary to deterministic fixtures, Pydantic schemas, rule-based quality gates, security review, and human review because peer-reviewed research documents adversarial and judgment-bias risks.
 
 ### Planned
 
 - PostgreSQL and object-storage adapters for horizontally scalable multi-node deployments.
 - Additional independent golden-chart fixtures near solar-term boundaries.
+- RFC 9457 Problem Details and W3C Trace Context propagation through a separately versioned compatibility change.
 
 ## [0.5.0] - 2026-08-04
 
@@ -59,7 +72,7 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 - Package and API versions advance to `0.4.0`; deterministic calculation-policy and prompt versions remain unchanged.
 - Browser report retries keep one key only in page memory until durable enqueueing succeeds, then clear it; changing reviewed inputs invalidates the pending key.
-- The full release gate continues to require complete public API docstrings and 100% statement and branch coverage on Python 3.11 and 3.12.
+- The full gate continues to enforce 100% statement and branch coverage and complete public API docstrings.
 
 ### Security
 
