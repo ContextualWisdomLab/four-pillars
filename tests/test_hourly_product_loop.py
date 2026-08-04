@@ -143,9 +143,9 @@ def test_standards_doctoring_contains_authoritative_and_peer_reviewed_sources() 
 
     for token in (
         "APA 7th",
-        "ISO/IEC 25010:2023",
-        "ISO/IEC 42001:2023",
-        "ISO/IEC 23894:2023",
+        "ISO/IEC Standard No. 25010:2023",
+        "ISO/IEC Standard No. 42001:2023",
+        "ISO/IEC Standard No. 23894:2023",
         "NIST AI 600-1",
         "RFC 9457",
         "W3C recommendation",
