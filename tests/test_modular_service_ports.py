@@ -7,8 +7,10 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from four_pillars.adapters import FilesystemArtifactPublisher, NimReportInterpreter
+from four_pillars.ports import ArtifactPublisher, ReportInterpreter, ReportJobRepository
+from test_quality import valid_report
+
 from four_pillars.analysis import GeneratedReport
 from four_pillars.jobs import JobStore
 from four_pillars.models import (
@@ -21,10 +23,8 @@ from four_pillars.models import (
     ReportDocument,
     ReportJob,
 )
-from four_pillars.ports import ArtifactPublisher, ReportInterpreter, ReportJobRepository
 from four_pillars.service import ReportRequest, ReportService
 from four_pillars.settings import Settings
-from test_quality import valid_report
 
 
 class RecordingInterpreter:
