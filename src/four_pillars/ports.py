@@ -25,15 +25,6 @@ class ReportJobRepository(Protocol):
         """Create one queued report job."""
         raise NotImplementedError  # pragma: no cover - protocol declaration
 
-    def create_idempotent(
-        self,
-        request: dict[str, Any],
-        idempotency_key_digest: str,
-        fingerprint: str,
-    ) -> tuple[ReportJob, bool]:
-        """Create or replay one queued job for a key and request fingerprint."""
-        raise NotImplementedError  # pragma: no cover - protocol declaration
-
     def get(self, job_id: str) -> ReportJob | None:
         """Return one report job or ``None`` when it does not exist."""
         raise NotImplementedError  # pragma: no cover - protocol declaration
@@ -56,6 +47,20 @@ class ReportJobRepository(Protocol):
 
     def purge(self, retention_days: int) -> list[str]:
         """Delete expired terminal rows and return their job identifiers."""
+        raise NotImplementedError  # pragma: no cover - protocol declaration
+
+
+@runtime_checkable
+class IdempotentReportJobRepository(Protocol):
+    """Add atomic idempotent creation without changing the base repository port."""
+
+    def create_idempotent(
+        self,
+        request: dict[str, Any],
+        idempotency_key_digest: str,
+        fingerprint: str,
+    ) -> tuple[ReportJob, bool]:
+        """Create or replay one queued job for a key and request fingerprint."""
         raise NotImplementedError  # pragma: no cover - protocol declaration
 
 
