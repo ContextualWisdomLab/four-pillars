@@ -1,3 +1,5 @@
+"""Load validated runtime, storage, authentication, and NVIDIA NIM configuration."""
+
 from __future__ import annotations
 
 from functools import lru_cache
@@ -8,6 +10,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """Environment-backed application settings with bounded operational values."""
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     app_env: str = "development"
@@ -28,6 +32,7 @@ class Settings(BaseSettings):
 
     @property
     def sqlite_path(self) -> Path:
+        """Return the local path encoded by the supported ``sqlite:///`` database URL."""
         prefix = "sqlite:///"
         if not self.database_url.startswith(prefix):
             raise ValueError("Only sqlite:/// database URLs are supported in v1")
@@ -36,4 +41,5 @@ class Settings(BaseSettings):
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
+    """Return the process-wide settings object loaded from environment and ``.env``."""
     return Settings()
