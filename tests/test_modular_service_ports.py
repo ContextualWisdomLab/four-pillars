@@ -162,6 +162,8 @@ async def test_injected_ports_process_a_job_without_nim_or_default_filesystem_pu
     assert isinstance(completed, ReportJob)
     assert completed.id == queued.id
     assert completed.status is JobStatus.COMPLETED
+    assert completed.artifact_dir is not None
+    assert Path(completed.artifact_dir).name == queued.id
     assert service.available_artifacts(queued.id) == ["report.json"]
     assert len(interpreter.calls) == 1
     assert interpreter.calls[0]["subject_name"] == "모듈 사용자"
@@ -169,4 +171,4 @@ async def test_injected_ports_process_a_job_without_nim_or_default_filesystem_pu
     assert interpreter.calls[0]["chart"].fingerprint
     assert len(publisher.calls) == 1
     assert publisher.calls[0]["report"].calculation_fingerprint == interpreter.calls[0]["chart"].fingerprint
-    assert publisher.calls[0]["directory"].name == queued.id
+    assert publisher.calls[0]["directory"].name == f".{queued.id}.tmp"
