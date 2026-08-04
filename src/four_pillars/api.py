@@ -14,10 +14,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .calendar import calculate_chart
 from .fortune import calculate_annual_luck, calculate_daewoon, calculate_monthly_luck
-from .idempotency import parse_idempotency_key, request_fingerprint
+from .idempotency import parse_idempotency_key
 from .jobs import IdempotencyKeyReuseError
 from .models import BirthInput, Chart, DaewoonResult, JobStatus, LuckSnapshot, ReportJob
-from .service import ReportRequest, ReportService
+from .service import (
+    IdempotencyNotSupportedError,
+    ReportRequest,
+    ReportService,
+)
 from .settings import Settings, get_settings
 from .version import __version__
 from .web import render_home
@@ -155,14 +159,17 @@ def create_report(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
-    payload = request.model_dump(mode="json")
-    fingerprint = request_fingerprint(payload)
     key_digest = hashlib.sha256(canonical_key.encode("utf-8")).hexdigest()
     try:
-        job, replayed = service.enqueue_idempotent(request, key_digest, fingerprint)
+        job, replayed = service.enqueue_idempotent(request, key_digest)
     except IdempotencyKeyReuseError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    except IdempotencyNotSupportedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail=str(exc),
         ) from exc
     response.headers["Idempotency-Replayed"] = "true" if replayed else "false"
