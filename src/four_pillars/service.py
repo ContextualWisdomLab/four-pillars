@@ -1,4 +1,4 @@
-"""Coordinate calculation, NIM generation, job processing, and artifact access."""
+"""Coordinate calculation, interpretation, job processing, and artifact access."""
 
 from __future__ import annotations
 
@@ -9,14 +9,14 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .analysis import GeneratedReport, generate_report
+from .adapters import FilesystemArtifactPublisher, NimReportInterpreter
+from .analysis import GeneratedReport
 from .calendar import calculate_chart
 from .fortune import calculate_annual_luck, calculate_daewoon, calculate_monthly_luck
 from .jobs import JobStore
 from .models import BirthInput, Chart, DaewoonResult, LuckSnapshot, ReportJob
-from .nim import NimClient
+from .ports import ArtifactPublisher, ReportInterpreter, ReportJobRepository
 from .quality import ReportQualityError
-from .reporting import write_artifacts
 from .settings import Settings
 
 ARTIFACT_NAMES = frozenset(
@@ -68,29 +68,39 @@ def calculate_bundle(request: ReportRequest) -> CalculationBundle:
 class ReportService:
     """Provide the application boundary for durable asynchronous report generation."""
 
-    def __init__(self, settings: Settings, store: JobStore | None = None) -> None:
-        """Create a service with configured storage and an optional injected job store."""
+    def __init__(
+        self,
+        settings: Settings,
+        store: ReportJobRepository | None = None,
+        interpreter: ReportInterpreter | None = None,
+        publisher: ArtifactPublisher | None = None,
+    ) -> None:
+        """Create standalone defaults while permitting independent adapter injection."""
         self.settings = settings
         self.settings.artifact_dir.mkdir(parents=True, exist_ok=True)
-        self.store = store or JobStore(settings.sqlite_path)
+        self.store = store if store is not None else JobStore(settings.sqlite_path)
+        self.interpreter = (
+            interpreter if interpreter is not None else NimReportInterpreter(settings)
+        )
+        self.publisher = (
+            publisher if publisher is not None else FilesystemArtifactPublisher()
+        )
 
     def enqueue(self, request: ReportRequest) -> ReportJob:
         """Persist one validated report request as a queued job."""
         return self.store.create(request.model_dump(mode="json"))
 
     async def generate(self, request: ReportRequest) -> tuple[CalculationBundle, GeneratedReport]:
-        """Calculate immutable evidence and generate a validated report through NVIDIA NIM."""
+        """Calculate immutable evidence and invoke the configured interpretation port."""
         bundle = calculate_bundle(request)
-        async with NimClient(self.settings) as client:
-            generated = await generate_report(
-                client=client,
-                subject_name=request.subject_name,
-                chart=bundle.chart,
-                daewoon=bundle.daewoon,
-                annual=bundle.annual,
-                monthly=bundle.monthly,
-                user_context=request.user_context,
-            )
+        generated = await self.interpreter.generate(
+            subject_name=request.subject_name,
+            chart=bundle.chart,
+            daewoon=bundle.daewoon,
+            annual=bundle.annual,
+            monthly=bundle.monthly,
+            user_context=request.user_context,
+        )
         return bundle, generated
 
     async def process(self, job: ReportJob) -> ReportJob:
@@ -102,7 +112,7 @@ class ReportService:
         shutil.rmtree(final, ignore_errors=True)
         try:
             bundle, generated = await self.generate(request)
-            write_artifacts(
+            self.publisher.publish(
                 temporary,
                 report=generated.report,
                 chart=bundle.chart,
