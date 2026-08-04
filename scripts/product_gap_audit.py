@@ -1,4 +1,4 @@
-"""Audit release, modularity, history, prompts, credentials, and database naming."""
+"""Audit release, modularity, interpretation, standards, and database naming."""
 
 from __future__ import annotations
 
@@ -34,6 +34,8 @@ REQUIRED_DOCUMENTS = (
     "docs/operations/NIM.md",
     "docs/operations/RUNBOOK.md",
     "docs/operations/HOURLY_PRODUCT_LOOP.md",
+    "docs/standards/REFERENCES.md",
+    "docs/standards/TRACEABILITY.md",
     "docs/uml/architecture.md",
     "docs/uml/domain.puml",
 )
@@ -50,6 +52,44 @@ HISTORY_CONTRACTS = (
     (
         "docs/technical/MODULARITY.md",
         "### Optional report-job history repository",
+    ),
+)
+INTERPRETATION_CONTRACTS = (
+    ("src/four_pillars/generation.py", "class StructuredGenerationClient"),
+    (
+        "src/four_pillars/contextual_orchestrator.py",
+        "class ContextualOrchestratorClient",
+    ),
+    (
+        "src/four_pillars/adapters.py",
+        "class ContextualOrchestratorReportInterpreter",
+    ),
+    ("src/four_pillars/adapters.py", "def build_report_interpreter"),
+    ("src/four_pillars/settings.py", "contextual_orchestrator_token"),
+    (".env.example", "INTERPRETATION_BACKEND=nvidia_nim"),
+    (".env.example", "CONTEXTUAL_ORCHESTRATOR_TOKEN="),
+    ("docs/operations/NIM.md", "No implicit fallback"),
+)
+STANDARDS_CONTRACTS = (
+    ("docs/standards/REFERENCES.md", "APA 7th"),
+    ("docs/standards/REFERENCES.md", "ISO/IEC 25010:2023"),
+    ("docs/standards/REFERENCES.md", "ISO/IEC 42001:2023"),
+    ("docs/standards/REFERENCES.md", "ISO/IEC 23894:2023"),
+    ("docs/standards/REFERENCES.md", "NIST AI 600-1"),
+    ("docs/standards/REFERENCES.md", "RFC 9457"),
+    ("docs/standards/REFERENCES.md", "W3C"),
+    (
+        "docs/standards/REFERENCES.md",
+        "10.18653/v1/2024.emnlp-main.427",
+    ),
+    (
+        "docs/standards/REFERENCES.md",
+        "10.18653/v1/2024.emnlp-main.474",
+    ),
+    ("docs/standards/TRACEABILITY.md", "traditional interpretation"),
+    (
+        "docs/standards/TRACEABILITY.md",
+        "100% statement and branch coverage",
     ),
 )
 TEXT_SUFFIXES = {".md", ".py", ".toml", ".yaml", ".yml"}
@@ -106,25 +146,60 @@ def _database_names() -> list[str]:
             ]
 
 
-def audit_history_contract(root: Path) -> list[ProductGap]:
-    """Return gaps in the optional report-history code and documentation contract."""
+def _audit_token_contracts(
+    root: Path,
+    contracts: tuple[tuple[str, str], ...],
+    *,
+    code: str,
+    label: str,
+) -> list[ProductGap]:
     gaps: list[ProductGap] = []
-    for relative, token in HISTORY_CONTRACTS:
+    for relative, token in contracts:
         path = root / relative
         text = path.read_text(encoding="utf-8") if path.is_file() else ""
         if token not in text:
             gaps.append(
                 _gap(
-                    "report_history_contract",
+                    code,
                     relative,
-                    f"Report-history contract is missing {token!r}.",
+                    f"{label} is missing {token!r}.",
                 )
             )
     return gaps
 
 
+def audit_history_contract(root: Path) -> list[ProductGap]:
+    """Return gaps in the optional report-history code and documentation contract."""
+    return _audit_token_contracts(
+        root,
+        HISTORY_CONTRACTS,
+        code="report_history_contract",
+        label="Report-history contract",
+    )
+
+
+def audit_interpretation_contract(root: Path) -> list[ProductGap]:
+    """Return gaps in explicit interpretation backend and credential boundaries."""
+    return _audit_token_contracts(
+        root,
+        INTERPRETATION_CONTRACTS,
+        code="interpretation_backend_contract",
+        label="Interpretation-backend contract",
+    )
+
+
+def audit_standards_contract(root: Path) -> list[ProductGap]:
+    """Return gaps in APA references and standards-to-control traceability."""
+    return _audit_token_contracts(
+        root,
+        STANDARDS_CONTRACTS,
+        code="standards_traceability_contract",
+        label="Standards traceability",
+    )
+
+
 def audit_repository(root: Path) -> list[ProductGap]:
-    """Return all release-quality gaps that can be verified without network access."""
+    """Return release-quality gaps that can be verified without network access."""
     root = root.resolve()
     gaps: list[ProductGap] = []
 
@@ -158,6 +233,8 @@ def audit_repository(root: Path) -> list[ProductGap]:
             )
 
     gaps.extend(audit_history_contract(root))
+    gaps.extend(audit_interpretation_contract(root))
+    gaps.extend(audit_standards_contract(root))
 
     pyproject_path = root / "pyproject.toml"
     version_path = root / "src/four_pillars/version.py"
@@ -214,7 +291,7 @@ def audit_repository(root: Path) -> list[ProductGap]:
                 _gap(
                     "legacy_nim_key",
                     path.relative_to(root).as_posix(),
-                    "Use NVIDIA_NIM_API_KEY exclusively for hosted NVIDIA NIM.",
+                    "Use NVIDIA_NIM_API_KEY exclusively for direct hosted NVIDIA NIM.",
                 )
             )
 
@@ -281,6 +358,15 @@ def audit_repository(root: Path) -> list[ProductGap]:
                     "Hourly schedule or manual dispatch is missing.",
                 )
             )
+        for secret in ("NVIDIA_NIM_API_KEY", "CONTEXTUAL_ORCHESTRATOR_TOKEN"):
+            if secret in workflow_text:
+                gaps.append(
+                    _gap(
+                        "hourly_secret_boundary",
+                        hourly_workflow.relative_to(root).as_posix(),
+                        f"Hourly quality workflow must not receive {secret}.",
+                    )
+                )
 
     release_workflow = root / ".github/workflows/release.yml"
     if release_workflow.is_file():
@@ -300,14 +386,15 @@ def audit_repository(root: Path) -> list[ProductGap]:
                     "Release workflow is incomplete or not reusable.",
                 )
             )
-        if "NVIDIA_NIM_API_KEY" in workflow_text:
-            gaps.append(
-                _gap(
-                    "release_secret_boundary",
-                    release_workflow.relative_to(root).as_posix(),
-                    "Release workflow must not receive the hosted NIM credential.",
+        for secret in ("NVIDIA_NIM_API_KEY", "CONTEXTUAL_ORCHESTRATOR_TOKEN"):
+            if secret in workflow_text:
+                gaps.append(
+                    _gap(
+                        "release_secret_boundary",
+                        release_workflow.relative_to(root).as_posix(),
+                        f"Release workflow must not receive {secret}.",
+                    )
                 )
-            )
 
     return sorted(
         gaps,
@@ -316,7 +403,7 @@ def audit_repository(root: Path) -> list[ProductGap]:
 
 
 def render_markdown(gaps: list[ProductGap]) -> str:
-    """Render a concise Markdown report suitable for logs and a GitHub issue body."""
+    """Render a concise Markdown report suitable for logs and an issue body."""
     lines = [
         "# Hourly Product Gap Audit",
         "",
@@ -326,8 +413,8 @@ def render_markdown(gaps: list[ProductGap]) -> str:
     ]
     if not gaps:
         lines.append(
-            "All deterministic release, modularity, history, prompt, credential, "
-            "and database naming contracts passed."
+            "All deterministic release, modularity, interpretation, standards, "
+            "prompt, credential, and database naming contracts passed."
         )
     else:
         lines.extend(
@@ -342,7 +429,7 @@ def render_markdown(gaps: list[ProductGap]) -> str:
 
 
 def main() -> int:
-    """Run the offline audit, write optional Markdown output, and return a shell status."""
+    """Run the offline audit, write optional Markdown output, and return status."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path("."))
     parser.add_argument("--output", type=Path)
