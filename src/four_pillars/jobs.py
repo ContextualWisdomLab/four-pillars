@@ -234,23 +234,67 @@ class JobStore:
         """Return one stable newest-first page of report jobs and its continuation."""
         if not 1 <= limit <= 100:
             raise ValueError("Report history limit must be between 1 and 100")
-        clauses: list[str] = []
-        parameters: list[str | int] = []
-        if status is not None:
-            clauses.append("status=?")
-            parameters.append(status.value)
+        boundary: tuple[str, str] | None = None
         if cursor is not None:
             created_at, job_id = decode_history_cursor(cursor)
-            boundary = created_at.isoformat()
-            clauses.append("(created_at < ? OR (created_at = ? AND id < ?))")
-            parameters.extend((boundary, boundary, job_id))
-        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
-        parameters.append(limit + 1)
+            boundary = (created_at.isoformat(), job_id)
+        fetch_limit = limit + 1
         with self._connect() as connection:
-            rows = connection.execute(
-                f"SELECT * FROM report_jobs{where} ORDER BY created_at DESC, id DESC LIMIT ?",
-                parameters,
-            ).fetchall()
+            if status is None and boundary is None:
+                rows = connection.execute(
+                    """
+                    SELECT * FROM report_jobs
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT ?
+                    """,
+                    (fetch_limit,),
+                ).fetchall()
+            elif status is not None and boundary is None:
+                rows = connection.execute(
+                    """
+                    SELECT * FROM report_jobs
+                    WHERE status=?
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT ?
+                    """,
+                    (status.value, fetch_limit),
+                ).fetchall()
+            elif status is None:
+                assert boundary is not None
+                boundary_created_at, boundary_job_id = boundary
+                rows = connection.execute(
+                    """
+                    SELECT * FROM report_jobs
+                    WHERE created_at < ? OR (created_at = ? AND id < ?)
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT ?
+                    """,
+                    (
+                        boundary_created_at,
+                        boundary_created_at,
+                        boundary_job_id,
+                        fetch_limit,
+                    ),
+                ).fetchall()
+            else:
+                assert boundary is not None
+                boundary_created_at, boundary_job_id = boundary
+                rows = connection.execute(
+                    """
+                    SELECT * FROM report_jobs
+                    WHERE status=?
+                      AND (created_at < ? OR (created_at = ? AND id < ?))
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT ?
+                    """,
+                    (
+                        status.value,
+                        boundary_created_at,
+                        boundary_created_at,
+                        boundary_job_id,
+                        fetch_limit,
+                    ),
+                ).fetchall()
         has_more = len(rows) > limit
         jobs = [self._row(row) for row in rows[:limit]]
         page = [job for job in jobs if job is not None]
