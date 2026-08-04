@@ -1,3 +1,5 @@
+"""Call hosted NVIDIA NIM with bounded retries and strict Pydantic schemas."""
+
 from __future__ import annotations
 
 import asyncio
@@ -14,15 +16,17 @@ T = TypeVar("T", bound=BaseModel)
 
 
 class NimError(RuntimeError):
-    pass
+    """Report a hosted NVIDIA NIM transport or response-contract failure."""
 
 
 class NimSchemaError(NimError):
-    pass
+    """Report model content that cannot satisfy the requested JSON schema."""
 
 
 @dataclass(frozen=True)
 class NimTrace:
+    """Record model identity, request attempts, repairs, and raw generated content."""
+
     model: str
     attempts: int
     repairs: int
@@ -38,6 +42,7 @@ class NimClient:
         *,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
+        """Create a hosted NIM client from validated settings and an optional test transport."""
         if not settings.nvidia_nim_api_key:
             raise NimError("NVIDIA_NIM_API_KEY is required for AI report generation")
         self.settings = settings
@@ -53,12 +58,15 @@ class NimClient:
         )
 
     async def __aenter__(self) -> NimClient:
+        """Return this client for asynchronous context management."""
         return self
 
     async def __aexit__(self, *_: object) -> None:
+        """Close the underlying HTTP client when leaving a context."""
         await self.aclose()
 
     async def aclose(self) -> None:
+        """Close the underlying asynchronous HTTP connection pool."""
         await self._client.aclose()
 
     async def _post(self, payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
@@ -130,6 +138,7 @@ class NimClient:
         temperature: float = 0.2,
         max_tokens: int = 4096,
     ) -> tuple[T, NimTrace]:
+        """Generate one schema-validated object with a bounded repair attempt."""
         selected_model = model or self.settings.nim_model
         messages: list[dict[str, str]] = [
             {"role": "system", "content": system_prompt},
