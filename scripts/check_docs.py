@@ -6,6 +6,7 @@ from pathlib import Path
 
 REQUIRED = (
     "README.md",
+    "CHANGELOG.md",
     "SECURITY.md",
     "CONTRIBUTING.md",
     "docs/product/PRD.md",

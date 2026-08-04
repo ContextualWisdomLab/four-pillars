@@ -17,11 +17,12 @@ from .fortune import calculate_annual_luck, calculate_daewoon, calculate_monthly
 from .models import BirthInput, Chart, DaewoonResult, JobStatus, LuckSnapshot, ReportJob
 from .service import ReportRequest, ReportService
 from .settings import Settings, get_settings
+from .version import __version__
 from .web import render_home
 
 app = FastAPI(
     title="Four Pillars API",
-    version="0.1.0",
+    version=__version__,
     description="Deterministic Korean Four Pillars calculation with NVIDIA NIM report generation",
 )
 

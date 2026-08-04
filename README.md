@@ -25,7 +25,7 @@ pip install -e '.[dev]'
 cp .env.example .env
 pytest
 four-pillars calculate --birth '1990-06-15T08:30:00' --timezone Asia/Seoul
-four-pillars serve
+uvicorn four_pillars.api:app --host 0.0.0.0 --port 8000
 ```
 
 To generate AI reports, set a hosted NVIDIA NIM key:
@@ -43,6 +43,7 @@ pytest -m nim_live
 
 ## Documents
 
+- [Changelog](CHANGELOG.md)
 - [Product Requirements](docs/product/PRD.md)
 - [Technical Requirements](docs/technical/TRD.md)
 - [Calculation Rules](docs/technical/CALCULATION.md)
