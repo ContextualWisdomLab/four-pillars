@@ -61,6 +61,28 @@ def test_browser_history_loads_filters_appends_and_restores_active_jobs() -> Non
     assert "historyList.appendChild" in page
 
 
+def test_browser_history_discards_stale_requests_and_respects_reduced_motion() -> None:
+    page = render_home()
+
+    assert "historyRequest" in page
+    assert "const requestId=++historyRequest" in page
+    assert "requestId!==historyRequest" in page
+    assert "if(requestId===historyRequest)setHistoryLoading(false)" in page
+    assert "matchMedia('(prefers-reduced-motion: reduce)')" in page
+    assert "behavior:reduced?'auto':'smooth'" in page
+
+
+def test_browser_history_uses_authenticated_downloads_and_bounded_error_copy() -> None:
+    page = render_home()
+
+    assert "async function downloadArtifact" in page
+    assert "fetch(`/v1/reports/${jobId}/artifacts/${name}`,{headers:headers()})" in page
+    assert "URL.createObjectURL" in page
+    assert "link.download=name" in page
+    assert "function boundedHistoryDetail" in page
+    assert "slice(0,239)" in page
+
+
 def test_browser_history_uses_safe_dom_and_ephemeral_state_only() -> None:
     page = render_home()
 
