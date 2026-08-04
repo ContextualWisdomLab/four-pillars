@@ -1,11 +1,11 @@
-"""Call hosted NVIDIA NIM with bounded retries and strict Pydantic schemas."""
+"""Call OpenAI-compatible model gateways with strict Pydantic schemas."""
 
 from __future__ import annotations
 
 import asyncio
 import json
 from dataclasses import dataclass
-from typing import Any, TypeVar
+from typing import Any, Self, TypeVar
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -16,11 +16,11 @@ T = TypeVar("T", bound=BaseModel)
 
 
 class NimError(RuntimeError):
-    """Report a hosted NVIDIA NIM transport or response-contract failure."""
+    """Report an OpenAI-compatible structured-generation transport failure."""
 
 
 class NimSchemaError(NimError):
-    """Report model content that cannot satisfy the requested JSON schema."""
+    """Report generated content that cannot satisfy the requested JSON schema."""
 
 
 @dataclass(frozen=True)
@@ -33,31 +33,39 @@ class NimTrace:
     raw_content: str
 
 
-class NimClient:
-    """Small OpenAI-compatible client dedicated to hosted NVIDIA NIM."""
+class _OpenAICompatibleJsonClient:
+    """Implement shared structured-generation transport and validation behavior."""
 
     def __init__(
         self,
-        settings: Settings,
         *,
+        api_key: str,
+        base_url: str,
+        default_model: str,
+        timeout_seconds: float,
+        max_retries: int,
+        max_schema_repairs: int,
+        provider_label: str,
+        request_metadata: dict[str, Any] | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
-        """Create a hosted NIM client from validated settings and an optional test transport."""
-        if not settings.nvidia_nim_api_key:
-            raise NimError("NVIDIA_NIM_API_KEY is required for AI report generation")
-        self.settings = settings
+        self._default_model = default_model
+        self._max_retries = max_retries
+        self._max_schema_repairs = max_schema_repairs
+        self._provider_label = provider_label
+        self._request_metadata = dict(request_metadata or {})
         self._client = httpx.AsyncClient(
-            base_url=settings.nim_base_url.rstrip("/"),
-            timeout=httpx.Timeout(settings.nim_timeout_seconds),
+            base_url=base_url.rstrip("/"),
+            timeout=httpx.Timeout(timeout_seconds),
             transport=transport,
             headers={
-                "Authorization": f"Bearer {settings.nvidia_nim_api_key}",
+                "Authorization": f"Bearer {api_key}",
                 "Accept": "application/json",
                 "Content-Type": "application/json",
             },
         )
 
-    async def __aenter__(self) -> NimClient:
+    async def __aenter__(self) -> Self:
         """Return this client for asynchronous context management."""
         return self
 
@@ -71,20 +79,23 @@ class NimClient:
 
     async def _post(self, payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
         attempts = 0
-        max_attempts = self.settings.nim_max_retries + 1
+        max_attempts = self._max_retries + 1
         while attempts < max_attempts:
             attempts += 1
             try:
                 response = await self._client.post("/chat/completions", json=payload)
             except (httpx.TimeoutException, httpx.NetworkError) as exc:
                 if attempts >= max_attempts:
-                    raise NimError("NIM request failed after network retries") from exc
+                    raise NimError(
+                        f"{self._provider_label} request failed after network retries"
+                    ) from exc
                 await asyncio.sleep(min(2 ** (attempts - 1), 8))
                 continue
             if response.status_code in {408, 429} or response.status_code >= 500:
                 if attempts >= max_attempts:
                     raise NimError(
-                        f"NIM request failed after retries with HTTP {response.status_code}"
+                        f"{self._provider_label} request failed after retries with "
+                        f"HTTP {response.status_code}"
                     )
                 retry_after = response.headers.get("Retry-After")
                 delay = (
@@ -95,21 +106,30 @@ class NimClient:
                 await asyncio.sleep(delay)
                 continue
             if response.is_error:
-                raise NimError(f"NIM returned HTTP {response.status_code}: {response.text[:500]}")
+                raise NimError(
+                    f"{self._provider_label} returned HTTP {response.status_code}: "
+                    f"{response.text[:500]}"
+                )
             try:
                 return response.json(), attempts
             except json.JSONDecodeError as exc:
-                raise NimError("NIM returned a non-JSON HTTP response") from exc
-        raise NimError("NIM request exhausted its retry budget")
+                raise NimError(
+                    f"{self._provider_label} returned a non-JSON HTTP response"
+                ) from exc
+        raise NimError(
+            f"{self._provider_label} request exhausted its retry budget"
+        )
 
-    @staticmethod
-    def _content(data: dict[str, Any]) -> str:
+    def _content(self, data: dict[str, Any]) -> str:
         try:
             content = data["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
-            raise NimError("NIM response did not contain choices[0].message.content") from exc
+            raise NimError(
+                f"{self._provider_label} response did not contain "
+                "choices[0].message.content"
+            ) from exc
         if not isinstance(content, str) or not content.strip():
-            raise NimError("NIM returned empty content")
+            raise NimError(f"{self._provider_label} returned empty content")
         return content.strip()
 
     @staticmethod
@@ -123,9 +143,9 @@ class NimClient:
         try:
             value = json.loads(cleaned)
         except json.JSONDecodeError as exc:
-            raise NimSchemaError("NIM content was not a JSON object") from exc
+            raise NimSchemaError("Generated content was not a JSON object") from exc
         if not isinstance(value, dict):
-            raise NimSchemaError("NIM content must be one JSON object")
+            raise NimSchemaError("Generated content must be one JSON object")
         return value
 
     async def generate(
@@ -138,8 +158,8 @@ class NimClient:
         temperature: float = 0.2,
         max_tokens: int = 4096,
     ) -> tuple[T, NimTrace]:
-        """Generate one schema-validated object with a bounded repair attempt."""
-        selected_model = model or self.settings.nim_model
+        """Generate one schema-validated object with bounded retries and repair."""
+        selected_model = model or self._default_model
         messages: list[dict[str, str]] = [
             {"role": "system", "content": system_prompt},
             {
@@ -152,23 +172,27 @@ class NimClient:
         ]
         total_attempts = 0
         raw_content = ""
-        for repair in range(self.settings.nim_max_schema_repairs + 1):
+        for repair in range(self._max_schema_repairs + 1):
             payload = {
                 "model": selected_model,
                 "messages": messages,
                 "temperature": temperature if repair == 0 else 0,
                 "max_tokens": max_tokens,
                 "response_format": {"type": "json_object"},
+                **self._request_metadata,
             }
             data, attempts = await self._post(payload)
             total_attempts += attempts
             raw_content = self._content(data)
             try:
-                parsed = response_model.model_validate(self._json_object(raw_content))
+                parsed = response_model.model_validate(
+                    self._json_object(raw_content)
+                )
             except (NimSchemaError, ValidationError) as exc:
-                if repair >= self.settings.nim_max_schema_repairs:
+                if repair >= self._max_schema_repairs:
                     raise NimSchemaError(
-                        f"NIM output failed schema validation after {repair} repair attempts: {exc}"
+                        f"{self._provider_label} output failed schema validation "
+                        f"after {repair} repair attempts: {exc}"
                     ) from exc
                 messages.extend(
                     [
@@ -178,7 +202,8 @@ class NimClient:
                             "content": (
                                 "Return the complete answer again as one JSON object. "
                                 f"Fix only this schema error: {exc}. "
-                                f"Required JSON Schema: {json.dumps(response_model.model_json_schema(), ensure_ascii=False)}"
+                                "Required JSON Schema: "
+                                f"{json.dumps(response_model.model_json_schema(), ensure_ascii=False)}"
                             ),
                         },
                     ]
@@ -191,3 +216,30 @@ class NimClient:
                 raw_content=raw_content,
             )
         raise NimSchemaError("unreachable schema repair state")
+
+
+class NimClient(_OpenAICompatibleJsonClient):
+    """OpenAI-compatible client dedicated to direct hosted NVIDIA NIM."""
+
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ) -> None:
+        """Create a hosted NIM client from settings and an optional test transport."""
+        if not settings.nvidia_nim_api_key:
+            raise NimError(
+                "NVIDIA_NIM_API_KEY is required for AI report generation"
+            )
+        self.settings = settings
+        super().__init__(
+            api_key=settings.nvidia_nim_api_key,
+            base_url=settings.nim_base_url,
+            default_model=settings.nim_model,
+            timeout_seconds=settings.nim_timeout_seconds,
+            max_retries=settings.nim_max_retries,
+            max_schema_repairs=settings.nim_max_schema_repairs,
+            provider_label="NIM",
+            transport=transport,
+        )
