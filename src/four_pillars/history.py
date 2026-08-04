@@ -60,6 +60,9 @@ def decode_history_cursor(cursor: str) -> tuple[datetime, str]:
             altchars=b"-_",
             validate=True,
         )
+        canonical_encoded = base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+        if canonical_encoded != encoded:
+            raise ValueError
         payload = json.loads(raw.decode("utf-8"))
         if not isinstance(payload, dict) or set(payload) != _CURSOR_KEYS:
             raise ValueError
