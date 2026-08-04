@@ -15,7 +15,7 @@ _MAXIMUM_KEY_LENGTH = 128
 
 
 def parse_idempotency_key(value: str) -> str:
-    """Return the decoded RFC 8941 structured-string idempotency key.
+    r"""Return the decoded RFC 8941 structured-string idempotency key.
 
     The product accepts printable ASCII structured strings whose decoded value is
     between 8 and 128 characters. Only the two RFC 8941 string escapes, ``\"``
