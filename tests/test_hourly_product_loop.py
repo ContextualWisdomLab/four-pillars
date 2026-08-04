@@ -71,11 +71,39 @@ def test_product_gap_audit_passes_the_repository_contract() -> None:
     assert module.audit_repository(Path(".")) == []
 
 
+def test_report_history_contract_audit_detects_missing_tokens(tmp_path: Path) -> None:
+    """Keep history code, indexes, API, and modular documentation in one audited unit."""
+    module = load_audit_module()
+    root = tmp_path / "repository"
+    for relative, token in module.HISTORY_CONTRACTS:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        current = path.read_text(encoding="utf-8") if path.is_file() else ""
+        path.write_text(f"{current}\n{token}\n", encoding="utf-8")
+
+    assert module.audit_history_contract(root) == []
+
+    first_relative, first_token = module.HISTORY_CONTRACTS[0]
+    first_path = root / first_relative
+    first_path.unlink()
+    missing_file = module.audit_history_contract(root)
+    assert any(gap.path == first_relative for gap in missing_file)
+
+    first_path.write_text("different contract", encoding="utf-8")
+    missing_token = module.audit_history_contract(root)
+    assert any(
+        gap.path == first_relative and first_token in gap.message
+        for gap in missing_token
+    )
+
+
 @pytest.mark.parametrize(
     ("name", "expected"),
     [
         ("report_jobs", True),
         ("idx_report_jobs_status_created", True),
+        ("idx_report_jobs_created_id", True),
+        ("idx_report_jobs_status_created_id", True),
         ("ReportJobs", True),
         ("reportJobs", True),
         ("jobs", False),
