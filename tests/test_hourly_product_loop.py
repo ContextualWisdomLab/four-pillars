@@ -55,6 +55,15 @@ def test_hourly_workflow_runs_the_full_release_gate_and_manages_one_issue() -> N
     assert "gh issue close" in text
 
 
+def test_hourly_issue_sync_treats_setup_or_loop_skips_as_failures() -> None:
+    """Never close a regression issue when setup failed before the loop produced outputs."""
+    text = WORKFLOW.read_text(encoding="utf-8")
+
+    assert "steps.loop.outcome != 'success'" in text
+    assert 'if [ ! -f "$report" ]; then' in text
+    assert "Hourly loop did not produce a report" in text
+
+
 def test_product_gap_audit_passes_the_repository_contract() -> None:
     """Report no statically detectable release, documentation, prompt, or naming gaps."""
     module = load_audit_module()
