@@ -23,6 +23,7 @@ REQUIRED = (
     "docs/uml/domain.puml",
     "docs/adr/0001-deterministic-core-and-nim-boundary.md",
     "docs/adr/0002-nvidia-nim.md",
+    "docs/adr/0003-explicit-contextual-orchestrator-backend.md",
 )
 FORBIDDEN = ("TBD", "TODO", "implement later", "fill in details")
 STANDARDS_TOKENS = {
@@ -33,7 +34,7 @@ STANDARDS_TOKENS = {
         "ISO/IEC 23894:2023",
         "NIST AI 600-1",
         "RFC 9457",
-        "W3C Recommendation",
+        "W3C recommendation",
         "10.18653/v1/2024.emnlp-main.427",
         "10.18653/v1/2024.emnlp-main.474",
     ),
