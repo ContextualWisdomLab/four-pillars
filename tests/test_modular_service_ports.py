@@ -26,9 +26,11 @@ from four_pillars.ports import (
     ArtifactPublisher,
     IdempotentReportJobRepository,
     ReportInterpreter,
+    ReportJobHistoryRepository,
     ReportJobRepository,
 )
 from four_pillars.service import (
+    HistoryNotSupportedError,
     IdempotencyNotSupportedError,
     ReportRequest,
     ReportService,
@@ -106,7 +108,7 @@ class RecordingPublisher:
 
 
 class LegacyRepository:
-    """Forward the original repository contract without idempotent creation."""
+    """Forward the original repository contract without optional capabilities."""
 
     def __init__(self, delegate: JobStore) -> None:
         self.delegate = delegate
@@ -181,21 +183,25 @@ def test_concrete_adapters_satisfy_runtime_port_contracts(tmp_path: Path) -> Non
 
     assert isinstance(store, ReportJobRepository)
     assert isinstance(store, IdempotentReportJobRepository)
+    assert isinstance(store, ReportJobHistoryRepository)
     assert isinstance(interpreter, ReportInterpreter)
     assert isinstance(publisher, ArtifactPublisher)
 
 
-def test_idempotency_is_optional_for_existing_repository_adapters(tmp_path: Path) -> None:
-    """Keep legacy adapters usable and fail keyed enqueueing explicitly."""
+def test_optional_capabilities_preserve_existing_repository_adapters(tmp_path: Path) -> None:
+    """Keep legacy adapters usable and fail optional operations explicitly."""
     configured = settings(tmp_path)
     repository = LegacyRepository(JobStore(configured.sqlite_path))
     service = ReportService(configured, store=repository)
 
     assert isinstance(repository, ReportJobRepository)
     assert not isinstance(repository, IdempotentReportJobRepository)
+    assert not isinstance(repository, ReportJobHistoryRepository)
     assert service.enqueue(request()).status is JobStatus.QUEUED
     with pytest.raises(IdempotencyNotSupportedError, match="idempotent"):
         service.enqueue_idempotent(request(), "0" * 64)
+    with pytest.raises(HistoryNotSupportedError, match="history"):
+        service.list_jobs(limit=1)
 
 
 @pytest.mark.asyncio
