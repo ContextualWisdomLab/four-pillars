@@ -74,14 +74,28 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
-          LOOP_FAILED: ${{ steps.loop.outputs.failed }}
+          LOOP_FAILED: ${{ steps.loop.outcome != 'success' || steps.loop.outputs.failed == '1' }}
         shell: bash
         run: |
           set -euo pipefail
           title='[hourly-product-loop] release-quality regression'
           issue_number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')"
           report='artifacts/hourly-product-loop.md'
-          if [ "$LOOP_FAILED" = '1' ]; then
+          if [ ! -f "$report" ]; then
+            mkdir -p artifacts
+            cat > "$report" <<EOF
+          # Hourly Product Quality Loop
+
+          Status: **FAIL**
+
+          Hourly loop did not produce a report because setup or an earlier workflow step failed.
+
+          - Commit: \`$GITHUB_SHA\`
+          - Run: \`$GITHUB_RUN_ID\`
+          - Trigger: \`$GITHUB_EVENT_NAME\`
+          EOF
+          fi
+          if [ "$LOOP_FAILED" = 'true' ]; then
             if [ -z "$issue_number" ]; then
               gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file "$report"
             else
