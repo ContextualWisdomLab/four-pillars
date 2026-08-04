@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from test_quality import valid_report
 
+import four_pillars.adapters as adapters_module
 import four_pillars.api as api_module
 import four_pillars.cli as cli_module
 import four_pillars.prompts as prompts_module
@@ -160,8 +161,8 @@ async def test_report_service_generate_uses_the_nim_boundary(
         )
         return GeneratedReport(report=report, traces={"fake": {"attempts": 1}})
 
-    monkeypatch.setattr(service_module, "NimClient", FakeNimClient)
-    monkeypatch.setattr(service_module, "generate_report", fake_generate_report)
+    monkeypatch.setattr(adapters_module, "NimClient", FakeNimClient)
+    monkeypatch.setattr(adapters_module, "generate_report", fake_generate_report)
     service = configured_service(tmp_path)
 
     bundle, generated = await service.generate(report_request())
