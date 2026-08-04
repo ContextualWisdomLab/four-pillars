@@ -14,10 +14,12 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .calendar import calculate_chart
 from .fortune import calculate_annual_luck, calculate_daewoon, calculate_monthly_luck
+from .history import HistoryCursorError
 from .idempotency import parse_idempotency_key
 from .jobs import IdempotencyKeyReuseError
 from .models import BirthInput, Chart, DaewoonResult, JobStatus, LuckSnapshot, ReportJob
 from .service import (
+    HistoryNotSupportedError,
     IdempotencyNotSupportedError,
     ReportRequest,
     ReportService,
@@ -54,6 +56,15 @@ class ReportJobView(BaseModel):
     updated_at: datetime
     error: str | None = None
     artifacts: list[str] = Field(default_factory=list)
+
+
+class ReportJobPageView(BaseModel):
+    """One privacy-safe newest-first page of report-job summaries."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[ReportJobView]
+    next_cursor: str | None = None
 
 
 @lru_cache(maxsize=1)
@@ -135,6 +146,40 @@ def annual(request: LuckRequest) -> LuckSnapshot:
 def monthly(request: LuckRequest) -> LuckSnapshot:
     """Calculate one solar-term-bounded monthly luck snapshot."""
     return calculate_monthly_luck(calculate_chart(request.birth), request.year, request.month)
+
+
+@app.get(
+    "/v1/reports",
+    response_model=ReportJobPageView,
+    dependencies=[Depends(require_api_key)],
+)
+def list_reports(
+    limit: int = Query(default=20, ge=1, le=100),
+    cursor: str | None = Query(default=None),
+    job_status: JobStatus | None = Query(default=None, alias="status"),
+    service: ReportService = Depends(get_service),
+) -> ReportJobPageView:
+    """Return one redacted keyset-paginated page of recent report jobs."""
+    try:
+        jobs, next_cursor = service.list_jobs(
+            limit=limit,
+            cursor=cursor,
+            status=job_status,
+        )
+    except HistoryCursorError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except HistoryNotSupportedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=str(exc),
+        ) from exc
+    return ReportJobPageView(
+        items=[_job_view(job, service) for job in jobs],
+        next_cursor=next_cursor,
+    )
 
 
 @app.post(
