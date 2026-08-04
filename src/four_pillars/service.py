@@ -15,11 +15,12 @@ from .calendar import calculate_chart
 from .fortune import calculate_annual_luck, calculate_daewoon, calculate_monthly_luck
 from .idempotency import request_fingerprint
 from .jobs import JobStore
-from .models import BirthInput, Chart, DaewoonResult, LuckSnapshot, ReportJob
+from .models import BirthInput, Chart, DaewoonResult, JobStatus, LuckSnapshot, ReportJob
 from .ports import (
     ArtifactPublisher,
     IdempotentReportJobRepository,
     ReportInterpreter,
+    ReportJobHistoryRepository,
     ReportJobRepository,
 )
 from .quality import ReportQualityError
@@ -42,6 +43,10 @@ ARTIFACT_NAMES = frozenset(
 
 class IdempotencyNotSupportedError(RuntimeError):
     """Signal that an injected legacy repository lacks atomic keyed creation."""
+
+
+class HistoryNotSupportedError(RuntimeError):
+    """Signal that an injected legacy repository lacks history pagination."""
 
 
 class ReportRequest(BaseModel):
@@ -123,7 +128,30 @@ class ReportService:
             request_fingerprint(payload),
         )
 
-    async def generate(self, request: ReportRequest) -> tuple[CalculationBundle, GeneratedReport]:
+    def list_jobs(
+        self,
+        *,
+        limit: int,
+        cursor: str | None = None,
+        status: JobStatus | None = None,
+    ) -> tuple[list[ReportJob], str | None]:
+        """Return one report-history page through the optional repository capability.
+
+        Raises:
+            HistoryNotSupportedError: When an injected legacy repository does not
+                implement ``ReportJobHistoryRepository``.
+        """
+        repository = self.store
+        if not isinstance(repository, ReportJobHistoryRepository):
+            raise HistoryNotSupportedError(
+                "The configured report repository does not support report history"
+            )
+        return repository.list_jobs(limit=limit, cursor=cursor, status=status)
+
+    async def generate(
+        self,
+        request: ReportRequest,
+    ) -> tuple[CalculationBundle, GeneratedReport]:
         """Calculate immutable evidence and invoke the configured interpretation port."""
         bundle = calculate_bundle(request)
         generated = await self.interpreter.generate(
