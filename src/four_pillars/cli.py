@@ -1,3 +1,5 @@
+"""Provide command-line access to deterministic chart, luck, and prompt metadata."""
+
 from __future__ import annotations
 
 import json
@@ -34,7 +36,6 @@ def calculate(
     gender: str = typer.Option(Gender.UNSPECIFIED.value, help="male, female, or unspecified."),
 ) -> None:
     """Calculate the deterministic natal Four Pillars chart."""
-
     _dump(calculate_chart(_birth_input(birth, timezone, gender)))
 
 
@@ -49,7 +50,6 @@ def luck(
     daewoon_count: int = typer.Option(8, min=1, max=12),
 ) -> None:
     """Calculate daewoon, annual luck, and one solar-term month."""
-
     birth_input = _birth_input(birth, timezone, gender)
     chart = calculate_chart(birth_input)
     payload = {
@@ -63,5 +63,4 @@ def luck(
 @app.command()
 def prompts() -> None:
     """List prompt versions and immutable SHA-256 digests."""
-
     _dump(prompt_manifest())
