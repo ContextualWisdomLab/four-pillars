@@ -19,7 +19,8 @@ Four Pillars converts verified birth data into a transparent Korean manse calend
 4. Generate a Korean report whose claims remain consistent with the calculation.
 5. Receive constructive possibilities, cautions, decision criteria, and practical techniques rather than a list of warnings.
 6. Recover a recent durable report job after a page refresh, client restart, or operational handoff without exposing stored birth information in the collection response.
-7. Download JSON, HTML, PDF, and a generation manifest, then delete the job when it is no longer needed.
+7. Filter recent work by lifecycle status, append older pages, restore active polling, and download completed files from the browser without retaining an individual UUID outside the service.
+8. Download JSON, HTML, PDF, and a generation manifest, then delete the job when it is no longer needed.
 
 ## 4. Functional requirements
 
@@ -45,11 +46,16 @@ The service shall provide FastAPI endpoints, a CLI, a durable SQLite job queue, 
 
 The authenticated report API shall provide a redacted newest-first job collection with exact lifecycle-status filtering and opaque keyset continuation. Collection items and cursors shall exclude subject labels, birth input, user notes, stored requests, request fingerprints, idempotency material, generated report text, model traces, and artifact paths. The required repository contract shall remain backward compatible; history traversal shall be a separate optional capability for standalone and MSA adapters.
 
+The browser studio shall present the collection as a responsive third workflow section based on the editable Figma desktop and mobile design. It shall load the latest 20 jobs, refresh the first page, filter by exact public status, append older pages from `next_cursor`, resume polling for queued or running jobs, and expose only server-supplied allow-listed artifact names for completed jobs. Authentication, cursor validation, ordering, privacy redaction, and adapter capability checks remain server-owned.
+
+The browser shall render API-derived values only through safe DOM text APIs. It shall suppress stale asynchronous history responses, bound displayed operational-error copy, announce history updates through a polite live region, communicate status with text as well as color, and keep the API key only in current page memory. Authenticated artifact downloads shall use an in-memory request header rather than credentials in URLs or persistent browser storage.
+
 ## 5. Non-functional requirements
 
 - Deterministic calculation p95 under 250 ms for modern dates on one CPU core.
 - Report job state remains recoverable after API restart.
 - Report-history traversal remains stable for equal timestamps and does not repeat existing rows when new jobs are inserted during a continuation sequence.
+- Browser history remains usable after a page refresh, rejects stale response races, and does not persist credentials or report data locally.
 - Offline CI never requires an external LLM key.
 - Live NIM tests are opt-in and use a repository secret.
 - Production statement and branch coverage remain exactly 100 percent.
@@ -66,8 +72,9 @@ The authenticated report API shall provide a redacted newest-first job collectio
 - At least 95 percent schema-valid first-pass NIM responses in the evaluation set.
 - At least 90 percent of evaluated reports score 3 or higher on completeness, balance, clarity, safety, and actionability, with deterministic fidelity fixed at 4.
 - Less than 1 percent report-generation jobs end in an unclassified failure.
-- 0 personal-data fields in report-history items and cursors.
+- 0 personal-data fields in report-history items, cursors, or browser history rows.
 - 0 duplicate job identifiers while traversing a stable continuation sequence.
+- A user can recover an existing queued, running, completed, or failed job from the browser without re-entering its UUID.
 - User can identify the relevant calculation evidence and one practical next step from each major chapter.
 
 ## 7. Release scope
@@ -76,4 +83,4 @@ Version 0.1 includes one-person natal and luck reporting, Korean output, NIM int
 
 ## 8. Risks and mitigations
 
-Approximate solar longitude can be least reliable at a boundary, so the product emits a six-hour warning and records the policy. NIM availability can vary, so the client retries transient errors and never falls back to a different provider silently. Symbolic text can sound deterministic, so quality checks require conditional language and real-world decision disclaimers. Personal data can persist in output, so storage uses UUIDs, retention, explicit deletion, restricted logs, redacted history items, and cursors containing only UTC timestamps and random job UUIDs.
+Approximate solar longitude can be least reliable at a boundary, so the product emits a six-hour warning and records the policy. NIM availability can vary, so the client retries transient errors and never falls back to a different provider silently. Symbolic text can sound deterministic, so quality checks require conditional language and real-world decision disclaimers. Personal data can persist in output, so storage uses UUIDs, retention, explicit deletion, restricted logs, redacted history items, cursors containing only UTC timestamps and random job UUIDs, and browser rendering that never reconstructs hidden request fields. Concurrent browser requests can complete out of order, so only the latest history request may update the visible collection.
