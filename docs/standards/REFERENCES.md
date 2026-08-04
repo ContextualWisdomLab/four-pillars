@@ -10,7 +10,7 @@ These references govern software engineering, AI risk, model evaluation, privacy
 
 International Organization for Standardization, & International Electrotechnical Commission. (2023). *Systems and software engineering—Systems and software Quality Requirements and Evaluation (SQuaRE)—Product quality model* (ISO/IEC Standard No. 25010:2023). https://www.iso.org/standard/78176.html
 
-**Application.** The nine-characteristic product-quality model informs the PRD/TRD quality goals, deterministic correctness tests, interoperability ports, reliability controls, security boundaries, maintainability requirements, accessibility-aware browser workflow, and release acceptance criteria.
+**Application.** ISO/IEC 25010:2023 and its nine-characteristic product-quality model inform the PRD/TRD quality goals, deterministic correctness tests, interoperability ports, reliability controls, security boundaries, maintainability requirements, accessibility-aware browser workflow, and release acceptance criteria.
 
 **Limitation.** Repository controls are an engineering crosswalk, not an ISO conformity assessment or certification.
 
@@ -18,7 +18,7 @@ International Organization for Standardization, & International Electrotechnical
 
 International Organization for Standardization, & International Electrotechnical Commission. (2023). *Information technology—Artificial intelligence—Management system* (ISO/IEC Standard No. 42001:2023). https://www.iso.org/standard/42001
 
-**Application.** The management-system approach informs explicit AI ownership, documented trust boundaries, controlled provider selection, prompt/model traceability, risk review, scheduled quality loops, incident handling, change management, and continual improvement.
+**Application.** ISO/IEC 42001:2023 and its management-system approach inform explicit AI ownership, documented trust boundaries, controlled provider selection, prompt/model traceability, risk review, scheduled quality loops, incident handling, change management, and continual improvement.
 
 **Limitation.** Four Pillars has not undergone an accredited ISO/IEC 42001 certification audit.
 
@@ -26,7 +26,7 @@ International Organization for Standardization, & International Electrotechnical
 
 International Organization for Standardization, & International Electrotechnical Commission. (2023). *Information technology—Artificial intelligence—Guidance on risk management* (ISO/IEC Standard No. 23894:2023). https://www.iso.org/standard/77304.html
 
-**Application.** The guidance informs context-specific AI risk identification, treatment, monitoring, provider boundaries, content-quality controls, privacy minimization, and explicit residual-risk documentation.
+**Application.** ISO/IEC 23894:2023 informs context-specific AI risk identification, treatment, monitoring, provider boundaries, content-quality controls, privacy minimization, and explicit residual-risk documentation.
 
 **Limitation.** This project uses a practical control mapping and does not reproduce the copyrighted standard.
 
