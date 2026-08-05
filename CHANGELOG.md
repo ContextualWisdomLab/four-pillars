@@ -11,11 +11,11 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 - PostgreSQL and object-storage adapters for horizontally scalable multi-node deployments.
 - Additional independent golden-chart fixtures near solar-term boundaries.
 
-## [0.6.0] - 2026-08-04
+## [0.6.0] - 2026-08-05
 
 ### Added
 
-- A responsive, accessible recent-report panel in the browser studio, backed by the authenticated v0.5 report-history API and the editable Figma desktop/mobile design.
+- A responsive, accessible recent report panel in the browser studio, backed by the authenticated v0.5 report-history API and the editable Figma desktop/mobile design.
 - Exact lifecycle-status filtering, refresh, cursor-based “load more,” active-job restoration and polling, completed artifact actions, explicit empty/error states, and stale-request suppression.
 - Desktop and mobile layouts that preserve the existing calculation-first workflow while making recent durable work recoverable after a refresh, client restart, or operational handoff.
 
