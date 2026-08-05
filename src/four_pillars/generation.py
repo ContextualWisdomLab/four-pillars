@@ -1,14 +1,23 @@
-"""Define the structural client boundary for schema-validated LLM generation."""
+"""Define provider-neutral contracts for schema-validated LLM generation."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Protocol, TypeVar, runtime_checkable
 
 from pydantic import BaseModel
 
-from .nim import NimTrace
-
 T = TypeVar("T", bound=BaseModel)
+
+
+@dataclass(frozen=True)
+class GenerationTrace:
+    """Record model identity, request attempts, repairs, and raw generated content."""
+
+    model: str
+    attempts: int
+    repairs: int
+    raw_content: str
 
 
 @runtime_checkable
@@ -24,6 +33,6 @@ class StructuredGenerationClient(Protocol):
         model: str | None = None,
         temperature: float = 0.2,
         max_tokens: int = 4096,
-    ) -> tuple[T, NimTrace]:
+    ) -> tuple[T, GenerationTrace]:
         """Return one validated response and provider-neutral generation trace."""
         raise NotImplementedError  # pragma: no cover - protocol declaration
