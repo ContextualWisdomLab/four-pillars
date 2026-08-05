@@ -7,7 +7,7 @@ from .adapters import (
 )
 from .calendar import calculate_chart
 from .fortune import calculate_annual_luck, calculate_daewoon, calculate_monthly_luck
-from .generation import StructuredGenerationClient
+from .generation import GenerationTrace, StructuredGenerationClient
 from .models import BirthInput, Chart, Gender
 from .ports import (
     ArtifactPublisher,
@@ -24,6 +24,7 @@ __all__ = [
     "Chart",
     "ContextualOrchestratorReportInterpreter",
     "Gender",
+    "GenerationTrace",
     "IdempotentReportJobRepository",
     "NimReportInterpreter",
     "ReportInterpreter",
