@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import json
-from dataclasses import dataclass
 from typing import Any, Self, TypeVar
 
 import httpx
 from pydantic import BaseModel, ValidationError
 
+from .generation import GenerationTrace
 from .settings import Settings
 
 T = TypeVar("T", bound=BaseModel)
@@ -23,14 +23,8 @@ class NimSchemaError(NimError):
     """Report generated content that cannot satisfy the requested JSON schema."""
 
 
-@dataclass(frozen=True)
-class NimTrace:
-    """Record model identity, request attempts, repairs, and raw generated content."""
-
-    model: str
-    attempts: int
-    repairs: int
-    raw_content: str
+NimTrace = GenerationTrace
+"""Backward-compatible alias for the provider-neutral generation trace."""
 
 
 class _OpenAICompatibleJsonClient:
@@ -157,7 +151,7 @@ class _OpenAICompatibleJsonClient:
         model: str | None = None,
         temperature: float = 0.2,
         max_tokens: int = 4096,
-    ) -> tuple[T, NimTrace]:
+    ) -> tuple[T, GenerationTrace]:
         """Generate one schema-validated object with bounded retries and repair."""
         selected_model = model or self._default_model
         messages: list[dict[str, str]] = [
@@ -209,7 +203,7 @@ class _OpenAICompatibleJsonClient:
                     ]
                 )
                 continue
-            return parsed, NimTrace(
+            return parsed, GenerationTrace(
                 model=selected_model,
                 attempts=total_attempts,
                 repairs=repair,
