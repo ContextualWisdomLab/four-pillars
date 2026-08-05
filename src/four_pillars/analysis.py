@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .generation import StructuredGenerationClient
+from .generation import GenerationTrace, StructuredGenerationClient
 from .models import (
     Chart,
     DaewoonResult,
@@ -16,7 +16,6 @@ from .models import (
     ReportDocument,
     ReportSection,
 )
-from .nim import NimTrace
 from .prompts import PROMPT_NAMES, PromptTemplate, load_prompt
 from .quality import ReportQualityError, assert_report_quality
 
@@ -67,7 +66,7 @@ def _allowed_pillars(
     return allowed
 
 
-def _trace_payload(trace: NimTrace, prompt: PromptTemplate) -> dict[str, Any]:
+def _trace_payload(trace: GenerationTrace, prompt: PromptTemplate) -> dict[str, Any]:
     return {
         "model": trace.model,
         "attempts": trace.attempts,
