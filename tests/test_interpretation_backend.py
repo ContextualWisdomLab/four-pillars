@@ -7,9 +7,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from test_quality import valid_report
 
 import four_pillars
-import four_pillars.adapters as adapters_module
 from four_pillars.adapters import (
     ContextualOrchestratorReportInterpreter,
     NimReportInterpreter,
@@ -25,7 +25,6 @@ from four_pillars.service import (
     calculate_bundle,
 )
 from four_pillars.settings import Settings
-from test_quality import valid_report
 
 
 def settings(tmp_path: Path, **updates: object) -> Settings:
@@ -149,13 +148,11 @@ async def test_orchestrator_adapter_forwards_immutable_evidence(
         return expected
 
     monkeypatch.setattr(
-        adapters_module,
-        "ContextualOrchestratorClient",
+        "four_pillars.adapters.ContextualOrchestratorClient",
         FakeClient,
     )
     monkeypatch.setattr(
-        adapters_module,
-        "generate_report",
+        "four_pillars.adapters.generate_report",
         fake_generate_report,
     )
     interpreter = ContextualOrchestratorReportInterpreter(configured)
