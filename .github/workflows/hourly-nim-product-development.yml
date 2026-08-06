@@ -241,7 +241,9 @@ jobs:
           prompt="$(cat "$RUNNER_TEMP/agent-prompt.md")"
           status=1
           read -r -a models <<<"$OPENCODE_MODELS"
-          for model in "${models[@]}"; do
+          model_count=${#models[@]}
+          for ((model_index = 0; model_index < model_count; model_index++)); do
+            model="${models[$model_index]}"
             if timeout --kill-after="${OPENCODE_KILL_GRACE_SECONDS}s" \
               "${OPENCODE_RUN_TIMEOUT_SECONDS}s" \
               env -u GH_TOKEN -u GITHUB_TOKEN -u REPOSITORY_TOKEN \
@@ -254,9 +256,13 @@ jobs:
               status=0
               break
             fi
+            if [ "$model_index" -eq $((model_count - 1)) ]; then
+              break
+            fi
             git reset --hard HEAD
             git clean -fdx
-            timeout --kill-after=15s 180s \
+            env -u NVIDIA_NIM_API_KEY \
+              timeout --kill-after=15s 180s \
               python -m pip install --require-hashes -r requirements/ci.txt
           done
           [ "$status" -eq 0 ] || { echo '::error::All NIM candidates failed'; exit 1; }
@@ -347,6 +353,9 @@ jobs:
           artifact_name="four-pillars-product-proposal-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           expected_artifact_digest="${{ needs.propose_product_increment.outputs.artifact_digest }}"
           expected_patch="${{ needs.propose_product_increment.outputs.patch_sha256 }}"
+          [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]] || { echo '::error::Malformed artifact ID'; exit 1; }
+          [[ "$expected_artifact_digest" =~ ^[0-9a-f]{64}$ ]] || { echo '::error::Malformed artifact digest'; exit 1; }
+          [[ "$expected_patch" =~ ^[0-9a-f]{64}$ ]] || { echo '::error::Malformed patch digest'; exit 1; }
           artifact_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}")"
           downloaded_digest="$(jq -r '.digest // empty' <<<"$artifact_json")"
           [[ "$downloaded_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
@@ -371,13 +380,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          env -u GH_TOKEN -u GITHUB_TOKEN -u REPOSITORY_TOKEN \
-            -u ACTIONS_ID_TOKEN_REQUEST_TOKEN -u ACTIONS_ID_TOKEN_REQUEST_URL \
-            -u ACTIONS_RUNTIME_TOKEN -u ACTIONS_RUNTIME_URL \
-            -u ACTIONS_RESULTS_URL -u ACTIONS_CACHE_URL \
-            -u GITHUB_ENV -u GITHUB_OUTPUT -u GITHUB_PATH \
-            -u GITHUB_STATE -u GITHUB_STEP_SUMMARY \
-            python -m pip check
+          unset GH_TOKEN GITHUB_TOKEN REPOSITORY_TOKEN
+          unset ACTIONS_ID_TOKEN_REQUEST_TOKEN ACTIONS_ID_TOKEN_REQUEST_URL
+          unset ACTIONS_RUNTIME_TOKEN ACTIONS_RUNTIME_URL
+          unset ACTIONS_RESULTS_URL ACTIONS_CACHE_URL
+          unset GITHUB_ENV GITHUB_OUTPUT GITHUB_PATH
+          unset GITHUB_STATE GITHUB_STEP_SUMMARY
+          python -m pip check
           python scripts/product_gap_audit.py
           ruff check .
           python -m compileall -q src tests scripts
@@ -434,6 +443,9 @@ jobs:
           artifact_name="four-pillars-product-proposal-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           expected_artifact_digest="${{ needs.propose_product_increment.outputs.artifact_digest }}"
           expected_patch="${{ needs.propose_product_increment.outputs.patch_sha256 }}"
+          [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]] || { echo '::error::Malformed artifact ID'; exit 1; }
+          [[ "$expected_artifact_digest" =~ ^[0-9a-f]{64}$ ]] || { echo '::error::Malformed artifact digest'; exit 1; }
+          [[ "$expected_patch" =~ ^[0-9a-f]{64}$ ]] || { echo '::error::Malformed patch digest'; exit 1; }
           artifact_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}")"
           downloaded_digest="$(jq -r '.digest // empty' <<<"$artifact_json")"
           [[ "$downloaded_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
@@ -512,7 +524,21 @@ jobs:
           git checkout -b "$branch"
           git -c core.hooksPath=/dev/null commit -m "$title"
           gh auth setup-git
-          git ls-remote --exit-code --heads origin "refs/heads/${branch}" >/dev/null 2>&1 && exit 1 || true
+          set +e
+          git ls-remote --exit-code --heads origin "refs/heads/${branch}" >/dev/null 2>&1
+          remote_status=$?
+          set -e
+          case "$remote_status" in
+            0)
+              echo '::error::proposal_branch_already_exists'
+              exit 1
+              ;;
+            2) ;;
+            *)
+              echo '::error::proposal_branch_inventory_unavailable'
+              exit 1
+              ;;
+          esac
           cleanup() { git push origin --delete "$branch" >/dev/null 2>&1 || true; }
           trap cleanup ERR
           git push origin "HEAD:refs/heads/${branch}"
