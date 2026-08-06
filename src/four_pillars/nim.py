@@ -41,13 +41,16 @@ class _OpenAICompatibleJsonClient:
         max_schema_repairs: int,
         provider_label: str,
         request_metadata: dict[str, Any] | None = None,
+        native_json_mode: bool = True,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
+        """Create a bounded OpenAI-compatible client with optional native JSON mode."""
         self._default_model = default_model
         self._max_retries = max_retries
         self._max_schema_repairs = max_schema_repairs
         self._provider_label = provider_label
         self._request_metadata = dict(request_metadata or {})
+        self._native_json_mode = native_json_mode
         self._client = httpx.AsyncClient(
             base_url=base_url.rstrip("/"),
             timeout=httpx.Timeout(timeout_seconds),
@@ -167,14 +170,15 @@ class _OpenAICompatibleJsonClient:
         total_attempts = 0
         raw_content = ""
         for repair in range(self._max_schema_repairs + 1):
-            payload = {
+            payload: dict[str, Any] = {
                 "model": selected_model,
                 "messages": messages,
                 "temperature": temperature if repair == 0 else 0,
                 "max_tokens": max_tokens,
-                "response_format": {"type": "json_object"},
                 **self._request_metadata,
             }
+            if self._native_json_mode:
+                payload["response_format"] = {"type": "json_object"}
             data, attempts = await self._post(payload)
             total_attempts += attempts
             raw_content = self._content(data)
@@ -235,5 +239,6 @@ class NimClient(_OpenAICompatibleJsonClient):
             max_retries=settings.nim_max_retries,
             max_schema_repairs=settings.nim_max_schema_repairs,
             provider_label="NIM",
+            native_json_mode=True,
             transport=transport,
         )
