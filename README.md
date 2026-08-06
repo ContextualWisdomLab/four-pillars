@@ -58,11 +58,14 @@ export INTERPRETATION_BACKEND='contextual_orchestrator'
 export CONTEXTUAL_ORCHESTRATOR_BASE_URL='https://orchestrator.example.com/v1'
 export CONTEXTUAL_ORCHESTRATOR_TOKEN='...'
 export CONTEXTUAL_ORCHESTRATOR_MODEL='contextual-orchestrator'
+export CONTEXTUAL_ORCHESTRATOR_MODE='auto'
 export CONTEXTUAL_ORCHESTRATOR_COMPANY='ContextualWisdomLab'
 export CONTEXTUAL_ORCHESTRATOR_TEAM='fortune-products'
 ```
 
-The adapter sends `response_format={"type":"json_object"}` through the orchestrator's OpenAI-compatible chat-completions endpoint and attaches prompt-safe usage attribution. Birth data, user context, generated copy, and credentials are never placed in attribution. A missing or unavailable orchestrator fails the report job visibly; it does not switch to direct NIM.
+`CONTEXTUAL_ORCHESTRATOR_MODE` accepts `auto`, `route`, or `conduct`. `auto` lets the gateway allocate work between one-agent routing and deeper multi-agent conduct, while the other values force one bounded execution mode. The adapter deliberately omits OpenAI `response_format`: the organization gateway treats that field as a single-agent passthrough trigger. Four Pillars instead supplies an explicit JSON-only prompt, validates every response with Pydantic, and performs one bounded repair without changing providers. This preserves actual orchestrator routing while retaining the same strict report schema.
+
+The adapter attaches prompt-safe usage attribution. Birth data, user context, generated copy, fingerprints, paths, and credentials are never placed in attribution. A missing or unavailable orchestrator fails the report job visibly; it does not switch to direct NIM. Requests remain synchronous because the report worker requires an immediate schema-validated response; asynchronous batch orchestration is a separately versioned future contract.
 
 For local development, the example base URL uses loopback HTTP. Production model traffic should use TLS and an approved provider-host policy.
 
