@@ -8,8 +8,8 @@ from pathlib import Path
 from four_pillars import __version__
 from four_pillars.api import app
 
-RELEASE_VERSION = "0.5.0"
-RELEASE_DATE = "2026-08-04"
+RELEASE_VERSION = "0.6.0"
+RELEASE_DATE = "2026-08-05"
 
 
 def test_release_version_is_consistent_across_public_surfaces() -> None:
@@ -22,15 +22,16 @@ def test_release_version_is_consistent_across_public_surfaces() -> None:
 
 
 def test_changelog_contains_the_current_release_and_core_capabilities() -> None:
-    """Describe the shipped report-history, modularity, and release guarantees."""
+    """Describe the shipped browser-recovery, modularity, and release guarantees."""
     changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
     normalized = changelog.casefold()
 
     assert f"## [{RELEASE_VERSION}] - {RELEASE_DATE}" in changelog
     for capability in (
-        "GET /v1/reports",
-        "ReportJobHistoryRepository",
-        "keyset pagination",
+        "recent report",
+        "authenticated",
+        "cursor",
+        "stale",
         "100% statement and branch coverage",
         "NVIDIA_NIM_API_KEY",
     ):
