@@ -6,32 +6,40 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ## [Unreleased]
 
-### Added
-
-- An optional `contextual_orchestrator` interpretation backend using the organization gateway's OpenAI-compatible chat-completions contract, schema-oriented passthrough, Bearer authentication, prompt-safe usage attribution, and explicit routing metadata.
-- A runtime-checkable `StructuredGenerationClient` port and settings-driven interpreter factory while preserving explicitly injected MSA interpreters.
-- APA 7th standards and research references plus a standards-to-code/test/workflow traceability matrix covering ISO/IEC 25010:2023, ISO/IEC 42001:2023, ISO/IEC 23894:2023, NIST AI RMF, NIST AI 600-1, RFC 9457, W3C Trace Context, and peer-reviewed LLM-judge research.
-- ADR 0003 documenting direct NIM as the standalone default, Contextual Orchestrator as an optional organization adapter, credential separation, and the no-fallback decision.
-
-### Changed
-
-- Staged interpretation now depends on a structural generation client rather than the concrete NIM client; both built-in adapters share bounded OpenAI-compatible JSON transport, retry, validation, and repair behavior.
-- `ReportService` selects the configured built-in interpreter only when a custom `ReportInterpreter` was not injected, preserving standalone and modular MSA composition.
-- Product, technical, API, modularity, security, operations, UML, hourly-loop, and environment documentation now describe both explicit interpretation backends and their trust boundaries.
-- The hourly product-gap and document audits now enforce interpretation, credential, standards, APA 7th, ADR, secret-exclusion, public-docstring, 100% coverage, and database-naming contracts.
-
-### Security
-
-- Direct model access continues to use only `NVIDIA_NIM_API_KEY`; the optional organization gateway uses only `CONTEXTUAL_ORCHESTRATOR_TOKEN`. A selected backend failure never triggers implicit fallback.
-- Contextual Orchestrator attribution contains only `service=four-pillars` and optional organization labels; personal data, prompt/report content, fingerprints, paths, API keys, and provider credentials are prohibited.
-- Hourly and release workflows receive neither model credential, and hosted evaluation remains opt-in.
-- LLM-as-a-judge output remains supplementary to deterministic fixtures, Pydantic schemas, rule-based quality gates, security review, and human review because peer-reviewed research documents adversarial and judgment-bias risks.
-
 ### Planned
 
 - PostgreSQL and object-storage adapters for horizontally scalable multi-node deployments.
 - Additional independent golden-chart fixtures near solar-term boundaries.
 - RFC 9457 Problem Details and W3C Trace Context propagation through a separately versioned compatibility change.
+- Stage-aware test-time compute allocation and ablation across routed and conducted interpretation stages.
+
+## [0.7.0] - 2026-08-06
+
+### Added
+
+- An optional Contextual Orchestrator interpretation backend using the organization gateway's OpenAI-compatible chat-completions contract, Bearer authentication, prompt-safe usage attribution, explicit routing metadata, and bounded `auto`, `route`, or `conduct` execution.
+- A runtime-checkable `StructuredGenerationClient` port and settings-driven interpreter factory while preserving explicitly injected standalone and MSA interpreters.
+- APA 7th standards and research references plus a standards-to-code, test, workflow, and residual-risk traceability matrix covering ISO/IEC 25010:2023, ISO/IEC 42001:2023, ISO/IEC 23894:2023, NIST AI RMF, NIST AI 600-1, RFC 9457, W3C Trace Context, and peer-reviewed LLM-judge research.
+- ADR 0003 documenting direct NIM as the standalone default, Contextual Orchestrator as an optional organization adapter, credential separation, real route/conduct execution, and the no-fallback decision.
+- Endpoint-security contracts that allow HTTPS remotely and cleartext HTTP only on explicit loopback hosts for local development.
+
+### Changed
+
+- Package and API versions advance to `0.7.0`; deterministic calculation-policy, prompt, database, cursor, idempotency, report schema, and artifact contracts remain unchanged.
+- Staged interpretation now depends on a provider-neutral structural generation client rather than the concrete NIM client; both built-in adapters share bounded transport, retry, validation, and repair behavior.
+- Direct NVIDIA NIM retains provider-native JSON mode, while Contextual Orchestrator deliberately omits `response_format`, tools, and function-calling fields so the gateway does not collapse the request into single-agent passthrough.
+- `ReportService` selects the configured built-in interpreter only when a custom `ReportInterpreter` was not injected, preserving standalone and modular MSA composition.
+- Product, technical, API, modularity, security, operations, UML, hourly-loop, and environment documentation describe both explicit interpretation backends and their trust boundaries.
+- The hourly product-gap and document audits enforce interpretation, credential, standards, APA 7th, ADR, secret-exclusion, public-docstring, 100% statement and branch coverage, and database-naming contracts.
+
+### Security
+
+- Direct model access uses only `NVIDIA_NIM_API_KEY`; the optional organization gateway uses only `CONTEXTUAL_ORCHESTRATOR_TOKEN`. A selected-backend failure has no silent provider fallback.
+- Remote credential-bearing model endpoints require HTTPS. Loopback HTTP is limited to `localhost`, `127.0.0.1`, or `::1` for local development.
+- Contextual Orchestrator attribution contains only `service=four-pillars` and optional organization labels; personal data, prompt or report content, fingerprints, paths, API keys, and provider credentials are prohibited.
+- Hourly and release workflows receive neither model credential, and hosted evaluation remains opt-in.
+- LLM-as-a-judge output remains supplementary to deterministic fixtures, Pydantic schemas, rule-based quality gates, security review, and human review because peer-reviewed research documents adversarial and judgment-bias risks.
+- Stranded report-job recovery requires proof that no worker owns the job and a fresh `Idempotency-Key`, preventing accidental replay of the existing queued or running record.
 
 ## [0.6.0] - 2026-08-05
 
@@ -123,7 +131,7 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ### Added
 
-- Deterministic Four Pillars calculation for solar and Korean lunar input, IANA time zones, optional solar-time correction, Li Chun year boundaries, twelve month-changing solar terms, year/month/day/hour pillars, Ten Gods, hidden stems, Twelve Growth Stages, element balance, interactions, and evidence fingerprints.
+- Deterministic Four Pillars calculation for solar and Korean lunar input, IANA time zones, optional solar-time correction, Li Chun year boundaries, twelve month-changing solar terms, year, month, day, and hour pillars, Ten Gods, hidden stems, Twelve Growth Stages, element balance, interactions, and evidence fingerprints.
 - Deterministic daewoon, annual luck, and monthly luck output with explicit date boundaries and interaction evidence.
 - Versioned natal, daewoon, annual, monthly, practical-skills, synthesis, editorial-repair, and LLM-judge prompts for NVIDIA NIM.
 - Schema-validated NVIDIA NIM generation with bounded network retries, bounded repair, prompt hashes, and no silent provider fallback.
@@ -142,7 +150,8 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 - Calculation data is the immutable source of truth; model output may interpret but cannot replace pillars, date boundaries, Ten Gods, interactions, or the calculation fingerprint.
 - Hosted model and evaluation model identifiers remain deployment configuration so operators can choose a currently available free NVIDIA NIM model.
 
-[Unreleased]: https://github.com/ContextualWisdomLab/four-pillars/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/ContextualWisdomLab/four-pillars/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/ContextualWisdomLab/four-pillars/releases/tag/v0.7.0
 [0.6.0]: https://github.com/ContextualWisdomLab/four-pillars/releases/tag/v0.6.0
 [0.5.0]: https://github.com/ContextualWisdomLab/four-pillars/releases/tag/v0.5.0
 [0.4.0]: https://github.com/ContextualWisdomLab/four-pillars/releases/tag/v0.4.0
