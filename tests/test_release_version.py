@@ -24,13 +24,16 @@ def test_release_version_is_consistent_across_public_surfaces() -> None:
 def test_changelog_contains_the_current_release_and_core_capabilities() -> None:
     """Describe the shipped orchestration, governance, and release guarantees."""
     changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
-    normalized = changelog.casefold()
+    release_header = f"## [{RELEASE_VERSION}] - {RELEASE_DATE}"
 
-    assert f"## [{RELEASE_VERSION}] - {RELEASE_DATE}" in changelog
+    assert release_header in changelog
+    release_section = changelog.split(release_header, 1)[1].split("\n## [", 1)[0]
+    normalized = release_section.casefold()
     for capability in (
         "contextual orchestrator",
         "StructuredGenerationClient",
         "auto`, `route`, or `conduct",
+        "bounded",
         "HTTPS",
         "APA 7th",
         "100% statement and branch coverage",
