@@ -44,6 +44,8 @@ class ContextualOrchestratorClient(_OpenAICompatibleJsonClient):
             if value:
                 attribution[dimension] = value
         request_metadata: dict[str, Any] = {
+            "mode": settings.contextual_orchestrator_mode,
+            "include_orchestration_trace": False,
             "attribution": attribution,
             "routing": {
                 "channel": "sync",
@@ -62,5 +64,6 @@ class ContextualOrchestratorClient(_OpenAICompatibleJsonClient):
             ),
             provider_label="Contextual Orchestrator",
             request_metadata=request_metadata,
+            native_json_mode=False,
             transport=transport,
         )
