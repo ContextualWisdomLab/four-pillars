@@ -33,6 +33,7 @@ INTERPRETATION_BACKEND=contextual_orchestrator
 CONTEXTUAL_ORCHESTRATOR_BASE_URL=https://orchestrator.example.com/v1
 CONTEXTUAL_ORCHESTRATOR_TOKEN=...
 CONTEXTUAL_ORCHESTRATOR_MODEL=contextual-orchestrator
+CONTEXTUAL_ORCHESTRATOR_MODE=auto
 CONTEXTUAL_ORCHESTRATOR_TIMEOUT_SECONDS=120
 CONTEXTUAL_ORCHESTRATOR_MAX_RETRIES=3
 CONTEXTUAL_ORCHESTRATOR_MAX_SCHEMA_REPAIRS=1
@@ -42,18 +43,30 @@ CONTEXTUAL_ORCHESTRATOR_GROUP=interpretation
 CONTEXTUAL_ORCHESTRATOR_COMPANY=ContextualWisdomLab
 ```
 
+`CONTEXTUAL_ORCHESTRATOR_MODE` accepts only `auto`, `route`, or `conduct`. `auto` delegates test-time compute allocation to the organization gateway; `route` requests one bounded routed worker; `conduct` requests deeper bounded multi-agent conduct. Four Pillars keeps synchronous delivery because its worker must receive and validate the complete response before it commits a report job. Batch orchestration requires a separately versioned asynchronous job contract.
+
 The example `.env.example` uses loopback HTTP for local development. Production traffic should use TLS, an approved hostname, restricted egress, and a gateway token scoped to inference rather than administration.
 
 The adapter sends the attribution value `service=four-pillars` and adds only configured account, team, group, and company labels. It never adds a subject name, birth value, user note, calculation fingerprint, prompt content, generated text, artifact path, API key, or Bearer token to attribution.
 
 ## Request contract
 
-Both clients send `POST /chat/completions` with Bearer authentication, the selected model, system and user messages, bounded temperature/max tokens, and `response_format={"type":"json_object"}`. Calculation JSON and user notes are serialized inside an explicit untrusted `<input>` boundary. The model is instructed that user notes are data rather than executable instructions.
+Both clients send `POST /chat/completions` with Bearer authentication, the selected model, system and user messages, and bounded temperature/max tokens. Calculation JSON and user notes are serialized inside an explicit untrusted `<input>` boundary. The model is instructed that user notes are data rather than executable instructions.
 
-Contextual Orchestrator requests also send:
+Direct NVIDIA NIM additionally receives:
 
 ```json
 {
+  "response_format": {"type": "json_object"}
+}
+```
+
+Contextual Orchestrator requests instead send:
+
+```json
+{
+  "mode": "auto",
+  "include_orchestration_trace": false,
   "attribution": {
     "service": "four-pillars",
     "company": "ContextualWisdomLab",
@@ -67,7 +80,7 @@ Contextual Orchestrator requests also send:
 }
 ```
 
-The `response_format` field intentionally selects the orchestrator's single-agent passthrough behavior for provider features that a multi-agent verifier cannot merge safely. Four Pillars still applies its own Pydantic and deterministic quality gates after the response returns.
+The orchestrator adapter deliberately omits `response_format`. The organization gateway treats that field, tools, and function-calling fields as provider passthrough triggers because those provider features cannot be merged safely across agents. Sending `response_format` would therefore bypass `auto`, `route`, and `conduct` execution and silently collapse the integration to one upstream model. Four Pillars preserves real orchestration by requesting JSON in the prompt, validating the returned object with Pydantic, and allowing one bounded same-backend repair.
 
 ## Reliability
 
@@ -77,7 +90,7 @@ The two adapters share the same structured-generation transport behavior and ret
 
 ## Offline tests
 
-Normal CI uses `httpx.MockTransport` to test headers, endpoint shape, JSON parsing, attribution, routing, schema repair, rate-limit retry, terminal errors, backend selection, and no-fallback behavior without spending model quota or exposing a secret. Run:
+Normal CI uses `httpx.MockTransport` to test headers, endpoint shape, JSON parsing, attribution, compute mode, routing, native JSON-mode separation, schema repair, rate-limit retry, terminal errors, backend selection, and no-fallback behavior without spending model quota or exposing a secret. Run:
 
 ```bash
 pytest -m 'not nim_live'
@@ -107,6 +120,10 @@ Apply retention and deletion to Four Pillars artifacts independently of provider
 ### Selected backend unavailable
 
 Keep the job failed or queued according to operator policy and continue serving deterministic calculations. Verify the selected backend, base URL, credential, DNS/TLS, route, model availability, and quota. Do not change providers under the same model label and do not add an undocumented fallback.
+
+### Contextual requests unexpectedly use one upstream agent
+
+Inspect the outbound request captured by the adapter contract test. It must include a valid `mode` and must not contain `response_format`, `tools`, `tool_choice`, `functions`, or `function_call`. Any of those provider-feature keys activates the gateway's single-agent passthrough path and is a regression in the integration boundary.
 
 ### Schema-valid but unsafe copy increases
 
