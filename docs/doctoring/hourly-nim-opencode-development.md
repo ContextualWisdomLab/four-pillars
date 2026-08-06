@@ -27,16 +27,15 @@ conventions as closely as the source type permits.
 ## Upstream version evidence
 
 The official OpenCode GitHub release API identified OpenCode 1.18.13 as the
-current upstream release on 2026-08-06. The workflow deliberately pins OpenCode
-1.17.13 because its Linux x64 archive SHA-256
+current upstream release on 2026-08-06. The workflow deliberately pins OpenCode 1.17.13 because its Linux x64 archive SHA-256
 `157afa289d1a8d9372de0ce19ac726119b937a1f6b201808d46f06e4e59bb348`
 had already been independently reviewed in the CWL Noema workflow. The newer
 archive is not adopted until its exact asset digest is independently captured,
 reviewed, committed, and exercised. “Latest” is not allowed to mean
 “unverified.”
 
-This is a supply-chain project decision, not a claim that 1.17.13 is functionally
-superior. The scheduled agent cannot auto-update itself.
+This is a supply-chain project decision, not a claim that OpenCode 1.17.13 is
+functionally superior. The scheduled agent cannot auto-update itself.
 
 ## Orchestration research application
 
