@@ -6,10 +6,32 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ## [Unreleased]
 
+### Added
+
+- An optional `contextual_orchestrator` interpretation backend using the organization gateway's OpenAI-compatible chat-completions contract, schema-oriented passthrough, Bearer authentication, prompt-safe usage attribution, and explicit routing metadata.
+- A runtime-checkable `StructuredGenerationClient` port and settings-driven interpreter factory while preserving explicitly injected MSA interpreters.
+- APA 7th standards and research references plus a standards-to-code/test/workflow traceability matrix covering ISO/IEC 25010:2023, ISO/IEC 42001:2023, ISO/IEC 23894:2023, NIST AI RMF, NIST AI 600-1, RFC 9457, W3C Trace Context, and peer-reviewed LLM-judge research.
+- ADR 0003 documenting direct NIM as the standalone default, Contextual Orchestrator as an optional organization adapter, credential separation, and the no-fallback decision.
+
+### Changed
+
+- Staged interpretation now depends on a structural generation client rather than the concrete NIM client; both built-in adapters share bounded OpenAI-compatible JSON transport, retry, validation, and repair behavior.
+- `ReportService` selects the configured built-in interpreter only when a custom `ReportInterpreter` was not injected, preserving standalone and modular MSA composition.
+- Product, technical, API, modularity, security, operations, UML, hourly-loop, and environment documentation now describe both explicit interpretation backends and their trust boundaries.
+- The hourly product-gap and document audits now enforce interpretation, credential, standards, APA 7th, ADR, secret-exclusion, public-docstring, 100% coverage, and database-naming contracts.
+
+### Security
+
+- Direct model access continues to use only `NVIDIA_NIM_API_KEY`; the optional organization gateway uses only `CONTEXTUAL_ORCHESTRATOR_TOKEN`. A selected backend failure never triggers implicit fallback.
+- Contextual Orchestrator attribution contains only `service=four-pillars` and optional organization labels; personal data, prompt/report content, fingerprints, paths, API keys, and provider credentials are prohibited.
+- Hourly and release workflows receive neither model credential, and hosted evaluation remains opt-in.
+- LLM-as-a-judge output remains supplementary to deterministic fixtures, Pydantic schemas, rule-based quality gates, security review, and human review because peer-reviewed research documents adversarial and judgment-bias risks.
+
 ### Planned
 
 - PostgreSQL and object-storage adapters for horizontally scalable multi-node deployments.
 - Additional independent golden-chart fixtures near solar-term boundaries.
+- RFC 9457 Problem Details and W3C Trace Context propagation through a separately versioned compatibility change.
 
 ## [0.6.0] - 2026-08-05
 
