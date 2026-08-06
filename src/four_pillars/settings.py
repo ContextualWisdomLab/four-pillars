@@ -10,6 +10,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 InterpretationBackend = Literal["nvidia_nim", "contextual_orchestrator"]
+ContextualOrchestrationMode = Literal["auto", "route", "conduct"]
 
 
 class Settings(BaseSettings):
@@ -62,6 +63,7 @@ class Settings(BaseSettings):
         min_length=1,
         max_length=256,
     )
+    contextual_orchestrator_mode: ContextualOrchestrationMode = "auto"
     contextual_orchestrator_timeout_seconds: float = Field(
         default=120,
         gt=0,
