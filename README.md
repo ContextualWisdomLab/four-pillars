@@ -6,6 +6,8 @@ The product keeps **calendar calculation** and **AI interpretation** on separate
 
 Direct hosted NVIDIA NIM remains the standalone default. Organization deployments may explicitly select [Contextual Orchestrator](https://github.com/ContextualWisdomLab/contextual-orchestrator) to centralize OpenAI-compatible routing, usage attribution, and provider governance. The service never silently falls back between backends.
 
+Repository automation uses two independent hourly control loops. The minute-17 loop is a deterministic, model-free release-quality sentinel. The minute-47 loop may use checksum-pinned OpenCode with `NVIDIA_NIM_API_KEY` to propose one bounded pull request only when the queue is empty; model execution, uncredentialed verification, and late publication occur on separate runners, and ordinary exact-head review retains every merge and release decision.
+
 ## Features
 
 - Solar and Korean lunar birth input with IANA time zones
@@ -20,6 +22,7 @@ Direct hosted NVIDIA NIM remains the standalone default. Organization deployment
 - FastAPI service, Typer CLI, SQLite job queue, worker, Docker, and GitHub Actions
 - Structural repository, interpreter, history, idempotency, and artifact-publisher ports for standalone or MSA use
 - APA 7th standards and research traceability with hourly regression checks
+- Proposal-only hourly OpenCode development with immutable patch handoff and three-runner isolation
 
 ## Quick start
 
@@ -51,11 +54,11 @@ pytest -m nim_live
 
 ### Contextual Orchestrator
 
-Point Four Pillars at an approved organization gateway without changing the calculation, prompts, report schemas, queue, or artifact format:
+Point Four Pillars at an approved organization gateway without changing the calculation, prompts, report schemas, queue, or artifact format. Local development may use the validated loopback HTTP exception:
 
 ```bash
 export INTERPRETATION_BACKEND='contextual_orchestrator'
-export CONTEXTUAL_ORCHESTRATOR_BASE_URL='https://orchestrator.example.com/v1'
+export CONTEXTUAL_ORCHESTRATOR_BASE_URL='http://127.0.0.1:8100/v1'
 export CONTEXTUAL_ORCHESTRATOR_TOKEN='...'
 export CONTEXTUAL_ORCHESTRATOR_MODEL='contextual-orchestrator'
 export CONTEXTUAL_ORCHESTRATOR_MODE='auto'
@@ -63,11 +66,9 @@ export CONTEXTUAL_ORCHESTRATOR_COMPANY='ContextualWisdomLab'
 export CONTEXTUAL_ORCHESTRATOR_TEAM='fortune-products'
 ```
 
-`CONTEXTUAL_ORCHESTRATOR_MODE` accepts `auto`, `route`, or `conduct`. `auto` lets the gateway allocate work between one-agent routing and deeper multi-agent conduct, while the other values force one bounded execution mode. The adapter deliberately omits OpenAI `response_format`: the organization gateway treats that field as a single-agent passthrough trigger. Four Pillars instead supplies an explicit JSON-only prompt, validates every response with Pydantic, and performs one bounded repair without changing providers. This preserves actual orchestrator routing while retaining the same strict report schema.
+Production must instead use an approved HTTPS URL, for example `https://orchestrator.example.com/v1`. Settings reject remote HTTP endpoints before constructing a credential-bearing client; only `localhost`, `127.0.0.1`, and `::1` may use HTTP for local development.
 
-The adapter attaches prompt-safe usage attribution. Birth data, user context, generated copy, fingerprints, paths, and credentials are never placed in attribution. A missing or unavailable orchestrator fails the report job visibly; it does not switch to direct NIM. Requests remain synchronous because the report worker requires an immediate schema-validated response; asynchronous batch orchestration is a separately versioned future contract.
-
-For local development, the example base URL uses loopback HTTP. Production model traffic should use TLS and an approved provider-host policy.
+The adapter sends prompt-safe usage attribution and an explicit orchestration mode through the orchestrator's OpenAI-compatible chat-completions endpoint. It intentionally omits `response_format`, tools, and function-calling fields because those capabilities select the orchestrator's single-agent passthrough path; `auto`, `route`, and `conduct` requests therefore retain real routing or multi-agent execution. Four Pillars still enforces the requested Pydantic schema after generation and may request a bounded repair through the same selected backend. Birth data, user context, generated copy, and credentials are never placed in attribution. A missing or unavailable orchestrator fails the report job visibly; it does not switch to direct NIM.
 
 ## Verification
 
@@ -86,6 +87,8 @@ The release gate requires exactly 100 percent statement and branch coverage. Hos
 
 ## Documents
 
+- [Root Architecture](ARCHITECTURE.md)
+- [Agent Development Contract](CLAUDE.md)
 - [Changelog](CHANGELOG.md)
 - [Product Requirements](docs/product/PRD.md)
 - [Technical Requirements](docs/technical/TRD.md)
@@ -93,6 +96,8 @@ The release gate requires exactly 100 percent statement and branch coverage. Hos
 - [Standalone and MSA Modularity](docs/technical/MODULARITY.md)
 - [Interpretation Operations](docs/operations/NIM.md)
 - [Operations Runbook](docs/operations/RUNBOOK.md)
+- [Hourly NVIDIA NIM Product Development](docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md)
+- [Hourly NIM/OpenCode Evidence Doctoring](docs/doctoring/hourly-nim-opencode-development.md)
 - [APA 7th Standards and Research References](docs/standards/REFERENCES.md)
 - [Standards Traceability](docs/standards/TRACEABILITY.md)
 - [UML and Architecture](docs/uml/architecture.md)
