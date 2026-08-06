@@ -7,8 +7,8 @@ import os
 import stat
 import sys
 import unicodedata
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 _BIDIRECTIONAL_CONTROLS = frozenset(
     {
@@ -30,7 +30,6 @@ _BIDIRECTIONAL_CONTROLS = frozenset(
 
 def _positive_limit(value: int, field_name: str) -> int:
     """Return a positive integer limit or raise a stable validation error."""
-
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
         raise ValueError(f"{field_name} must be a positive integer")
     return value
@@ -38,7 +37,6 @@ def _positive_limit(value: int, field_name: str) -> int:
 
 def _read_regular_file(path: Path, maximum_bytes: int) -> bytes:
     """Read a stable regular file without following a symbolic link."""
-
     try:
         before = path.lstat()
     except OSError as exc:
@@ -74,7 +72,6 @@ def _read_regular_file(path: Path, maximum_bytes: int) -> bytes:
 
 def _reject_unsafe_text(value: str) -> None:
     """Reject control and bidirectional characters that can spoof metadata."""
-
     for character in value:
         if character in _BIDIRECTIONAL_CONTROLS:
             raise ValueError("PR message contains a bidirectional control character")
@@ -84,7 +81,6 @@ def _reject_unsafe_text(value: str) -> None:
 
 def _write_private_text(path: Path, value: str) -> None:
     """Replace one UTF-8 output file with owner-only permissions."""
-
     path.parent.mkdir(parents=True, exist_ok=True)
     flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
     descriptor = os.open(path, flags, 0o600)
@@ -119,7 +115,6 @@ def parse_pr_message(
     budgets, stable regular-file identity, control characters, and bidirectional
     spoofing before any credential-bearing publication step consumes the text.
     """
-
     title_limit = _positive_limit(max_title_bytes, "max_title_bytes")
     body_limit = _positive_limit(max_body_bytes, "max_body_bytes")
     maximum_source_bytes = title_limit + body_limit + 4
@@ -155,7 +150,6 @@ def parse_pr_message(
 
 def _parser() -> argparse.ArgumentParser:
     """Build the command-line parser for the trusted publication boundary."""
-
     parser = argparse.ArgumentParser(
         description="Validate an untrusted PR_MESSAGE.md and write trusted outputs."
     )
@@ -177,7 +171,6 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Parse CLI arguments, emit trusted files, and return a process status."""
-
     arguments = _parser().parse_args(argv)
     try:
         parse_pr_message(
