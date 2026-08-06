@@ -5,12 +5,14 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 InterpretationBackend = Literal["nvidia_nim", "contextual_orchestrator"]
 ContextualOrchestrationMode = Literal["auto", "route", "conduct"]
+_LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 
 
 class Settings(BaseSettings):
@@ -86,6 +88,20 @@ class Settings(BaseSettings):
         default="ContextualWisdomLab",
         max_length=128,
     )
+
+    @field_validator("nim_base_url", "contextual_orchestrator_base_url")
+    @classmethod
+    def validate_credential_endpoint(cls, value: str) -> str:
+        """Require HTTPS remotely and allow cleartext only on an explicit loopback host."""
+        parsed = urlsplit(value)
+        hostname = parsed.hostname
+        valid_https = parsed.scheme == "https" and bool(hostname)
+        valid_loopback_http = parsed.scheme == "http" and hostname in _LOOPBACK_HOSTS
+        if not (valid_https or valid_loopback_http):
+            raise ValueError(
+                "Credential-bearing model endpoints require HTTPS or loopback HTTP"
+            )
+        return value
 
     @property
     def sqlite_path(self) -> Path:
