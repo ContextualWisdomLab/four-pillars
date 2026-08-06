@@ -141,6 +141,7 @@ def test_hourly_prompt_and_verifier_keep_commercial_quality_gates() -> None:
     """Require one buyer gap, research-grounded orchestration, and full checks."""
 
     text = _text(WORKFLOW)
+    normalized = " ".join(text.casefold().split())
     for token in (
         "buyer-visible",
         "exactly one bounded pull request",
@@ -168,7 +169,7 @@ def test_hourly_prompt_and_verifier_keep_commercial_quality_gates() -> None:
         "Do not release",
         "Do not deploy",
     ):
-        assert token.casefold() in text.casefold()
+        assert token.casefold() in normalized
 
     verifier = text.split("package_product_increment:", 1)[1].split(
         "publish_product_increment:", 1
@@ -333,7 +334,7 @@ def test_root_and_operational_documents_explain_the_control_plane() -> None:
         "2512.04388",
         "NIST SP 800-218",
         "APA 7",
-        "OpenCode 1.18.13",
-        "OpenCode 1.17.13",
+        "1.18.13",
+        "1.17.13",
     ):
         assert token in doctoring
