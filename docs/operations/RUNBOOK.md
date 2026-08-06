@@ -4,7 +4,7 @@
 
 Create `.env` from `.env.example`, choose exactly one `INTERPRETATION_BACKEND`, set secrets outside source control, and run `docker compose up -d --build`. The API listens on port 8000 and the worker shares the `artifacts` volume. Stop with `docker compose down`; add `-v` only when intentionally deleting the SQLite database and all artifacts.
 
-Direct standalone generation uses `INTERPRETATION_BACKEND=nvidia_nim` and `NVIDIA_NIM_API_KEY`. Organization routing uses `INTERPRETATION_BACKEND=contextual_orchestrator`, `CONTEXTUAL_ORCHESTRATOR_BASE_URL`, and `CONTEXTUAL_ORCHESTRATOR_TOKEN`. Do not configure automatic failover between them.
+Direct standalone generation uses `INTERPRETATION_BACKEND=nvidia_nim` and `NVIDIA_NIM_API_KEY`. Organization routing uses `INTERPRETATION_BACKEND=contextual_orchestrator`, `CONTEXTUAL_ORCHESTRATOR_BASE_URL`, and `CONTEXTUAL_ORCHESTRATOR_TOKEN`. Credential-bearing model endpoints must use HTTPS, except explicit loopback HTTP addresses (`localhost`, `127.0.0.1`, or `::1`) used for local development. Do not configure automatic failover between backends.
 
 ## Readiness checklist
 
@@ -27,7 +27,9 @@ Check that the worker container is running, points to the same `DATABASE_URL` an
 
 ### Jobs remain running after a crash
 
-Confirm that no worker owns the job. Preserve the database and temporary directory for evidence. The current release does not automatically requeue running jobs because duplicate model calls can create inconsistent charges and artifacts. Operators may recreate the request as a new idempotent job after recording the incident.
+Confirm through worker ownership and process evidence that no worker still owns the job. Preserve the database and temporary directory for incident evidence. The current release does not automatically requeue running jobs because duplicate model calls can create inconsistent charges and artifacts.
+
+After ownership is cleared, record the stranded job ID and its original idempotency digest, then recreate the request with a newly generated `Idempotency-Key`. Reusing the prior key and payload would correctly replay the existing queued or running job rather than create recovery work. Do not delete or mutate the stranded row until retention, billing, and incident evidence obligations have been satisfied.
 
 ### Direct NVIDIA NIM returns 429 or 5xx
 
@@ -35,11 +37,15 @@ Confirm `INTERPRETATION_BACKEND=nvidia_nim`, inspect the bounded job error/trace
 
 ### Contextual Orchestrator is unavailable
 
-Confirm `INTERPRETATION_BACKEND=contextual_orchestrator`, gateway DNS/TLS, `/v1/chat/completions`, Bearer token scope, selected orchestrator model, route capacity, and downstream worker health. Compare Four Pillars attempts with the gateway request/cost ledger. Do not expose or forward `NVIDIA_NIM_API_KEY` from Four Pillars to the gateway and do not switch to direct NIM under the same job.
+Confirm `INTERPRETATION_BACKEND=contextual_orchestrator`, gateway DNS/TLS, `/v1/chat/completions`, Bearer token scope, selected orchestrator model, compute mode, route capacity, and downstream worker health. Compare Four Pillars attempts with the gateway request/cost ledger. Do not expose or forward `NVIDIA_NIM_API_KEY` from Four Pillars to the gateway and do not switch to direct NIM under the same job.
 
-### Contextual Orchestrator rejects structured requests
+### Contextual Orchestrator bypasses routing or conduct
 
-Confirm that its deployed version accepts OpenAI-compatible `response_format`, `attribution`, and `routing`. Four Pillars intentionally uses `response_format={"type":"json_object"}` to preserve schema-oriented provider behavior. Reproduce with the offline mock contract and the orchestrator's passthrough tests before changing either side.
+Capture the outbound adapter request with the offline mock contract. It must include `mode=auto`, `route`, or `conduct`, and it must not contain `response_format`, tools, or function-calling keys. The gateway treats those provider-feature fields as single-agent passthrough triggers, so their presence would silently bypass the organization route/conduct path. Four Pillars enforces JSON through explicit prompting, Pydantic validation, and a bounded same-backend repair instead.
+
+### Contextual Orchestrator rejects structured responses
+
+Confirm that its deployed version accepts OpenAI-compatible messages, `mode`, `attribution`, and `routing`, and that it returns `choices[0].message.content`. Reproduce with the offline adapter contract and the orchestrator's route/conduct tests. Do not restore `response_format` as a workaround because that changes execution to single-agent passthrough.
 
 ### Attribution or cost records are incorrect
 
