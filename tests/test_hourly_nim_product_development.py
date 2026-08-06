@@ -274,9 +274,9 @@ def test_parser_accepts_bounded_unicode_and_writes_private_outputs(tmp_path: Pat
     ("payload", "message"),
     [
         (b"\xff\xfe", "UTF-8"),
-        ("\nbody".encode(), "title"),
-        ("title\n\n".encode(), "body"),
-        ("title\n\nline\x00".encode(), "control"),
+        (b"\nbody", "title"),
+        (b"title\n\n", "body"),
+        (b"title\n\nline\x00", "control"),
         ("title\n\nline\u202e".encode("utf-8"), "bidirectional"),
     ],
 )
