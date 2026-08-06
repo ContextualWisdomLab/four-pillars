@@ -1,88 +1,82 @@
 # Contextual Orchestrator Backend Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Use the Superpowers TDD, systematic-debugging, review, and verification workflow. Execute tasks in order and merge only an exact reviewed green head.
 
-**Goal:** Add an optional Contextual Orchestrator interpretation backend while preserving direct NVIDIA NIM as the standalone default and publishing complete standards traceability.
+**Goal:** Add an optional Contextual Orchestrator interpretation backend while preserving direct NVIDIA NIM as the standalone default, immutable calculation evidence, strict report schemas, and complete standards traceability.
 
-**Architecture:** Introduce a structural structured-generation client protocol, implement an OpenAI-compatible orchestrator client and report-interpreter adapter, and select the adapter through validated Pydantic settings only when no custom interpreter is injected. Deterministic calculations, prompts, report schemas, quality gates, queues, artifacts, and repository ports remain unchanged. Add APA 7th standards documentation and make the hourly product loop detect missing traceability.
+**Architecture:** Introduce a structural structured-generation client protocol, implement an OpenAI-compatible organization-gateway client and report-interpreter adapter, and select the adapter through validated Pydantic settings only when no custom interpreter is injected. Deterministic calculations, prompts, report schemas, quality gates, queues, artifacts, and repository ports remain unchanged.
 
-**Tech Stack:** Python 3.11/3.12, Pydantic 2, Pydantic Settings 2, HTTPX, FastAPI, contextual-orchestrator OpenAI-compatible API, NVIDIA NIM, pytest, pytest-cov, Ruff, GitHub Actions.
+**Tech stack:** Python 3.11/3.12, Pydantic 2, Pydantic Settings 2, HTTPX, FastAPI, Contextual Orchestrator, NVIDIA NIM, pytest, pytest-cov, Ruff, Docker, and GitHub Actions.
 
-## Global Constraints
+## Global constraints
 
 - `NVIDIA_NIM_API_KEY` remains the only direct hosted NVIDIA NIM credential.
-- `CONTEXTUAL_ORCHESTRATOR_TOKEN` authenticates only the optional orchestrator backend.
+- `CONTEXTUAL_ORCHESTRATOR_TOKEN` authenticates only the optional organization gateway.
 - No backend silently falls back to another provider or adapter.
+- Remote credential-bearing endpoints use HTTPS; cleartext HTTP is restricted to explicit loopback hosts.
 - Statement and branch coverage remain exactly 100 percent.
 - Every public production API has a complete docstring.
 - Database objects retain two-or-more-word naming; this feature adds no database object.
 - Direct NIM remains the default standalone behavior.
 - Traditional interpretation is not represented as scientific prediction.
 - Standards and research references use APA 7th edition entries and explicit application notes.
+- Contextual Orchestrator must execute `auto`, `route`, or `conduct`; provider-passthrough fields must not silently bypass orchestration.
 
 ---
 
-### Task 1: Lock backend selection and request contracts
+## Task 1: Lock backend selection and wire contracts
 
-**Files:**
-- Create: `tests/test_contextual_orchestrator.py`
-- Modify: `tests/test_modular_service_ports.py`
-- Modify: `tests/test_nim.py`
+**Files**
 
-**Interfaces:**
-- Consumes: existing `Settings`, `NimClient`, `ReportService`, and `ReportInterpreter` behavior.
-- Produces: failing contracts for `ContextualOrchestratorClient`, `ContextualOrchestratorReportInterpreter`, and `build_report_interpreter(settings)`.
+- Create `tests/test_contextual_orchestrator.py`.
+- Modify `tests/test_modular_service_ports.py`.
+- Modify `tests/test_nim.py`.
 
-- [ ] **Step 1: Add settings and factory RED tests**
+**Interfaces**
 
-Require the default backend to build `NimReportInterpreter`, explicit `contextual_orchestrator` to build `ContextualOrchestratorReportInterpreter`, and an unknown backend to raise Pydantic validation error.
+- Consume existing `Settings`, `NimClient`, `ReportService`, and `ReportInterpreter` behavior.
+- Produce failing contracts for `ContextualOrchestratorClient`, `ContextualOrchestratorReportInterpreter`, and `build_report_interpreter(settings)`.
 
-- [ ] **Step 2: Add HTTP contract RED tests**
+### Steps
 
-Use `httpx.MockTransport` to require:
+1. Require the default backend to build `NimReportInterpreter`.
+2. Require explicit `contextual_orchestrator` selection to build `ContextualOrchestratorReportInterpreter`.
+3. Require an unknown backend or compute mode to fail Pydantic validation.
+4. Use `httpx.MockTransport` to require the organization request contract:
 
-```python
-assert request.url.path == "/v1/chat/completions"
-assert request.headers["Authorization"] == "Bearer orchestrator-test-token"
-assert body["model"] == "contextual-orchestrator"
-assert body["response_format"] == {"type": "json_object"}
-assert body["attribution"]["service"] == "four-pillars"
-assert body["routing"] == {"channel": "sync", "latency_tolerant": False, "priority": "normal"}
-```
+   ```python
+   assert request.url.path == "/v1/chat/completions"
+   assert request.headers["Authorization"] == "Bearer orchestrator-test-token"
+   assert body["model"] == "contextual-orchestrator"
+   assert body["mode"] in {"auto", "route", "conduct"}
+   assert body["include_orchestration_trace"] is False
+   assert "response_format" not in body
+   assert body["attribution"]["service"] == "four-pillars"
+   assert body["routing"] == {
+       "channel": "sync",
+       "latency_tolerant": False,
+       "priority": "normal",
+   }
+   ```
 
-- [ ] **Step 3: Add failure and repair RED tests**
+5. Keep the direct NIM contract requiring `response_format={"type":"json_object"}`.
+6. Require missing-token failure, one schema repair, transient 429 retry, permanent 400 failure, and explicit proof that direct NIM is not invoked as fallback.
+7. Run focused tests and record RED before production implementation.
 
-Require missing token failure, one schema repair, transient 429 retry, permanent 400 failure, and explicit proof that the direct NIM client is not invoked.
+## Task 2: Add the structural generation boundary
 
-- [ ] **Step 4: Run focused tests and record RED**
+**Files**
 
-Run:
+- Create `src/four_pillars/generation.py`.
+- Modify `src/four_pillars/analysis.py`.
+- Test with `tests/test_contextual_orchestrator.py`.
 
-```bash
-pytest tests/test_contextual_orchestrator.py tests/test_modular_service_ports.py tests/test_nim.py -v
-```
+**Interfaces**
 
-Expected: collection or import failures because the new client, settings fields, adapter, and factory do not exist.
+- Produce runtime-checkable `StructuredGenerationClient`.
+- Consume the provider-neutral `GenerationTrace` and Pydantic response-model contract.
 
-- [ ] **Step 5: Commit RED contracts**
-
-```bash
-git add tests/test_contextual_orchestrator.py tests/test_modular_service_ports.py tests/test_nim.py
-git commit -m "test: require contextual orchestrator backend"
-```
-
-### Task 2: Add the structural generation boundary
-
-**Files:**
-- Create: `src/four_pillars/generation.py`
-- Modify: `src/four_pillars/analysis.py`
-- Test: `tests/test_contextual_orchestrator.py`
-
-**Interfaces:**
-- Produces: runtime-checkable `StructuredGenerationClient` protocol.
-- Consumes: existing `NimTrace` and Pydantic response model contract.
-
-- [ ] **Step 1: Define the protocol**
+### Protocol
 
 ```python
 @runtime_checkable
@@ -96,179 +90,82 @@ class StructuredGenerationClient(Protocol):
         model: str | None = None,
         temperature: float = 0.2,
         max_tokens: int = 4096,
-    ) -> tuple[T, NimTrace]: ...
+    ) -> tuple[T, GenerationTrace]: ...
 ```
 
-Every public symbol receives a complete docstring. Protocol declarations raise `NotImplementedError` with the existing coverage exclusion convention.
+Every public symbol receives a complete docstring. `analysis.py` depends on this protocol rather than a provider-specific client. Staging, prompts, schemas, deterministic evidence, editorial repair, and trace persistence remain unchanged.
 
-- [ ] **Step 2: Depend on the protocol in `analysis.py`**
+## Task 3: Implement the Contextual Orchestrator client
 
-Change `generate_report(client: NimClient, ...)` to `generate_report(client: StructuredGenerationClient, ...)`; do not change staging, prompts, schemas, repair behavior, or traces.
+**Files**
 
-- [ ] **Step 3: Run focused analysis and protocol tests**
+- Create `src/four_pillars/contextual_orchestrator.py`.
+- Modify `src/four_pillars/settings.py`.
+- Test with `tests/test_contextual_orchestrator.py` and `tests/test_backend_url_security.py`.
 
-```bash
-pytest tests/test_analysis.py tests/test_modular_service_ports.py tests/test_contextual_orchestrator.py -v
-```
+**Interfaces**
 
-- [ ] **Step 4: Commit**
+- Produce `ContextualOrchestratorClient`, `ContextualOrchestratorError`, and `ContextualOrchestratorSchemaError`.
+- Consume `Settings`, `GenerationTrace`, Pydantic schemas, and the gateway's OpenAI-compatible endpoint.
 
-```bash
-git add src/four_pillars/generation.py src/four_pillars/analysis.py tests
-git commit -m "refactor: define structured generation port"
-```
+### Steps
 
-### Task 3: Implement the Contextual Orchestrator client
+1. Add validated settings for backend, base URL, token, model, `auto|route|conduct` mode, timeout, retry/repair budgets, and prompt-safe attribution labels.
+2. Require HTTPS for remote model endpoints and allow HTTP only on `localhost`, `127.0.0.1`, or `::1`.
+3. Construct an `httpx.AsyncClient` with Bearer authentication, bounded timeout, and an optional test transport.
+4. Retry network failures, HTTP 408, HTTP 429, and server errors; honor integer `Retry-After`; fail other client errors immediately.
+5. Build the same untrusted input envelope used by direct NIM.
+6. Add `mode`, synchronous routing metadata, and prompt-safe attribution.
+7. Deliberately omit `response_format`, tools, and function-calling fields because the gateway treats those provider features as single-agent passthrough triggers.
+8. Require one JSON object through explicit prompting, Pydantic validation, and at most the configured same-backend repair turns.
+9. Preserve direct NIM native JSON mode and prove the two wire contracts independently.
 
-**Files:**
-- Create: `src/four_pillars/contextual_orchestrator.py`
-- Modify: `src/four_pillars/settings.py`
-- Test: `tests/test_contextual_orchestrator.py`
+## Task 4: Add interpretation adapter and settings factory
 
-**Interfaces:**
-- Produces: `ContextualOrchestratorClient`, `ContextualOrchestratorError`, and `ContextualOrchestratorSchemaError`.
-- Consumes: `Settings`, `NimTrace`, Pydantic model schemas, and the orchestrator's OpenAI-compatible endpoint.
+**Files**
 
-- [ ] **Step 1: Add validated settings**
+- Modify `src/four_pillars/adapters.py`.
+- Modify `src/four_pillars/service.py`.
+- Modify `src/four_pillars/ports.py` only if the structural contract requires it.
+- Test `tests/test_interpretation_backend.py`, `tests/test_modular_service_ports.py`, and service tests.
 
-Use `Literal["nvidia_nim", "contextual_orchestrator"]` and bounded `Field` values. Define the base URL, token, model, timeout, retry/repair budgets, and attribution labels. Keep credentials optional at load time.
+### Steps
 
-- [ ] **Step 2: Implement client lifecycle and transport**
+1. Open one `ContextualOrchestratorClient` per report-generation operation.
+2. Call `generate_report` with unchanged deterministic evidence.
+3. Implement `build_report_interpreter(settings) -> ReportInterpreter` for exactly the two validated built-in values.
+4. Use the factory only when no `ReportInterpreter` was injected.
+5. Prove explicit MSA adapter injection remains authoritative.
 
-Construct an `httpx.AsyncClient` with Bearer authentication, bounded timeout, optional test transport, and a normalized base URL. Missing token raises `ContextualOrchestratorError` when the client is constructed.
+## Task 5: Add APA 7 standards and research traceability
 
-- [ ] **Step 3: Implement bounded retries**
+**Files**
 
-Retry network failures, HTTP 408, HTTP 429, and server errors. Honor integer `Retry-After`; otherwise use bounded exponential delay. Fail other 4xx responses immediately with at most 500 response characters.
+- Create `docs/standards/REFERENCES.md`.
+- Create `docs/standards/TRACEABILITY.md`.
+- Modify product, technical, API, modularity, operations, architecture, security, README, and environment documentation.
+- Strengthen `scripts/check_docs.py`, `scripts/product_gap_audit.py`, and hourly-loop tests.
 
-- [ ] **Step 4: Implement structured generation and repair**
+### Steps
 
-Build the same untrusted input envelope used by `NimClient`. Add orchestrator attribution and routing fields. Validate exactly one JSON object through the requested Pydantic model. On failure, include the model JSON Schema in at most the configured number of repair turns.
+1. Add full APA 7 entries, stable URLs or DOIs, applicability, and limitations for ISO/IEC 25010:2023, ISO/IEC 42001:2023, ISO/IEC 23894:2023, NIST AI RMF 1.0, NIST AI 600-1, RFC 9457, W3C Trace Context, and peer-reviewed LLM-judge robustness and bias work.
+2. Map standards concepts to calculation immutability, schema validation, quality gates, prompt traces, privacy redaction, MSA ports, retries, scheduled review, and coverage.
+3. State explicitly that the mapping is neither ISO certification nor scientific validation of traditional interpretation.
+4. Require every interpretation and standards contract token in the hourly offline audit.
+5. Test every contract entry independently for both missing-file and missing-token failure.
 
-- [ ] **Step 5: Run focused client tests**
+## Task 6: Complete review findings and operational hardening
 
-```bash
-pytest tests/test_contextual_orchestrator.py -v
-```
+1. Review every CodeRabbit, security, Semgrep, and human thread against current code.
+2. Require secure model endpoint validation before a Bearer request can be constructed.
+3. Update stuck-job recovery so a replacement request uses a fresh `Idempotency-Key` only after ownership is cleared; never replay the stranded key accidentally.
+4. Keep local loopback examples separate from production TLS examples.
+5. Correct all historical provider-specific `NimTrace` references to `GenerationTrace` at the structural port.
+6. Resolve a thread only after the corresponding exact-head tests pass.
 
-Expected: all client, retry, repair, authentication, and no-fallback tests pass.
+## Task 7: Complete full verification, merge, and release follow-up
 
-- [ ] **Step 6: Commit**
-
-```bash
-git add src/four_pillars/contextual_orchestrator.py src/four_pillars/settings.py tests/test_contextual_orchestrator.py
-git commit -m "feat: add contextual orchestrator client"
-```
-
-### Task 4: Add interpretation adapter and settings factory
-
-**Files:**
-- Modify: `src/four_pillars/adapters.py`
-- Modify: `src/four_pillars/service.py`
-- Modify: `src/four_pillars/ports.py`
-- Test: `tests/test_modular_service_ports.py`
-- Test: `tests/test_service.py`
-
-**Interfaces:**
-- Produces: `ContextualOrchestratorReportInterpreter` and `build_report_interpreter(settings) -> ReportInterpreter`.
-- Preserves: injected custom `ReportInterpreter` and all repository/publisher ports.
-
-- [ ] **Step 1: Implement the orchestrator adapter**
-
-Open one `ContextualOrchestratorClient` per report-generation operation and call `generate_report` with unchanged deterministic evidence.
-
-- [ ] **Step 2: Implement the adapter factory**
-
-```python
-def build_report_interpreter(settings: Settings) -> ReportInterpreter:
-    if settings.interpretation_backend == "nvidia_nim":
-        return NimReportInterpreter(settings)
-    return ContextualOrchestratorReportInterpreter(settings)
-```
-
-The `Literal` setting makes any third branch unreachable; tests cover both valid values.
-
-- [ ] **Step 3: Use the factory only for standalone defaults**
-
-Change `ReportService` to call `build_report_interpreter(settings)` only when `interpreter is None`. Do not change explicit injection.
-
-- [ ] **Step 4: Verify service compatibility**
-
-```bash
-pytest tests/test_modular_service_ports.py tests/test_service.py tests/test_service_errors.py -v
-```
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add src/four_pillars/adapters.py src/four_pillars/service.py src/four_pillars/ports.py tests
-git commit -m "feat: select interpretation backend by settings"
-```
-
-### Task 5: Add APA 7 standards and research traceability
-
-**Files:**
-- Create: `docs/standards/REFERENCES.md`
-- Create: `docs/standards/TRACEABILITY.md`
-- Modify: `docs/technical/TRD.md`
-- Modify: `docs/technical/MODULARITY.md`
-- Modify: `docs/operations/NIM.md`
-- Modify: `docs/operations/RUNBOOK.md`
-- Modify: `README.md`
-- Modify: `.env.example`
-- Modify: `scripts/check_docs.py`
-- Modify: `scripts/product_gap_audit.py`
-- Test: `tests/test_hourly_product_loop.py`
-
-**Interfaces:**
-- Produces: a publishable APA 7 reference catalog and code/test/workflow control mapping.
-- Consumes: ISO, NIST, IETF, W3C, ACL Anthology, and current Pydantic Settings guidance.
-
-- [ ] **Step 1: Write `REFERENCES.md`**
-
-Include full APA 7 entries, stable URLs or DOIs, applicability, and limitation notes. Cite ISO/IEC 25010:2023, ISO/IEC 42001:2023, ISO/IEC 23894:2023, NIST AI RMF 1.0, NIST AI 600-1, RFC 9457, W3C Trace Context, and peer-reviewed 2024 LLM-judge robustness/bias work.
-
-- [ ] **Step 2: Write `TRACEABILITY.md`**
-
-Map standards clauses or concepts to calculation immutability, schema validation, quality gates, prompt traces, privacy redaction, MSA ports, retries, scheduled review, coverage, and explicit external gaps. State that traditional interpretation is not scientific prediction.
-
-- [ ] **Step 3: Update operator and technical documents**
-
-Document both backends, environment variables, deployment examples, no-fallback behavior, orchestrator attribution, and local-versus-production TLS requirements.
-
-- [ ] **Step 4: Strengthen scheduled document audits**
-
-Require the two standards documents in `check_docs.py` and `product_gap_audit.py`. Require canonical tokens such as `ISO/IEC 25010:2023`, `ISO/IEC 42001:2023`, `NIST AI 600-1`, `RFC 9457`, `APA 7th`, and `ContextualOrchestratorClient`.
-
-- [ ] **Step 5: Run document and hourly-loop tests**
-
-```bash
-python scripts/check_docs.py
-python scripts/product_gap_audit.py
-pytest tests/test_hourly_product_loop.py -v
-```
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add .env.example README.md docs scripts tests/test_hourly_product_loop.py
-git commit -m "docs: add AI standards traceability"
-```
-
-### Task 6: Complete full verification, review, and merge
-
-**Files:**
-- Modify: `CHANGELOG.md`
-- Verify: all changed production, test, documentation, and workflow files.
-
-**Interfaces:**
-- Produces: one mergeable feature PR with an exact green head.
-
-- [ ] **Step 1: Add Unreleased notes**
-
-Document the optional orchestrator backend, settings, attribution, no-fallback boundary, standards doctoring, and scheduled regression checks. Do not advance the package version in the feature PR.
-
-- [ ] **Step 2: Run the complete release-quality gate**
+### Full gate
 
 ```bash
 python -m pip check
@@ -282,48 +179,16 @@ python -m build --no-isolation
 docker build --tag four-pillars:contextual-orchestrator .
 ```
 
-Expected: every command succeeds with exactly 100 percent statement and branch coverage.
+Expected result: every command succeeds on Python 3.11 and 3.12 with exactly 100 percent statement and branch coverage.
 
-- [ ] **Step 3: Review the complete diff**
+### Merge rules
 
-Inspect every changed file, PR issue comment, review submission, inline thread, Security Scan finding, and Semgrep result. Correct every actionable finding and rerun all required gates on the exact final head.
+- Inspect the complete diff, issue comments, reviews, code-scanning findings, and inline threads.
+- Require zero unresolved actionable threads.
+- Require CI, container, Security Scan, and Semgrep success on the same head.
+- Squash merge with an expected-head guard.
+- Do not release from an unverified head.
 
-- [ ] **Step 4: Merge with an expected-head guard**
+### Release relationship
 
-Use squash merge only after Python 3.11, Python 3.12, container, Security Scan, Semgrep, and review-thread checks succeed on the same head.
-
-### Task 7: Release Four Pillars v0.6.0
-
-**Files:**
-- Modify: `pyproject.toml`
-- Modify: `src/four_pillars/version.py`
-- Modify: `CHANGELOG.md`
-- Modify: `tests/test_release_version.py`
-- Create: `docs/superpowers/plans/2026-08-04-v0.6.0-release.md`
-
-**Interfaces:**
-- Produces: package/runtime/API version `0.6.0`, curated changelog section, wheel, source distribution, `SHA256SUMS`, and GitHub Release.
-
-- [ ] **Step 1: Change the release test to require `0.6.0`**
-
-Require the dated changelog section and core capabilities `contextual-orchestrator`, `StructuredGenerationClient`, `APA 7th`, `100% statement and branch coverage`, and `NVIDIA_NIM_API_KEY`.
-
-- [ ] **Step 2: Record RED**
-
-```bash
-pytest tests/test_release_version.py -v
-```
-
-Expected: package/runtime/API remain `0.5.0` and the dated v0.6.0 section is missing.
-
-- [ ] **Step 3: Align package, runtime, API, and changelog**
-
-Set both version surfaces to `0.6.0`, move the integration notes from Unreleased into `## [0.6.0] - 2026-08-04`, retain planned items under Unreleased, and update comparison links.
-
-- [ ] **Step 4: Run every release gate and review**
-
-Repeat the complete Task 6 gate, build `four_pillars-0.6.0.tar.gz` and `four_pillars-0.6.0-py3-none-any.whl`, inspect every review and security finding, and merge only the exact green head.
-
-- [ ] **Step 5: Verify publication and convergence**
-
-Confirm `main` exposes `0.6.0`, tag `v0.6.0` targets the merged release commit, release assets include wheel, source distribution, and `SHA256SUMS`, and the repository has zero open PRs.
+Four Pillars v0.6.0 was released independently for the Figma-backed browser-history feature. This integration remains under `Unreleased` until it is merged and intentionally versioned in a subsequent release. It must not retarget or overwrite the existing v0.6.0 tag or assets.
