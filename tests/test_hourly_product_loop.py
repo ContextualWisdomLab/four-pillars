@@ -80,30 +80,37 @@ def assert_token_contract_detects_missing_entries(
     contracts: tuple[tuple[str, str], ...],
     audit_name: str,
 ) -> None:
-    """Exercise one token-based contract with valid, missing-file, and missing-token cases."""
+    """Exercise every token contract with missing-file and missing-token cases."""
     module = load_audit_module()
     audit = getattr(module, audit_name)
     root = tmp_path / audit_name
+    original_contents: dict[Path, str] = {}
     for relative, token in contracts:
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         current = path.read_text(encoding="utf-8") if path.is_file() else ""
         path.write_text(f"{current}\n{token}\n", encoding="utf-8")
+        original_contents[path] = path.read_text(encoding="utf-8")
 
     assert audit(root) == []
 
-    first_relative, first_token = contracts[0]
-    first_path = root / first_relative
-    first_path.unlink()
-    missing_file = audit(root)
-    assert any(gap.path == first_relative for gap in missing_file)
+    for relative, token in contracts:
+        path = root / relative
+        path.unlink()
+        missing_file = audit(root)
+        assert any(gap.path == relative for gap in missing_file)
 
-    first_path.write_text("different contract", encoding="utf-8")
-    missing_token = audit(root)
-    assert any(
-        gap.path == first_relative and first_token in gap.message
-        for gap in missing_token
-    )
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(original_contents[path], encoding="utf-8")
+        path.write_text("different contract", encoding="utf-8")
+        missing_token = audit(root)
+        assert any(
+            gap.path == relative and token in gap.message
+            for gap in missing_token
+        )
+        path.write_text(original_contents[path], encoding="utf-8")
+
+    assert audit(root) == []
 
 
 def test_report_history_contract_audit_detects_missing_tokens(tmp_path: Path) -> None:
