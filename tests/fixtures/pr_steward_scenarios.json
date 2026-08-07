@@ -1,0 +1,239 @@
+{
+  "schema_version": "1.0.0",
+  "scenarios": {
+    "green": {
+      "schema_version": "1.0.0",
+      "repository": "ContextualWisdomLab/four-pillars",
+      "generated_at": "2026-08-07T06:30:00Z",
+      "pull_request": {
+        "number": 31,
+        "created_at": "2026-08-07T01:00:00Z",
+        "is_draft": false,
+        "head_sha": "1111111111111111111111111111111111111111",
+        "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "head_repository": "ContextualWisdomLab/four-pillars",
+        "base_repository": "ContextualWisdomLab/four-pillars",
+        "head_ref": "feat/green-change",
+        "base_ref": "main",
+        "mergeable": "MERGEABLE",
+        "merge_state_status": "CLEAN",
+        "review_decision": "APPROVED"
+      },
+      "reviews": [
+        {"author": "independent-reviewer", "state": "APPROVED", "submitted_at": "2026-08-07T05:00:00Z"}
+      ],
+      "threads": [],
+      "checks": [
+        {"kind": "check_run", "name": "CI", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/1"},
+        {"kind": "check_run", "name": "Security Scan", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/2"},
+        {"kind": "status_context", "name": "CodeRabbit", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/pull/31"}
+      ],
+      "api_errors": []
+    },
+    "failed_checks": {
+      "schema_version": "1.0.0",
+      "repository": "ContextualWisdomLab/four-pillars",
+      "generated_at": "2026-08-07T06:30:00Z",
+      "pull_request": {
+        "number": 32,
+        "created_at": "2026-08-07T01:10:00Z",
+        "is_draft": false,
+        "head_sha": "2222222222222222222222222222222222222222",
+        "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "head_repository": "ContextualWisdomLab/four-pillars",
+        "base_repository": "ContextualWisdomLab/four-pillars",
+        "head_ref": "fix/failing-test",
+        "base_ref": "main",
+        "mergeable": "MERGEABLE",
+        "merge_state_status": "UNSTABLE",
+        "review_decision": "APPROVED"
+      },
+      "reviews": [],
+      "threads": [],
+      "checks": [
+        {"kind": "check_run", "name": "quality (3.12)", "status": "COMPLETED", "conclusion": "FAILURE", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/3"},
+        {"kind": "check_run", "name": "Security Scan", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/4"}
+      ],
+      "api_errors": []
+    },
+    "pending_checks": {
+      "schema_version": "1.0.0",
+      "repository": "ContextualWisdomLab/four-pillars",
+      "generated_at": "2026-08-07T06:30:00Z",
+      "pull_request": {
+        "number": 33,
+        "created_at": "2026-08-07T01:20:00Z",
+        "is_draft": false,
+        "head_sha": "3333333333333333333333333333333333333333",
+        "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "head_repository": "ContextualWisdomLab/four-pillars",
+        "base_repository": "ContextualWisdomLab/four-pillars",
+        "head_ref": "feat/pending",
+        "base_ref": "main",
+        "mergeable": "MERGEABLE",
+        "merge_state_status": "BLOCKED",
+        "review_decision": "APPROVED"
+      },
+      "reviews": [],
+      "threads": [],
+      "checks": [
+        {"kind": "check_run", "name": "CI", "status": "IN_PROGRESS", "conclusion": null, "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/5"}
+      ],
+      "api_errors": []
+    },
+    "changes_requested": {
+      "schema_version": "1.0.0",
+      "repository": "ContextualWisdomLab/four-pillars",
+      "generated_at": "2026-08-07T06:30:00Z",
+      "pull_request": {
+        "number": 34,
+        "created_at": "2026-08-07T01:30:00Z",
+        "is_draft": false,
+        "head_sha": "4444444444444444444444444444444444444444",
+        "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "head_repository": "ContextualWisdomLab/four-pillars",
+        "base_repository": "ContextualWisdomLab/four-pillars",
+        "head_ref": "fix/review",
+        "base_ref": "main",
+        "mergeable": "MERGEABLE",
+        "merge_state_status": "BLOCKED",
+        "review_decision": "CHANGES_REQUESTED"
+      },
+      "reviews": [
+        {"author": "reviewer", "state": "CHANGES_REQUESTED", "submitted_at": "2026-08-07T05:20:00Z"}
+      ],
+      "threads": [],
+      "checks": [
+        {"kind": "check_run", "name": "CI", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/6"}
+      ],
+      "api_errors": []
+    },
+    "unresolved_thread": {
+      "schema_version": "1.0.0",
+      "repository": "ContextualWisdomLab/four-pillars",
+      "generated_at": "2026-08-07T06:30:00Z",
+      "pull_request": {
+        "number": 35,
+        "created_at": "2026-08-07T01:40:00Z",
+        "is_draft": false,
+        "head_sha": "5555555555555555555555555555555555555555",
+        "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "head_repository": "ContextualWisdomLab/four-pillars",
+        "base_repository": "ContextualWisdomLab/four-pillars",
+        "head_ref": "fix/thread",
+        "base_ref": "main",
+        "mergeable": "MERGEABLE",
+        "merge_state_status": "BLOCKED",
+        "review_decision": "APPROVED"
+      },
+      "reviews": [],
+      "threads": [
+        {"id": "PRRT_example", "is_resolved": false, "is_outdated": false, "path": "src/four_pillars/api.py", "line": 42, "author": "reviewer", "body": "검증되지 않은 입력에서 이 분기가 열립니다. 테스트와 함께 수정하세요."}
+      ],
+      "checks": [
+        {"kind": "check_run", "name": "CI", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/7"}
+      ],
+      "api_errors": []
+    },
+    "api_failure": {
+      "schema_version": "1.0.0",
+      "repository": "ContextualWisdomLab/four-pillars",
+      "generated_at": "2026-08-07T06:30:00Z",
+      "pull_request": {
+        "number": 36,
+        "created_at": "2026-08-07T01:50:00Z",
+        "is_draft": false,
+        "head_sha": "6666666666666666666666666666666666666666",
+        "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "head_repository": "ContextualWisdomLab/four-pillars",
+        "base_repository": "ContextualWisdomLab/four-pillars",
+        "head_ref": "feat/api-failure",
+        "base_ref": "main",
+        "mergeable": "UNKNOWN",
+        "merge_state_status": "UNKNOWN",
+        "review_decision": null
+      },
+      "reviews": [],
+      "threads": [],
+      "checks": [],
+      "api_errors": ["review_thread_inventory_unavailable"]
+    },
+    "stale_base": {
+      "schema_version": "1.0.0",
+      "repository": "ContextualWisdomLab/four-pillars",
+      "generated_at": "2026-08-07T06:30:00Z",
+      "pull_request": {
+        "number": 37,
+        "created_at": "2026-08-07T02:00:00Z",
+        "is_draft": false,
+        "head_sha": "7777777777777777777777777777777777777777",
+        "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "head_repository": "ContextualWisdomLab/four-pillars",
+        "base_repository": "ContextualWisdomLab/four-pillars",
+        "head_ref": "feat/stale",
+        "base_ref": "main",
+        "mergeable": "MERGEABLE",
+        "merge_state_status": "BEHIND",
+        "review_decision": "APPROVED"
+      },
+      "reviews": [],
+      "threads": [],
+      "checks": [
+        {"kind": "check_run", "name": "CI", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/8"}
+      ],
+      "api_errors": []
+    },
+    "external_fork_failure": {
+      "schema_version": "1.0.0",
+      "repository": "ContextualWisdomLab/four-pillars",
+      "generated_at": "2026-08-07T06:30:00Z",
+      "pull_request": {
+        "number": 38,
+        "created_at": "2026-08-07T02:10:00Z",
+        "is_draft": false,
+        "head_sha": "8888888888888888888888888888888888888888",
+        "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "head_repository": "external/four-pillars",
+        "base_repository": "ContextualWisdomLab/four-pillars",
+        "head_ref": "fix/external",
+        "base_ref": "main",
+        "mergeable": "MERGEABLE",
+        "merge_state_status": "UNSTABLE",
+        "review_decision": "CHANGES_REQUESTED"
+      },
+      "reviews": [
+        {"author": "reviewer", "state": "CHANGES_REQUESTED", "submitted_at": "2026-08-07T05:30:00Z"}
+      ],
+      "threads": [],
+      "checks": [
+        {"kind": "check_run", "name": "CI", "status": "COMPLETED", "conclusion": "FAILURE", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/9"}
+      ],
+      "api_errors": []
+    },
+    "conflicting": {
+      "schema_version": "1.0.0",
+      "repository": "ContextualWisdomLab/four-pillars",
+      "generated_at": "2026-08-07T06:30:00Z",
+      "pull_request": {
+        "number": 39,
+        "created_at": "2026-08-07T02:20:00Z",
+        "is_draft": false,
+        "head_sha": "9999999999999999999999999999999999999999",
+        "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "head_repository": "ContextualWisdomLab/four-pillars",
+        "base_repository": "ContextualWisdomLab/four-pillars",
+        "head_ref": "feat/conflict",
+        "base_ref": "main",
+        "mergeable": "CONFLICTING",
+        "merge_state_status": "DIRTY",
+        "review_decision": "APPROVED"
+      },
+      "reviews": [],
+      "threads": [],
+      "checks": [
+        {"kind": "check_run", "name": "CI", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/10"}
+      ],
+      "api_errors": []
+    }
+  }
+}
