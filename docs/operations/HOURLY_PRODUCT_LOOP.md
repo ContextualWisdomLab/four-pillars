@@ -8,6 +8,14 @@ GitHub Actions runs `.github/workflows/hourly-product-loop.yml` at minute 17 of 
 
 The workflow uses one concurrency group and does not cancel an in-progress run. A slow verification therefore finishes with coherent evidence instead of being replaced by the next scheduled invocation.
 
+## Separate product-development loop
+
+The deterministic sentinel is intentionally not a coding agent. A separate `.github/workflows/hourly-nim-product-development.yml` workflow runs at minute 47 and may use checksum-pinned OpenCode with `NVIDIA_NIM_API_KEY` to propose one bounded pull request only when open-PR inventory is readable and empty.
+
+That workflow separates model execution, uncredentialed verification, and late publication onto three fresh runners. It never approves, merges, tags, releases, deploys, or changes reviewer-agent credentials. Its full trust boundary, configuration, failure modes, rollback, and APA 7 evidence are documented in `docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md` and `docs/doctoring/hourly-nim-opencode-development.md`.
+
+The two schedules use different concurrency groups and responsibilities. A minute-47 proposal cannot substitute for a minute-17 quality result, and the quality sentinel cannot publish source changes.
+
 ## Release-quality gate
 
 Each invocation installs the hash-locked Python 3.12 CI environment and executes every release gate even when an earlier gate fails:
@@ -69,9 +77,9 @@ The issue is evidence and coordination, not an automated source-code change. Rem
 
 ## Security and NIM boundary
 
-The hourly loop never calls direct hosted NVIDIA NIM or Contextual Orchestrator and receives neither `NVIDIA_NIM_API_KEY` nor `CONTEXTUAL_ORCHESTRATOR_TOKEN`. Hosted generation and LLM-as-a-judge evaluation remain opt-in workflows with separate secret boundaries.
+The minute-17 hourly loop never calls direct hosted NVIDIA NIM or Contextual Orchestrator and receives neither `NVIDIA_NIM_API_KEY` nor `CONTEXTUAL_ORCHESTRATOR_TOKEN`. Hosted generation, the separate minute-47 proposal workflow, and LLM-as-a-judge evaluation retain independent secret and trust boundaries.
 
-User birth data, notes, report prompts, generated prose, API authentication values, provider credentials, gateway attribution, and artifact content are not uploaded by the hourly loop. The scheduled audit verifies configuration names and source contracts only.
+User birth data, notes, report prompts, generated prose, API authentication values, provider credentials, gateway attribution, and artifact content are not uploaded by the minute-17 loop. The scheduled audit verifies configuration names and source contracts only.
 
 Actions are pinned to immutable commit SHAs. Dependencies are installed from hash-locked CI requirements. The GitHub token is scoped to repository metadata and issues required by the incident lifecycle.
 
