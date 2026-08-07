@@ -22,7 +22,11 @@ MSA component.
 - Use descriptive two-word-or-longer `snake_case` database object names.
 - Update CHANGELOG.md and affected architecture/operations/security documents.
 - Do not fabricate customer, revenue, production, attestation, transfer,
-  acquisition, or scientific-prediction evidence.
+  acquisition, certification, or scientific-prediction evidence.
+- Preserve useful review and Check diagnostics; do not apply blanket PII masking.
+  Instead exclude customer birth data, generated reports, credentials, emails,
+  and unrelated records, then enforce purpose limitation, least privilege,
+  byte bounds, one-day retention, and exact artifact identity.
 
 ## Pull-request governance
 
@@ -31,10 +35,26 @@ repair actionable findings, rerun exact-head Checks, and merge only the unchange
 green head. Waiting for a review or Check is not permission to weaken the gate;
 continue other bounded investigation instead.
 
-The hourly NVIDIA NIM OpenCode workflow is proposal-only. Its model runner has
+The minute-47 NVIDIA NIM OpenCode workflow is proposal-only. Its model runner has
 no GitHub write authority. Its publisher may open one pull request after fresh
 verification, but it has **no merge**, approval, release, deployment, or reviewer
 authority. Existing exact-head review remains mandatory.
+
+The minute-07 hourly exact-head PR steward may inspect only the oldest open
+non-draft pull request. It may either wait, propose a same-repository repair, or
+queue ordinary squash auto-merge. Inspection, OpenCode repair, fresh verification,
+non-executing publication, and merge are separate trust zones. The model receives
+only `NVIDIA_NIM_API_KEY` and untrusted bounded review/Check evidence; it never
+receives a GitHub, OIDC, Actions runtime/cache, reviewer, publication, or merge
+credential. Repair publication is a normal fast-forward commit, never a force
+push. Merge remains subject to current reviews, unresolved-thread policy,
+branch protection, and exact-head Checks; no steward job may approve, dismiss a
+review, use `--admin`, tag, release, or deploy.
+
+The steward workflow is repository-local and independently operable. Central
+`.github`, `naruon`, contextual-orchestrator, and other MSA consumers may reuse
+its workflow-call and deterministic evidence contracts without importing Four
+Pillars application state or changing local governance.
 
 ## Code-owner review gates — disabled (on hold)
 
