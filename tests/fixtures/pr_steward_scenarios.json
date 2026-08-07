@@ -17,19 +17,21 @@
         "base_ref": "main",
         "mergeable": "MERGEABLE",
         "merge_state_status": "CLEAN",
-        "review_decision": "APPROVED"
+        "review_decision": null
       },
-      "reviews": [
-        {"author": "independent-reviewer", "state": "APPROVED", "submitted_at": "2026-08-07T05:00:00Z"}
-      ],
+      "reviews": [],
       "threads": [],
       "checks": [
         {"kind": "check_run", "name": "quality (3.11)", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/1"},
         {"kind": "check_run", "name": "quality (3.12)", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/2"},
         {"kind": "check_run", "name": "container", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/3"},
-        {"kind": "check_run", "name": "Security Scan", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/4"},
-        {"kind": "check_run", "name": "Semgrep OSS", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/5"},
-        {"kind": "status_context", "name": "CodeRabbit", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/pull/31"}
+        {"kind": "check_run", "name": "dependency-review", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/4"},
+        {"kind": "check_run", "name": "osv-scan", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/5"},
+        {"kind": "check_run", "name": "trivy-fs", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/6"},
+        {"kind": "check_run", "name": "scorecard", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/7"},
+        {"kind": "check_run", "name": "Semgrep (multi-language SAST)", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/8"},
+        {"kind": "check_run", "name": "opencode-review", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/9"},
+        {"kind": "check_run", "name": "noema-review", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/10"}
       ],
       "api_errors": []
     },
@@ -49,13 +51,12 @@
         "base_ref": "main",
         "mergeable": "MERGEABLE",
         "merge_state_status": "UNSTABLE",
-        "review_decision": "APPROVED"
+        "review_decision": null
       },
       "reviews": [],
       "threads": [],
       "checks": [
-        {"kind": "check_run", "name": "quality (3.12)", "status": "COMPLETED", "conclusion": "FAILURE", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/6"},
-        {"kind": "check_run", "name": "Security Scan", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/7"}
+        {"kind": "check_run", "name": "quality (3.12)", "status": "COMPLETED", "conclusion": "FAILURE", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/11"}
       ],
       "api_errors": []
     },
@@ -75,12 +76,12 @@
         "base_ref": "main",
         "mergeable": "MERGEABLE",
         "merge_state_status": "BLOCKED",
-        "review_decision": "APPROVED"
+        "review_decision": null
       },
       "reviews": [],
       "threads": [],
       "checks": [
-        {"kind": "check_run", "name": "CI", "status": "IN_PROGRESS", "conclusion": null, "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/8"}
+        {"kind": "check_run", "name": "quality (3.11)", "status": "IN_PROGRESS", "conclusion": null, "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/12"}
       ],
       "api_errors": []
     },
@@ -107,7 +108,7 @@
       ],
       "threads": [],
       "checks": [
-        {"kind": "check_run", "name": "CI", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/9"}
+        {"kind": "check_run", "name": "quality (3.11)", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/13"}
       ],
       "api_errors": []
     },
@@ -127,14 +128,14 @@
         "base_ref": "main",
         "mergeable": "MERGEABLE",
         "merge_state_status": "BLOCKED",
-        "review_decision": "APPROVED"
+        "review_decision": null
       },
       "reviews": [],
       "threads": [
         {"id": "PRRT_example", "is_resolved": false, "is_outdated": false, "path": "src/four_pillars/api.py", "line": 42, "author": "reviewer", "body": "검증되지 않은 입력에서 이 분기가 열립니다. 테스트와 함께 수정하세요."}
       ],
       "checks": [
-        {"kind": "check_run", "name": "CI", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/10"}
+        {"kind": "check_run", "name": "quality (3.11)", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/14"}
       ],
       "api_errors": []
     },
@@ -177,12 +178,12 @@
         "base_ref": "main",
         "mergeable": "MERGEABLE",
         "merge_state_status": "BEHIND",
-        "review_decision": "APPROVED"
+        "review_decision": null
       },
       "reviews": [],
       "threads": [],
       "checks": [
-        {"kind": "check_run", "name": "CI", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/11"}
+        {"kind": "check_run", "name": "quality (3.11)", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/15"}
       ],
       "api_errors": []
     },
@@ -209,7 +210,7 @@
       ],
       "threads": [],
       "checks": [
-        {"kind": "check_run", "name": "CI", "status": "COMPLETED", "conclusion": "FAILURE", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/12"}
+        {"kind": "check_run", "name": "quality (3.11)", "status": "COMPLETED", "conclusion": "FAILURE", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/16"}
       ],
       "api_errors": []
     },
@@ -229,12 +230,12 @@
         "base_ref": "main",
         "mergeable": "CONFLICTING",
         "merge_state_status": "DIRTY",
-        "review_decision": "APPROVED"
+        "review_decision": null
       },
       "reviews": [],
       "threads": [],
       "checks": [
-        {"kind": "check_run", "name": "CI", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/13"}
+        {"kind": "check_run", "name": "quality (3.11)", "status": "COMPLETED", "conclusion": "SUCCESS", "details_url": "https://github.com/ContextualWisdomLab/four-pillars/actions/runs/17"}
       ],
       "api_errors": []
     }
