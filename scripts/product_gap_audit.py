@@ -97,6 +97,22 @@ STANDARDS_CONTRACTS = (
         "100% statement and branch coverage",
     ),
 )
+AUTHORITY_FIXTURE_CONTRACTS = (
+    (
+        "tests/fixtures/kasi_2026_jie_terms.json",
+        '"maximum_absolute_error_seconds": 120',
+    ),
+    (
+        "docs/doctoring/kasi-solar-term-golden-fixtures.md",
+        "Korea Astronomy and Space Science Institute",
+    ),
+    ("docs/technical/CALCULATION.md", "KASI 2026"),
+    ("docs/technical/TRD.md", "calendar-1.1.0"),
+    ("docs/standards/REFERENCES.md", "10.3847/1538-3881/abd414"),
+    ("docs/standards/REFERENCES.md", "Planetary theories in rectangular"),
+    ("docs/standards/TRACEABILITY.md", "kasi_2026_jie_terms.json"),
+    ("src/four_pillars/calendar.py", 'CALCULATION_VERSION = "calendar-1.1.0"'),
+)
 TEXT_SUFFIXES = {".md", ".py", ".toml", ".yaml", ".yml"}
 IGNORED_PARTS = {
     ".git",
@@ -203,6 +219,16 @@ def audit_standards_contract(root: Path) -> list[ProductGap]:
     )
 
 
+def audit_authority_fixture_contract(root: Path) -> list[ProductGap]:
+    """Return gaps in independent solar-term evidence and provenance."""
+    return _audit_token_contracts(
+        root,
+        AUTHORITY_FIXTURE_CONTRACTS,
+        code="authority_fixture_contract",
+        label="Authority fixture contract",
+    )
+
+
 def audit_repository(root: Path) -> list[ProductGap]:
     """Return release-quality gaps that can be verified without network access."""
     root = root.resolve()
@@ -240,6 +266,7 @@ def audit_repository(root: Path) -> list[ProductGap]:
     gaps.extend(audit_history_contract(root))
     gaps.extend(audit_interpretation_contract(root))
     gaps.extend(audit_standards_contract(root))
+    gaps.extend(audit_authority_fixture_contract(root))
 
     pyproject_path = root / "pyproject.toml"
     version_path = root / "src/four_pillars/version.py"
@@ -337,7 +364,11 @@ def audit_repository(root: Path) -> list[ProductGap]:
                 )
             )
 
-    for relative in ("src/four_pillars/calendar.py", "src/four_pillars/fortune.py"):
+    for relative in (
+        "src/four_pillars/calendar.py",
+        "src/four_pillars/fortune.py",
+        "src/four_pillars/solar.py",
+    ):
         text = (root / relative).read_text(encoding="utf-8")
         for forbidden_dependency in ("fastapi", "httpx"):
             if forbidden_dependency in text:
@@ -419,7 +450,7 @@ def render_markdown(gaps: list[ProductGap]) -> str:
     if not gaps:
         lines.append(
             "All deterministic release, modularity, interpretation, standards, "
-            "prompt, credential, and database naming contracts passed."
+            "authority-fixture, prompt, credential, and database naming contracts passed."
         )
     else:
         lines.extend(

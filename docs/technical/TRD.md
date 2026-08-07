@@ -21,9 +21,11 @@ The selected interpretation adapter never changes deterministic evidence and nev
 
 ## 3. Components
 
-### 3.1 `calendar.py`
+### 3.1 `calendar.py` and `solar.py`
 
-Calculates timezone-normalized birth moments, optional solar-time correction, apparent solar longitude, month-changing solar terms, four pillars, ten gods, hidden stems, growth stages, element balance, interactions, warnings, and SHA-256 fingerprint. It has no network dependency.
+`solar.py` evaluates a bounded VSOP87 Earth longitude/radius series in Terrestrial Time and applies FK5, dominant nutation, and aberration corrections without a network or third-party ephemeris dependency. `calendar.py` locates the month-changing roots, normalizes birth time, calculates four pillars, ten gods, hidden stems, growth stages, element balance, interactions, boundary warnings, and the SHA-256 fingerprint.
+
+All twelve 2026 `jie` boundaries are checked against committed KASI/NAOJ minute-precision evidence with a two-minute budget and buyer-visible five-minute year/month transition tests. The calculation evidence version is `calendar-1.1.0`.
 
 ### 3.2 `fortune.py`
 
@@ -68,7 +70,9 @@ The renderer escapes HTML, uses fixed semantic colors, builds searchable Korean 
 
 ## 5. Calculation policy
 
-Modern Gregorian dates use integer Julian day numbers for the sexagenary day and a compact apparent-solar-longitude series for `jie` crossings. The year changes at 315 degrees apparent solar longitude (Li Chun). Month branches start at Xiao Han, Li Chun, Jing Zhe, Qing Ming, Li Xia, Mang Zhong, Xiao Shu, Li Qiu, Bai Lu, Han Lu, Li Dong, and Da Xue. The service records its calculation version and warns within six hours of a boundary. See `CALCULATION.md` for formulas and limitations.
+Modern Gregorian dates use integer Julian day numbers for the sexagenary day and the bounded VSOP87 apparent-solar-longitude implementation for `jie` crossings. UTC is converted to Terrestrial Time through tabled `TAI-UTC` plus 32.184 seconds. The year changes at 315 degrees apparent solar longitude (Li Chun). Month branches start at Xiao Han, Li Chun, Jing Zhe, Qing Ming, Li Xia, Mang Zhong, Xiao Shu, Li Qiu, Bai Lu, Han Lu, Li Dong, and Da Xue.
+
+The service records calculation version `calendar-1.1.0` and warns within six hours of a boundary. The KASI 2026 fixture and signed timing deltas are independently reviewable; historical timezone and pre-1972 timescale limitations remain explicit. See `CALCULATION.md` and `docs/doctoring/kasi-solar-term-golden-fixtures.md`.
 
 ## 6. Interpretation backend contract
 
@@ -106,7 +110,7 @@ Current generation traces are not W3C distributed traces. A future separately re
 
 ## 10. Test strategy
 
-Unit tests cover known pillars, solar-term boundaries, time policies, ten gods, daewoon direction, monthly period dates, queue transitions, idempotent creation, strict history cursors, stable multi-page traversal, privacy redaction, optional adapter behavior, quality rules, report rendering, and API authentication.
+Unit tests cover known pillars, all twelve externally published 2026 solar-term instants and transitions, time policies, ten gods, daewoon direction, monthly period dates, queue transitions, idempotent creation, strict history cursors, stable multi-page traversal, privacy redaction, optional adapter behavior, quality rules, report rendering, and API authentication.
 
 Structured-generation contract tests use `httpx.MockTransport` to verify both direct NIM and orchestrator authentication, endpoint shape, JSON mode, attribution, routing, schema validation, bounded repair, transient retry, terminal error, backend selection, and no-fallback behavior. Live direct NIM tests are marked and skipped without `NVIDIA_NIM_API_KEY`.
 
@@ -120,6 +124,6 @@ Direct NIM remains the default independent product. An organization module may s
 
 ## 12. Standards and research traceability
 
-`docs/standards/REFERENCES.md` records APA 7th references for ISO/IEC 25010:2023, ISO/IEC 42001:2023, ISO/IEC 23894:2023, NIST AI RMF 1.0, NIST AI 600-1, RFC 9457, W3C Trace Context, and peer-reviewed LLM-judge research. `docs/standards/TRACEABILITY.md` maps those sources to code, tests, workflows, and residual gaps.
+`docs/standards/REFERENCES.md` records APA 7th references for ISO/IEC 25010:2023, ISO/IEC 42001:2023, ISO/IEC 23894:2023, NIST AI RMF 1.0, NIST AI 600-1, RFC 9457, W3C Trace Context, KASI/NAOJ calendar evidence, VSOP87, IERS timescales, JPL DE440, and peer-reviewed LLM-judge research. `docs/standards/TRACEABILITY.md` maps those sources to code, tests, workflows, and residual gaps.
 
 The mapping is maintained by `check_docs.py`, `product_gap_audit.py`, the hourly quality loop, PR review, and semantic releases. It is not an ISO certification statement or scientific validation of traditional interpretation.

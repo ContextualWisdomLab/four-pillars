@@ -1,6 +1,6 @@
 # Standards Traceability and Control Evidence
 
-This document maps applicable international standards, public frameworks, and peer-reviewed evaluation findings to concrete Four Pillars controls. It is an engineering traceability record, not a certificate, legal opinion, medical claim, or scientific validation of traditional interpretation.
+This document maps applicable international standards, public frameworks, authoritative calendar evidence, and peer-reviewed evaluation findings to concrete Four Pillars controls. It is an engineering traceability record, not a certificate, legal opinion, medical claim, or scientific validation of traditional interpretation.
 
 ## 1. System context
 
@@ -17,7 +17,7 @@ Traditional Four Pillars analysis is presented as symbolic and conditional. Dete
 
 | Quality concern | Four Pillars control | Verification evidence | Residual limitation |
 |---|---|---|---|
-| Functional suitability | Golden four-pillar fixtures, Li Chun and `jie` boundaries, ten-god and luck calculations, immutable report evidence | `tests/test_calendar.py`, `tests/test_fortune.py`, edge and golden-fixture tests | Astronomical approximation near boundaries is disclosed by warnings |
+| Functional suitability | Golden four-pillar fixtures, externally published KASI/NAOJ `jie` instants, Li Chun and month transitions, ten-god and luck calculations, immutable report evidence | `tests/test_calendar.py`, `tests/test_solar_term_golden.py`, `tests/test_fortune.py`, edge tests | Modern minute-precision evidence is not research-grade historical ephemeris certification |
 | Performance efficiency | Deterministic calculation has no network dependency; long model calls run in a worker | calculation unit tests, API/worker separation | Hosted model latency is provider-dependent |
 | Compatibility | FastAPI/JSON interfaces, OpenAI-compatible model adapters, structural repository/interpreter/publisher ports | `ports.py`, API tests, modular service tests | Remote PostgreSQL/object-storage adapters remain operator work |
 | Interaction capability | Accessible calculation-first browser workflow and recent-job recovery | `tests/test_web.py`, editable Figma desktop/mobile frames | Full assistive-technology certification is not claimed |
@@ -61,6 +61,7 @@ Traditional Four Pillars analysis is presented as symbolic and conditional. Dete
 ### Measure
 
 - Golden calculations compare exact expected pillars and date boundaries.
+- KASI/NAOJ minute-precision fixtures independently measure all twelve 2026 month-changing term roots and before/after pillar transitions.
 - Pydantic models measure response-contract validity.
 - Rule-based checks measure deterministic fidelity, completeness, constructive balance, wording, safety, and disclaimer presence.
 - LLM-as-a-judge evaluation is supplementary because peer-reviewed work reports adversarial and judgment-bias vulnerabilities.
@@ -73,6 +74,7 @@ Traditional Four Pillars analysis is presented as symbolic and conditional. Dete
 - Terminal jobs support deletion and time-based purge.
 - Provider misconfiguration fails clearly without changing provider.
 - The hourly loop creates or updates one regression issue and closes it only after the entire gate is green.
+- Authority-fixture deletion, tolerance drift, provenance loss, or calculation-version regression fails the offline product-gap audit.
 
 ## 5. NIST AI 600-1 Generative AI controls
 
@@ -145,13 +147,28 @@ Peer-reviewed EMNLP 2024 research reports that judge models can be manipulated b
 
 The integration introduces no database object. Existing application-owned objects continue to use two-or-more-word `snake_case`, including `report_jobs`, `idx_report_jobs_status_created`, `idx_report_jobs_idempotency_key_digest`, `idx_report_jobs_created_id`, and `idx_report_jobs_status_created_id`. `product_gap_audit.py` creates a temporary database and rejects any noncompliant application-owned table or index.
 
-## 11. Verification and review cadence
+## 11. Independent calendar-evidence traceability
+
+| Contract | Implementation | Verification evidence | Residual limitation |
+|---|---|---|---|
+| Official Korean calendar basis | KASI 2026 월력요항 announcement and institute calendar-data presentation | `docs/doctoring/kasi-solar-term-golden-fixtures.md` | Display page is convenient evidence; formal announcement remains the authority boundary |
+| Independent UTC+09:00 cross-check | NAOJ 2026 Reki Yoko solar-term table | APA 7 entry and matching minute values | Shared values do not prove sub-minute precision |
+| Immutable offline fixture | `tests/fixtures/kasi_2026_jie_terms.json` | schema/order/timezone/tolerance tests | Manual transcription requires reviewed updates |
+| Solar longitude | bounded VSOP87 Earth series in `solar.py` | twelve timing tests, Security Scan, Semgrep | Bounded series is not a full research ephemeris |
+| Timescale conversion | tabled `TAI-UTC`, `TT = TAI + 32.184 s` | naive-time rejection and all modern fixtures | pre-1972 fallback is coarse; future leap seconds require maintenance |
+| Buyer-visible transitions | public `calculate_chart` five minutes before/after each term | `tests/test_solar_term_golden.py` | Historical local-time policy remains outside this modern fixture |
+| Versioned evidence | `calendar-1.1.0` in chart and fingerprint | calculation-version assertion | Different versions intentionally produce different fingerprints |
+| Continual monitoring | `AUTHORITY_FIXTURE_CONTRACTS` | hourly product-gap audit tests | Static tokens do not replace semantic review |
+
+The JPL DE440/DE441 paper supplies current-century high-precision ephemeris context, not a hidden dependency or the direct generator of the fixture. The acceptance claim is limited to modern Korean product behavior within the explicit two-minute budget.
+
+## 12. Verification and review cadence
 
 The hourly workflow runs at `17 * * * *` and on manual dispatch. It performs dependency integrity, product-gap and database naming audit, Ruff and public-docstring checks, compilation, document and prompt checks, all offline tests with exactly 100% statement and branch coverage, and distribution build. Failures update one idempotent regression issue; recovery closes it with the verified commit.
 
 Hosted model tests remain explicit because they incur external dependency and usage. Direct NIM hosted tests use the GitHub Secret `NVIDIA_NIM_API_KEY`. A hosted Contextual Orchestrator test requires an independently deployed gateway and gateway token; Four Pillars does not repurpose or expose the NIM credential to that service.
 
-## 12. Open evidence gaps
+## 13. Open evidence gaps
 
 - No accredited ISO certification or independent conformity assessment.
 - No production SLO, external penetration test, data-protection impact assessment, or buyer-specific legal review in this repository.
@@ -159,4 +176,5 @@ Hosted model tests remain explicit because they incur external dependency and us
 - No assurance that an externally operated model remains free or available.
 - No distributed trace propagation until the dedicated W3C Trace Context PR is implemented.
 - No RFC 9457 response migration until the dedicated API compatibility PR is implemented.
-- Consensus literature-search quota was unavailable during this review; ACL papers were verified against their canonical peer-reviewed records, and future reviews should expand the evidence base.
+- No research-grade historical ephemeris or timezone fixture outside the bounded modern KASI/NAOJ evidence.
+- Consensus literature-search quota was unavailable during this review; primary institute, standards-service, catalog, journal, and ACL sources were verified directly, and future reviews should expand the evidence base.

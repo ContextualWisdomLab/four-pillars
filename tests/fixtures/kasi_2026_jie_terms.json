@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0.0",
+  "source_title": "2026년 달력자료(월력요항)",
+  "source_url": "https://astro.kasi.re.kr/life/post/calendardata",
+  "source_timezone": "Asia/Seoul",
+  "published_precision": "minute",
+  "retrieved_on": "2026-08-07",
+  "maximum_absolute_error_seconds": 120,
+  "terms": [
+    {"name_ko": "소한", "longitude": 285.0, "expected_kst": "2026-01-05T17:23:00+09:00", "month_branch": "丑"},
+    {"name_ko": "입춘", "longitude": 315.0, "expected_kst": "2026-02-04T05:02:00+09:00", "month_branch": "寅"},
+    {"name_ko": "경칩", "longitude": 345.0, "expected_kst": "2026-03-05T22:59:00+09:00", "month_branch": "卯"},
+    {"name_ko": "청명", "longitude": 15.0, "expected_kst": "2026-04-05T03:40:00+09:00", "month_branch": "辰"},
+    {"name_ko": "입하", "longitude": 45.0, "expected_kst": "2026-05-05T20:49:00+09:00", "month_branch": "巳"},
+    {"name_ko": "망종", "longitude": 75.0, "expected_kst": "2026-06-06T00:48:00+09:00", "month_branch": "午"},
+    {"name_ko": "소서", "longitude": 105.0, "expected_kst": "2026-07-07T10:57:00+09:00", "month_branch": "未"},
+    {"name_ko": "입추", "longitude": 135.0, "expected_kst": "2026-08-07T20:43:00+09:00", "month_branch": "申"},
+    {"name_ko": "백로", "longitude": 165.0, "expected_kst": "2026-09-07T23:41:00+09:00", "month_branch": "酉"},
+    {"name_ko": "한로", "longitude": 195.0, "expected_kst": "2026-10-08T15:29:00+09:00", "month_branch": "戌"},
+    {"name_ko": "입동", "longitude": 225.0, "expected_kst": "2026-11-07T18:52:00+09:00", "month_branch": "亥"},
+    {"name_ko": "대설", "longitude": 255.0, "expected_kst": "2026-12-07T11:53:00+09:00", "month_branch": "子"}
+  ]
+}

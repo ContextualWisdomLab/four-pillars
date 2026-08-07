@@ -114,9 +114,9 @@ def test_delete_report_never_removes_an_untrusted_artifact_directory(
         assert artifact_dir.exists()
 
 
-def test_julian_date_rejects_a_naive_datetime() -> None:
+def test_solar_longitude_rejects_a_naive_datetime() -> None:
     with pytest.raises(ValueError, match="timezone-aware"):
-        calendar_module._julian_date(datetime(2026, 1, 1))
+        calendar_module.apparent_solar_longitude(datetime(2026, 1, 1))
 
 
 def test_solar_term_requires_a_bracketed_root(monkeypatch: pytest.MonkeyPatch) -> None:

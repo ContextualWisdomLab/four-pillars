@@ -2,7 +2,7 @@
 
 This catalog records the external standards and peer-reviewed research used to design, review, and operate Four Pillars. Entries follow APA 7th edition conventions as closely as the source type permits. ISO standards are listed by their issuing organizations and reference numbers; purchase of an ISO publication may be required to inspect its complete normative text.
 
-These references govern software engineering, AI risk, model evaluation, privacy, reliability, interoperability, and operations. They do **not** establish Four Pillars interpretation as scientifically validated prediction. The product treats traditional interpretation as symbolic, conditional content and keeps deterministic calendar calculations, AI-generated prose, and ordinary practical guidance visibly separate.
+These references govern software engineering, AI risk, model evaluation, privacy, reliability, interoperability, calculation evidence, and operations. They do **not** establish Four Pillars interpretation as scientifically validated prediction. The product treats traditional interpretation as symbolic, conditional content and keeps deterministic calendar calculations, AI-generated prose, and ordinary practical guidance visibly separate.
 
 ## International standards
 
@@ -52,6 +52,34 @@ World Wide Web Consortium. (2021). *Trace context: W3C recommendation, 23 Novemb
 
 **Application.** W3C Trace Context is the target for future propagation of `traceparent` and `tracestate` across Four Pillars, Contextual Orchestrator, model gateways, and organization observability systems. Current model and prompt traces are local generation evidence and are not represented as distributed traces.
 
+## Astronomical calculation and civil-calendar evidence
+
+Bretagnon, P., & Francou, G. (1988). Planetary theories in rectangular and spherical variables: VSOP87 solutions. *Astronomy and Astrophysics, 202*, 309–315.
+
+**Application.** A bounded VSOP87 Earth longitude/radius series replaces the former compact solar approximation for modern month-changing solar-term roots. The coefficients remain local, deterministic, dependency-free, and reviewable.
+
+International Earth Rotation and Reference Systems Service. (n.d.). *How is TT computed from TAI?* Retrieved August 7, 2026, from https://www.iers.org/iers/en/service/faqs/time/howisttcomputedfromtai-163
+
+International Earth Rotation and Reference Systems Service. (2026, July 7). *Bulletin C 72: Information on UTC–TAI*. https://datacenter.iers.org/data/html/bulletinc-072.html
+
+**Application.** Civil UTC is converted to Terrestrial Time with the conventional exact relation `TT = TAI + 32.184 s`; the tabled `TAI-UTC` offset is 37 seconds from 2017-01-01 through the end of 2026.
+
+Korea Astronomy and Space Science Institute. (n.d.). *달력자료(월력요항): 2026년 달력자료*. Retrieved August 7, 2026, from https://astro.kasi.re.kr/life/post/calendardata
+
+Korea Astronomy and Space Science Institute. (2025, June 30). *「2026년 월력요항」 발표*. https://www.kasi.re.kr/kor/post/newsMaterial/32031
+
+National Astronomical Observatory of Japan. (2025, February 3). *Reki Yoko Reiwa 8 (2026): Solar terms*. https://eco.mtk.nao.ac.jp/koyomi/yoko/2026/rekiyou262.html.en
+
+**Application.** KASI is the Korean calendar-production authority boundary. NAOJ independently publishes the same twelve 2026 minute values at the shared UTC+09:00 offset. The committed fixture is used offline and cannot silently change during CI.
+
+National Institute of Standards and Technology. (2026). *Leap second and UT1–UTC information*. https://www.nist.gov/pml/time-and-frequency-division/time-realization/leap-seconds
+
+Park, R. S., Folkner, W. M., Williams, J. G., & Boggs, D. H. (2021). The JPL planetary and lunar ephemerides DE440 and DE441. *The Astronomical Journal, 161*(3), 105. https://doi.org/10.3847/1538-3881/abd414
+
+VizieR. (1995). *Planetary solutions VSOP87 (Catalog VI/81)*. Centre de Données astronomiques de Strasbourg. https://cdsarc.cds.unistra.fr/viz-bin/cat/VI/81
+
+**Claim boundary.** Official minute values and the two-minute product budget validate modern Korean boundary behavior; they do not constitute legal, navigation, or research-grade ephemeris certification. DE440 is high-precision comparison context and does not secretly generate the committed fixture.
+
 ## Peer-reviewed LLM evaluation research
 
 Raina, V., Liusie, A., & Gales, M. (2024). Is LLM-as-a-judge robust? Investigating universal adversarial attacks on zero-shot LLM assessment. In Y. Al-Onaizan, M. Bansal, & Y.-N. Chen (Eds.), *Proceedings of the 2024 Conference on Empirical Methods in Natural Language Processing* (pp. 7499–7517). Association for Computational Linguistics. https://doi.org/10.18653/v1/2024.emnlp-main.427
@@ -77,4 +105,4 @@ Contextual Wisdom Lab. (2026). *Contextual Orchestrator* [Computer software]. Gi
 - `scripts/check_docs.py` and `scripts/product_gap_audit.py` verify that this catalog and its core references remain present.
 - The hourly GitHub Actions loop executes those checks at minute 17 of every hour and on manual dispatch.
 - A standards update does not alter production behavior automatically. It creates a documented review obligation followed by tests, a PR, security review, and a release when behavior changes.
-- Consensus search capacity was unavailable during the 2026-08-04 review, so the academic entries above were verified directly against ACL Anthology records. Future literature reviews should add independent peer-reviewed evidence rather than replacing deterministic software tests.
+- Consensus search capacity was unavailable during the 2026-08-07 review, so the astronomical and existing academic entries were verified directly against authoritative institute, standards-service, catalog, journal, and ACL sources. Future literature reviews should add independent peer-reviewed evidence rather than replacing deterministic software tests.

@@ -6,9 +6,19 @@ The deterministic engine targets modern Gregorian dates and Korean users. It acc
 
 ## Solar longitude and `jie`
 
-The service uses the compact Meeus/NOAA apparent geocentric solar-longitude series. A binary search finds the instant at which longitude crosses each month-changing term. The twelve terms and month branches are: Xiao Han 285°/Chou, Li Chun 315°/Yin, Jing Zhe 345°/Mao, Qing Ming 15°/Chen, Li Xia 45°/Si, Mang Zhong 75°/Wu, Xiao Shu 105°/Wei, Li Qiu 135°/Shen, Bai Lu 165°/You, Han Lu 195°/Xu, Li Dong 225°/Hai, and Da Xue 255°/Zi.
+The service uses a compact, dependency-free VSOP87 Earth longitude and radius series evaluated in Terrestrial Time. It converts the heliocentric Earth coordinate to apparent geocentric solar longitude and applies bounded FK5, nutation, and aberration corrections. A binary search finds the instant at which longitude crosses each month-changing term.
+
+The twelve terms and month branches are: Xiao Han 285°/Chou, Li Chun 315°/Yin, Jing Zhe 345°/Mao, Qing Ming 15°/Chen, Li Xia 45°/Si, Mang Zhong 75°/Wu, Xiao Shu 105°/Wei, Li Qiu 135°/Shen, Bai Lu 165°/You, Han Lu 195°/Xu, Li Dong 225°/Hai, and Da Xue 255°/Zi.
 
 The year pillar changes at Li Chun, not January 1. The month pillar changes at the latest `jie`, not the first day of a Gregorian month. A birth within six hours of Li Chun or the adjacent month-changing term receives a visible warning because input time, historical timezone, or algorithmic approximation can change the result.
+
+## Independent boundary validation
+
+`tests/fixtures/kasi_2026_jie_terms.json` commits all twelve 2026 month-changing instants in Korean Standard Time from the KASI 2026 calendar evidence. The same minute values are independently published by NAOJ at the shared UTC+09:00 offset.
+
+`tests/test_solar_term_golden.py` requires every calculated 2026 `jie` to remain within 120 seconds of the minute-precision fixture. It also calculates charts five minutes before and after each published instant, proving that the month branch changes on the expected side. Li Chun separately proves the sexagenary year transition from `乙巳` to `丙午`.
+
+The fixture and timing budget are product correctness evidence, not research-grade ephemeris certification. The source publishes civil values to the minute; the two-minute budget accounts for source rounding and bounded analytical-model differences. KASI 2026 provenance, the previous model's signed seasonal errors, the VSOP87 revision, time-scale conversion, and residual risks are recorded in `docs/doctoring/kasi-solar-term-golden-fixtures.md`.
 
 ## Year and month pillars
 
@@ -42,4 +52,4 @@ Annual luck begins at Li Chun and ends at the next Li Chun. Monthly luck begins 
 
 ## Limitations
 
-The compact solar series is appropriate for this product's modern range but is not a substitute for a licensed high-precision ephemeris in legal or research use. Historical timezone transitions, uncertain birth records, solar-term proximity, and competing schools of day rollover or daewoon timing can produce alternatives. The service exposes those policies and warnings rather than hiding them.
+The bounded VSOP87 implementation is validated for the released modern fixture but is not a substitute for a full IAU 2000A implementation or a licensed high-precision ephemeris in legal, navigation, or research use. The pre-1972 `TAI-UTC` fallback is intentionally coarse, and the leap-second table requires review after any new IERS Bulletin C time step. Historical timezone transitions, uncertain birth records, solar-term proximity, and competing schools of day rollover or daewoon timing can produce alternatives. The service exposes those policies and warnings rather than hiding them.

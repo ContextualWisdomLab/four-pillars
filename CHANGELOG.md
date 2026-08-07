@@ -8,25 +8,17 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ### Added
 
-- A proposal-only hourly OpenCode development workflow at minute 47 using `NVIDIA_NIM_API_KEY`, bounded NVIDIA NIM model fallback, a zero-open-PR single-flight gate, and separate proposal, verification, and publication runners.
-- A trusted PR-message parser that rejects symlinks, non-regular files, malformed UTF-8, control and bidirectional characters, and UTF-8 byte-budget violations before publication credentials exist.
-- Root `ARCHITECTURE.md`, `CLAUDE.md`, expanded `AGENTS.md`, an operations runbook, APA 7 doctoring, and executable workflow-security contracts for standalone and modular MSA maintenance.
+- Independent KASI/NAOJ 2026 golden fixtures for all twelve month-changing solar terms, enforcing a two-minute timing budget and five-minute year/month pillar transition checks without network or test-only ephemeris dependencies.
+- Offline authority-fixture governance that detects missing evidence, provenance, tolerance, traceability, and calculation-version contracts in the hourly product-gap audit.
 
 ### Changed
 
-- The deterministic minute-17 quality sentinel remains read-only and model-free; commercial product development is isolated in a separate minute-47 workflow that may create at most one pull request and never merges, approves, releases, or deploys.
-- Autonomous LLM increments must preserve immutable calculation evidence and evaluate single-model routing versus deep multi-agent execution with explicit stages, access lists, bounded recursion, role-specific reasoning effort, and ablation grounded in Fugu, Conductor, and TRINITY.
-
-### Security
-
-- The OpenCode runner receives NVIDIA NIM access but no GitHub write, OIDC, Actions runtime/cache, command-file, or reviewer credential; the fresh verifier receives neither model nor publication credentials.
-- The fresh publisher executes no proposed code, validates exact artifact ID, digest, base SHA, patch digest, byte/file limits, and Git modes, parses bounded metadata, then mints a repository-scoped Maintainer App token only for one branch and one pull request.
-- `COPILOT_GITHUB_TOKEN` remains prohibited for model execution, and existing review-agent identities and credential names are unchanged.
+- Apparent solar longitude now uses a bounded VSOP87 Earth series in Terrestrial Time with FK5, nutation, and aberration corrections; deterministic calculation evidence advances to `calendar-1.1.0`.
+- Calculation and standards doctoring now trace the official Korean calendar basis, independent NAOJ cross-check, IERS time-scale policy, JPL DE440 claim boundary, signed before/after model errors, and residual historical-time risks.
 
 ### Planned
 
 - PostgreSQL and object-storage adapters for horizontally scalable multi-node deployments.
-- Additional independent golden-chart fixtures near solar-term boundaries.
 - RFC 9457 Problem Details and W3C Trace Context propagation through a separately versioned compatibility change.
 - Stage-aware test-time compute allocation and ablation across routed and conducted interpretation stages.
 
