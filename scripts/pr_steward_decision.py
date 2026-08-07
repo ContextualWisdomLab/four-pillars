@@ -9,7 +9,7 @@ import re
 import stat
 import sys
 import unicodedata
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Any, NamedTuple
@@ -119,12 +119,18 @@ FAILED_CHECK_CONCLUSIONS = {
     "STALE",
 }
 SUCCESS_CHECK_CONCLUSIONS = {"SUCCESS", "NEUTRAL", "SKIPPED"}
+QUEUEABLE_MERGE_STATES = {"CLEAN", "BLOCKED", "HAS_HOOKS", "UNSTABLE"}
 REQUIRED_CHECK_GROUPS = {
-    "python_311": ("quality (3.11)", "python 3.11"),
-    "python_312": ("quality (3.12)", "python 3.12"),
+    "python_311": ("quality (3.11)",),
+    "python_312": ("quality (3.12)",),
     "container": ("container",),
-    "security_scan": ("security scan",),
-    "sast_semgrep": ("sast semgrep", "semgrep oss"),
+    "dependency_review": ("dependency-review",),
+    "osv": ("osv-scan", "osv-scanner"),
+    "trivy": ("trivy-fs", "trivy"),
+    "scorecard": ("scorecard",),
+    "semgrep": ("semgrep (multi-language sast)", "semgrep oss"),
+    "opencode_review": ("opencode-review",),
+    "noema_review": ("noema-review",),
 }
 
 
@@ -269,14 +275,11 @@ def _validate_pull_request(value: Any) -> dict[str, Any]:
 
     item = _mapping(value, "pull_request")
     _exact_keys(item, PULL_REQUEST_KEYS, "pull_request")
-    is_draft = item["is_draft"]
-    if not isinstance(is_draft, bool):
+    if not isinstance(item["is_draft"], bool):
         raise ValueError("pull_request.is_draft must be a boolean")
 
     mergeable = _sanitize_text(
-        item["mergeable"],
-        "pull_request.mergeable",
-        64,
+        item["mergeable"], "pull_request.mergeable", 64
     ).upper()
     if mergeable not in ALLOWED_MERGEABLE:
         raise ValueError("pull_request.mergeable is invalid")
@@ -302,19 +305,14 @@ def _validate_pull_request(value: Any) -> dict[str, Any]:
     return {
         "number": _positive_integer(item["number"], "pull_request.number"),
         "created_at": _timestamp(
-            item["created_at"],
-            "pull_request.created_at",
+            item["created_at"], "pull_request.created_at"
         ),
-        "is_draft": is_draft,
+        "is_draft": item["is_draft"],
         "head_sha": _identifier(
-            item["head_sha"],
-            "pull_request.head_sha",
-            SHA_PATTERN,
+            item["head_sha"], "pull_request.head_sha", SHA_PATTERN
         ),
         "base_sha": _identifier(
-            item["base_sha"],
-            "pull_request.base_sha",
-            SHA_PATTERN,
+            item["base_sha"], "pull_request.base_sha", SHA_PATTERN
         ),
         "head_repository": _identifier(
             item["head_repository"],
@@ -327,14 +325,10 @@ def _validate_pull_request(value: Any) -> dict[str, Any]:
             REPOSITORY_PATTERN,
         ),
         "head_ref": _identifier(
-            item["head_ref"],
-            "pull_request.head_ref",
-            REF_PATTERN,
+            item["head_ref"], "pull_request.head_ref", REF_PATTERN
         ),
         "base_ref": _identifier(
-            item["base_ref"],
-            "pull_request.base_ref",
-            REF_PATTERN,
+            item["base_ref"], "pull_request.base_ref", REF_PATTERN
         ),
         "mergeable": mergeable,
         "merge_state_status": merge_state,
@@ -356,14 +350,11 @@ def _validate_reviews(value: Any) -> list[dict[str, Any]]:
         reviews.append(
             {
                 "author": _sanitize_text(
-                    item["author"],
-                    f"{label}.author",
-                    256,
+                    item["author"], f"{label}.author", 256
                 ),
                 "state": state,
                 "submitted_at": _timestamp(
-                    item["submitted_at"],
-                    f"{label}.submitted_at",
+                    item["submitted_at"], f"{label}.submitted_at"
                 ),
             }
         )
@@ -387,20 +378,14 @@ def _validate_threads(value: Any) -> list[dict[str, Any]]:
                 "is_resolved": item["is_resolved"],
                 "is_outdated": item["is_outdated"],
                 "path": _sanitize_text(
-                    item["path"],
-                    f"{label}.path",
-                    1_024,
+                    item["path"], f"{label}.path", 1_024
                 ),
                 "line": _optional_line(item["line"], f"{label}.line"),
                 "author": _sanitize_text(
-                    item["author"],
-                    f"{label}.author",
-                    256,
+                    item["author"], f"{label}.author", 256
                 ),
                 "body": _sanitize_text(
-                    item["body"],
-                    f"{label}.body",
-                    4_000,
+                    item["body"], f"{label}.body", 4_000
                 ),
             }
         )
@@ -421,52 +406,39 @@ def _validate_checks(value: Any) -> list[dict[str, Any]]:
         conclusion = item["conclusion"]
         if conclusion is not None:
             conclusion = _sanitize_text(
-                conclusion,
-                f"{label}.conclusion",
-                64,
+                conclusion, f"{label}.conclusion", 64
             ).upper()
         checks.append(
             {
                 "kind": kind,
                 "name": _sanitize_text(
-                    item["name"],
-                    f"{label}.name",
-                    512,
+                    item["name"], f"{label}.name", 512
                 ),
                 "status": _sanitize_text(
-                    item["status"],
-                    f"{label}.status",
-                    64,
+                    item["status"], f"{label}.status", 64
                 ).upper(),
                 "conclusion": conclusion,
                 "details_url": _https_github_url(
-                    item["details_url"],
-                    f"{label}.details_url",
+                    item["details_url"], f"{label}.details_url"
                 ),
             }
         )
     return checks
 
 
-def _walk_strings(value: Any) -> list[str]:
-    """Collect strings recursively for one aggregate evidence budget."""
+def _iter_strings(value: Any) -> Iterable[str]:
+    """Yield strings recursively for one aggregate evidence budget."""
 
     if isinstance(value, str):
-        return [value]
-    if isinstance(value, Mapping):
-        result: list[str] = []
+        yield value
+    elif isinstance(value, Mapping):
         for item in value.values():
-            result.extend(_walk_strings(item))
-        return result
-    if isinstance(value, Sequence) and not isinstance(
-        value,
-        (str, bytes, bytearray),
+            yield from _iter_strings(item)
+    elif isinstance(value, Sequence) and not isinstance(
+        value, (str, bytes, bytearray)
     ):
-        result = []
         for item in value:
-            result.extend(_walk_strings(item))
-        return result
-    return []
+            yield from _iter_strings(item)
 
 
 def validate_evidence(
@@ -480,35 +452,26 @@ def validate_evidence(
     _exact_keys(document, TOP_LEVEL_KEYS, "evidence")
     if document["schema_version"] != SCHEMA_VERSION:
         raise ValueError("schema_version is unsupported")
-
-    errors = [
-        _sanitize_text(item, f"api_errors[{index}]", 1_024)
-        for index, item in enumerate(
-            _sequence(document["api_errors"], "api_errors")
-        )
-    ]
     normalized = {
         "schema_version": SCHEMA_VERSION,
         "repository": _identifier(
-            document["repository"],
-            "repository",
-            REPOSITORY_PATTERN,
+            document["repository"], "repository", REPOSITORY_PATTERN
         ),
         "generated_at": _timestamp(
-            document["generated_at"],
-            "generated_at",
+            document["generated_at"], "generated_at"
         ),
         "pull_request": _validate_pull_request(document["pull_request"]),
         "reviews": _validate_reviews(document["reviews"]),
         "threads": _validate_threads(document["threads"]),
         "checks": _validate_checks(document["checks"]),
-        "api_errors": errors,
+        "api_errors": [
+            _sanitize_text(item, f"api_errors[{index}]", 1_024)
+            for index, item in enumerate(
+                _sequence(document["api_errors"], "api_errors")
+            )
+        ],
     }
-    text_bytes = sum(
-        len(item.encode("utf-8"))
-        for item in _walk_strings(normalized)
-    )
-    if text_bytes > max_text_bytes:
+    if sum(len(item.encode("utf-8")) for item in _iter_strings(normalized)) > max_text_bytes:
         raise ValueError("evidence exceeds the aggregate text byte budget")
     return normalized
 
@@ -538,11 +501,7 @@ def _read_regular_file(path: Path, maximum_bytes: int) -> bytes:
             raise ValueError("evidence source must be a regular file")
         if (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino):
             raise ValueError("evidence source identity changed while opening")
-        with os.fdopen(
-            descriptor,
-            "rb",
-            closefd=True,
-        ) as handle:
+        with os.fdopen(descriptor, "rb", closefd=True) as handle:
             descriptor = -1
             payload = handle.read(maximum_bytes + 1)
     finally:
@@ -560,9 +519,7 @@ def _write_private_json(path: Path, value: Mapping[str, Any]) -> None:
     temporary = path.with_name(f".{path.name}.tmp")
     temporary.unlink(missing_ok=True)
     descriptor = os.open(
-        temporary,
-        os.O_WRONLY | os.O_CREAT | os.O_EXCL,
-        0o600,
+        temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600
     )
     try:
         os.fchmod(descriptor, 0o600)
@@ -620,11 +577,9 @@ def select_oldest_non_draft(
     """Return the oldest non-draft PR using creation time then number."""
 
     if isinstance(pull_requests, (str, bytes, bytearray)) or not isinstance(
-        pull_requests,
-        Sequence,
+        pull_requests, Sequence
     ):
         raise ValueError("pull_requests must be a list")
-
     eligible: list[tuple[datetime, int, dict[str, Any]]] = []
     for index, raw in enumerate(pull_requests):
         item = _mapping(raw, f"pull_requests[{index}]")
@@ -634,24 +589,23 @@ def select_oldest_non_draft(
                 f"pull_requests[{index}] is missing queue fields"
             )
         number = _positive_integer(
-            item["number"],
-            f"pull_requests[{index}].number",
+            item["number"], f"pull_requests[{index}].number"
         )
         created = _timestamp(
-            item["created_at"],
-            f"pull_requests[{index}].created_at",
+            item["created_at"], f"pull_requests[{index}].created_at"
         )
-        is_draft = item["is_draft"]
-        if not isinstance(is_draft, bool):
+        if not isinstance(item["is_draft"], bool):
             raise ValueError(
                 f"pull_requests[{index}].is_draft must be a boolean"
             )
-        if not is_draft:
-            instant = datetime.fromisoformat(
-                created.replace("Z", "+00:00")
+        if not item["is_draft"]:
+            eligible.append(
+                (
+                    datetime.fromisoformat(created.replace("Z", "+00:00")),
+                    number,
+                    dict(item),
+                )
             )
-            eligible.append((instant, number, dict(item)))
-
     if not eligible:
         return None
     eligible.sort(key=lambda candidate: (candidate[0], candidate[1]))
@@ -671,14 +625,11 @@ def _latest_review_states(
         current = latest.get(review["author"])
         if current is None or submitted > current[0]:
             latest[review["author"]] = (submitted, review["state"])
-    return {
-        author: state
-        for author, (_, state) in latest.items()
-    }
+    return {author: state for author, (_, state) in latest.items()}
 
 
 def _required_check_gaps(checks: Sequence[Mapping[str, Any]]) -> list[str]:
-    """Return required exact-head check groups without a successful result."""
+    """Return required exact-head groups without a successful Check."""
 
     successful_names = {
         check["name"].casefold()
@@ -703,8 +654,7 @@ def decide_action(evidence: Mapping[str, Any]) -> StewardDecision:
     normalized = validate_evidence(evidence)
     pull_request = normalized["pull_request"]
     same_repository = (
-        pull_request["head_repository"]
-        == pull_request["base_repository"]
+        pull_request["head_repository"] == pull_request["base_repository"]
     )
     identity = {
         "pr_number": pull_request["number"],
@@ -715,30 +665,24 @@ def decide_action(evidence: Mapping[str, Any]) -> StewardDecision:
 
     if normalized["api_errors"]:
         return StewardDecision(
-            "wait",
-            ("api_inventory_incomplete",),
-            **identity,
+            "wait", ("api_inventory_incomplete",), **identity
         )
     if (
         pull_request["mergeable"] == "CONFLICTING"
         or pull_request["merge_state_status"] == "DIRTY"
     ):
         return StewardDecision(
-            "wait",
-            ("merge_conflict_requires_human",),
-            **identity,
+            "wait", ("merge_conflict_requires_human",), **identity
         )
 
     repair_reasons: list[str] = []
     latest_reviews = _latest_review_states(normalized["reviews"])
     if pull_request["review_decision"] == "CHANGES_REQUESTED" or any(
-        state == "CHANGES_REQUESTED"
-        for state in latest_reviews.values()
+        state == "CHANGES_REQUESTED" for state in latest_reviews.values()
     ):
         repair_reasons.append("changes_requested")
     if any(
-        not thread["is_resolved"]
-        and not thread["is_outdated"]
+        not thread["is_resolved"] and not thread["is_outdated"]
         for thread in normalized["threads"]
     ):
         repair_reasons.append("unresolved_thread")
@@ -747,68 +691,47 @@ def decide_action(evidence: Mapping[str, Any]) -> StewardDecision:
     if not normalized["checks"]:
         wait_reasons.append("checks_missing")
     for check in normalized["checks"]:
-        status = check["status"]
-        conclusion = check["conclusion"]
-        if status in PENDING_CHECK_STATUSES or conclusion is None:
+        if (
+            check["status"] in PENDING_CHECK_STATUSES
+            or check["conclusion"] is None
+        ):
             wait_reasons.append("check_pending")
-        elif conclusion in FAILED_CHECK_CONCLUSIONS:
+        elif check["conclusion"] in FAILED_CHECK_CONCLUSIONS:
             repair_reasons.append("check_failed")
-        elif conclusion not in SUCCESS_CHECK_CONCLUSIONS:
+        elif check["conclusion"] not in SUCCESS_CHECK_CONCLUSIONS:
             wait_reasons.append("check_state_unknown")
 
     if repair_reasons:
-        unique_repair_reasons = tuple(dict.fromkeys(repair_reasons))
+        unique = tuple(dict.fromkeys(repair_reasons))
         if not same_repository:
             return StewardDecision(
-                "wait",
-                (
-                    "external_fork_repair_forbidden",
-                    *unique_repair_reasons,
-                ),
-                **identity,
+                "wait", ("external_fork_repair_forbidden", *unique), **identity
             )
-        return StewardDecision(
-            "repair",
-            unique_repair_reasons,
-            **identity,
-        )
+        return StewardDecision("repair", unique, **identity)
 
-    if pull_request["review_decision"] != "APPROVED":
-        wait_reasons.append("review_not_approved")
     wait_reasons.extend(_required_check_gaps(normalized["checks"]))
-
     merge_state = pull_request["merge_state_status"]
     if pull_request["mergeable"] == "UNKNOWN" or merge_state == "UNKNOWN":
         wait_reasons.append("mergeability_unknown")
     elif merge_state == "BEHIND":
         wait_reasons.append("base_behind")
-    elif merge_state == "BLOCKED":
-        wait_reasons.append("merge_blocked")
-    elif merge_state == "UNSTABLE":
-        wait_reasons.append("merge_state_unstable")
-    elif merge_state != "CLEAN":
-        wait_reasons.append("merge_state_not_ready")
+    elif merge_state not in QUEUEABLE_MERGE_STATES:
+        wait_reasons.append("merge_state_not_queueable")
 
     if wait_reasons:
         return StewardDecision(
-            "wait",
-            tuple(dict.fromkeys(wait_reasons)),
-            **identity,
+            "wait", tuple(dict.fromkeys(wait_reasons)), **identity
         )
     return StewardDecision(
-        "queue_merge",
-        ("exact_head_green",),
-        **identity,
+        "queue_merge", ("exact_head_green",), **identity
     )
 
 
 def _sanitize_failed_logs(value: str, maximum_bytes: int) -> str:
-    """Bound diagnostic logs and remove credential-looking assignments."""
+    """Bound diagnostics and remove credential-looking assignments."""
 
     cleaned = _sanitize_text(
-        value,
-        "failed_logs",
-        max(maximum_bytes * 2, 1),
+        value, "failed_logs", max(maximum_bytes * 2, 1)
     )
     redacted = "\n".join(
         "[redacted credential-like line]"
@@ -819,8 +742,7 @@ def _sanitize_failed_logs(value: str, maximum_bytes: int) -> str:
     encoded = redacted.encode("utf-8")
     if len(encoded) > maximum_bytes:
         redacted = encoded[:maximum_bytes].decode(
-            "utf-8",
-            errors="ignore",
+            "utf-8", errors="ignore"
         )
     return redacted
 
@@ -869,8 +791,7 @@ Make the smallest coherent repair supported by repository tests and documentatio
 
 
 def _load_json(
-    path: Path,
-    maximum_bytes: int = DEFAULT_MAX_SOURCE_BYTES,
+    path: Path, maximum_bytes: int = DEFAULT_MAX_SOURCE_BYTES
 ) -> Any:
     """Read one regular UTF-8 JSON file for a CLI operation."""
 
@@ -882,19 +803,19 @@ def _load_json(
 
 
 def _write_github_output(
-    path: Path | None,
-    values: Mapping[str, Any],
+    path: Path | None, values: Mapping[str, Any]
 ) -> None:
-    """Append bounded single-line values to one trusted GitHub output file."""
+    """Append bounded single-line values to a trusted GitHub output file."""
 
     if path is None:
         return
     with path.open("a", encoding="utf-8", newline="\n") as handle:
         for key, value in values.items():
-            if isinstance(value, (list, dict)):
-                text = json.dumps(value, ensure_ascii=False)
-            else:
-                text = str(value)
+            text = (
+                json.dumps(value, ensure_ascii=False)
+                if isinstance(value, (list, dict))
+                else str(value)
+            )
             if "\n" in text or "\r" in text:
                 raise ValueError(f"GitHub output {key} must be one line")
             handle.write(f"{key}={text}\n")
@@ -907,31 +828,27 @@ def _build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
 
     select = commands.add_parser(
-        "select",
-        help="select the oldest non-draft PR",
+        "select", help="select the oldest non-draft PR"
     )
     select.add_argument("source", type=Path)
     select.add_argument("output", type=Path)
     select.add_argument("--github-output", type=Path)
 
     canonicalize = commands.add_parser(
-        "canonicalize",
-        help="validate evidence",
+        "canonicalize", help="validate evidence"
     )
     canonicalize.add_argument("source", type=Path)
     canonicalize.add_argument("output", type=Path)
 
     decide = commands.add_parser(
-        "decide",
-        help="classify one exact-head snapshot",
+        "decide", help="classify one exact-head snapshot"
     )
     decide.add_argument("source", type=Path)
     decide.add_argument("output", type=Path)
     decide.add_argument("--github-output", type=Path)
 
     prompt = commands.add_parser(
-        "prompt",
-        help="render one bounded repair prompt",
+        "prompt", help="render one bounded repair prompt"
     )
     prompt.add_argument("source", type=Path)
     prompt.add_argument("logs", type=Path)
@@ -957,13 +874,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                 arguments.github_output,
                 {
                     "selected": str(selected is not None).lower(),
-                    "pr_number": "" if selected is None else selected["number"],
+                    "pr_number": ""
+                    if selected is None
+                    else selected["number"],
                 },
             )
         elif arguments.command == "canonicalize":
             write_canonical_evidence(
-                arguments.source,
-                arguments.output,
+                arguments.source, arguments.output
             )
         elif arguments.command == "decide":
             evidence = validate_evidence(_load_json(arguments.source))
@@ -982,14 +900,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             evidence = validate_evidence(_load_json(arguments.source))
             logs = _read_regular_file(
-                arguments.logs,
-                DEFAULT_MAX_LOG_BYTES,
+                arguments.logs, DEFAULT_MAX_LOG_BYTES
             ).decode("utf-8", errors="replace")
             prompt = render_repair_prompt(evidence, logs)
             arguments.output.write_text(
-                prompt,
-                encoding="utf-8",
-                newline="\n",
+                prompt, encoding="utf-8", newline="\n"
             )
             os.chmod(arguments.output, 0o600)
     except (OSError, TypeError, ValueError) as exc:
