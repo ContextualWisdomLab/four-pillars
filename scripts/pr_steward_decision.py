@@ -68,7 +68,15 @@ PULL_REQUEST_KEYS = {
     "review_decision",
 }
 REVIEW_KEYS = {"author", "state", "submitted_at"}
-THREAD_KEYS = {"id", "is_resolved", "is_outdated", "path", "line", "author", "body"}
+THREAD_KEYS = {
+    "id",
+    "is_resolved",
+    "is_outdated",
+    "path",
+    "line",
+    "author",
+    "body",
+}
 CHECK_KEYS = {"kind", "name", "status", "conclusion", "details_url"}
 ALLOWED_MERGEABLE = {"MERGEABLE", "CONFLICTING", "UNKNOWN"}
 ALLOWED_MERGE_STATES = {
@@ -81,10 +89,26 @@ ALLOWED_MERGE_STATES = {
     "UNKNOWN",
     "UNSTABLE",
 }
-ALLOWED_REVIEW_DECISIONS = {None, "APPROVED", "CHANGES_REQUESTED", "REVIEW_REQUIRED"}
-ALLOWED_REVIEW_STATES = {"APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED"}
+ALLOWED_REVIEW_DECISIONS = {
+    None,
+    "APPROVED",
+    "CHANGES_REQUESTED",
+    "REVIEW_REQUIRED",
+}
+ALLOWED_REVIEW_STATES = {
+    "APPROVED",
+    "CHANGES_REQUESTED",
+    "COMMENTED",
+    "DISMISSED",
+}
 ALLOWED_CHECK_KINDS = {"check_run", "status_context"}
-PENDING_CHECK_STATUSES = {"QUEUED", "IN_PROGRESS", "WAITING", "REQUESTED", "PENDING"}
+PENDING_CHECK_STATUSES = {
+    "QUEUED",
+    "IN_PROGRESS",
+    "WAITING",
+    "REQUESTED",
+    "PENDING",
+}
 FAILED_CHECK_CONCLUSIONS = {
     "FAILURE",
     "ERROR",
@@ -95,10 +119,17 @@ FAILED_CHECK_CONCLUSIONS = {
     "STALE",
 }
 SUCCESS_CHECK_CONCLUSIONS = {"SUCCESS", "NEUTRAL", "SKIPPED"}
+REQUIRED_CHECK_GROUPS = {
+    "python_311": ("quality (3.11)", "python 3.11"),
+    "python_312": ("quality (3.12)", "python 3.12"),
+    "container": ("container",),
+    "security_scan": ("security scan",),
+    "sast_semgrep": ("sast semgrep", "semgrep oss"),
+}
 
 
 class StewardDecision(NamedTuple):
-    """One deterministic action and the exact pull-request identity it governs."""
+    """One deterministic action and exact pull-request identity."""
 
     action: str
     reasons: tuple[str, ...]
@@ -108,7 +139,7 @@ class StewardDecision(NamedTuple):
     same_repository: bool
 
     def as_dict(self) -> dict[str, Any]:
-        """Return a JSON-serializable representation for workflow handoff."""
+        """Return a JSON-safe representation for workflow handoff."""
 
         return {
             "action": self.action,
@@ -137,13 +168,17 @@ def _exact_keys(value: Mapping[str, Any], expected: set[str], label: str) -> Non
     if actual != expected:
         missing = sorted(expected - actual)
         unknown = sorted(actual - expected)
-        raise ValueError(f"{label} fields are invalid: missing={missing}, unknown={unknown}")
+        raise ValueError(
+            f"{label} fields are invalid: missing={missing}, unknown={unknown}"
+        )
 
 
 def _sequence(value: Any, label: str) -> Sequence[Any]:
     """Return a bounded non-text sequence."""
 
-    if isinstance(value, (str, bytes, bytearray)) or not isinstance(value, Sequence):
+    if isinstance(value, (str, bytes, bytearray)) or not isinstance(
+        value, Sequence
+    ):
         raise ValueError(f"{label} must be a list")
     if len(value) > MAX_ITEMS:
         raise ValueError(f"{label} contains too many items")
@@ -151,11 +186,14 @@ def _sequence(value: Any, label: str) -> Sequence[Any]:
 
 
 def _sanitize_text(value: Any, label: str, maximum_bytes: int) -> str:
-    """Normalize text and remove control channels without masking useful content."""
+    """Normalize text and remove control channels without blanket masking."""
 
     if not isinstance(value, str):
         raise ValueError(f"{label} must be a string")
-    normalized = unicodedata.normalize("NFC", value.replace("\r\n", "\n").replace("\r", "\n"))
+    normalized = unicodedata.normalize(
+        "NFC",
+        value.replace("\r\n", "\n").replace("\r", "\n"),
+    )
     cleaned = "".join(
         character
         for character in normalized
@@ -180,7 +218,7 @@ def _identifier(value: Any, label: str, pattern: re.Pattern[str]) -> str:
 
 
 def _timestamp(value: Any, label: str) -> str:
-    """Return one normalized RFC 3339 timestamp with an explicit offset."""
+    """Return one RFC 3339 timestamp with an explicit timezone."""
 
     cleaned = _sanitize_text(value, label, 128)
     try:
@@ -227,42 +265,77 @@ def _https_github_url(value: Any, label: str) -> str:
 
 
 def _validate_pull_request(value: Any) -> dict[str, Any]:
-    """Validate one exact pull-request identity and merge-state snapshot."""
+    """Validate exact pull-request identity and merge-state evidence."""
 
     item = _mapping(value, "pull_request")
     _exact_keys(item, PULL_REQUEST_KEYS, "pull_request")
     is_draft = item["is_draft"]
     if not isinstance(is_draft, bool):
         raise ValueError("pull_request.is_draft must be a boolean")
-    mergeable = _sanitize_text(item["mergeable"], "pull_request.mergeable", 64).upper()
+
+    mergeable = _sanitize_text(
+        item["mergeable"],
+        "pull_request.mergeable",
+        64,
+    ).upper()
     if mergeable not in ALLOWED_MERGEABLE:
         raise ValueError("pull_request.mergeable is invalid")
+
     merge_state = _sanitize_text(
-        item["merge_state_status"], "pull_request.merge_state_status", 64
+        item["merge_state_status"],
+        "pull_request.merge_state_status",
+        64,
     ).upper()
     if merge_state not in ALLOWED_MERGE_STATES:
         raise ValueError("pull_request.merge_state_status is invalid")
+
     review_decision = item["review_decision"]
     if review_decision is not None:
         review_decision = _sanitize_text(
-            review_decision, "pull_request.review_decision", 64
+            review_decision,
+            "pull_request.review_decision",
+            64,
         ).upper()
     if review_decision not in ALLOWED_REVIEW_DECISIONS:
         raise ValueError("pull_request.review_decision is invalid")
+
     return {
         "number": _positive_integer(item["number"], "pull_request.number"),
-        "created_at": _timestamp(item["created_at"], "pull_request.created_at"),
+        "created_at": _timestamp(
+            item["created_at"],
+            "pull_request.created_at",
+        ),
         "is_draft": is_draft,
-        "head_sha": _identifier(item["head_sha"], "pull_request.head_sha", SHA_PATTERN),
-        "base_sha": _identifier(item["base_sha"], "pull_request.base_sha", SHA_PATTERN),
+        "head_sha": _identifier(
+            item["head_sha"],
+            "pull_request.head_sha",
+            SHA_PATTERN,
+        ),
+        "base_sha": _identifier(
+            item["base_sha"],
+            "pull_request.base_sha",
+            SHA_PATTERN,
+        ),
         "head_repository": _identifier(
-            item["head_repository"], "pull_request.head_repository", REPOSITORY_PATTERN
+            item["head_repository"],
+            "pull_request.head_repository",
+            REPOSITORY_PATTERN,
         ),
         "base_repository": _identifier(
-            item["base_repository"], "pull_request.base_repository", REPOSITORY_PATTERN
+            item["base_repository"],
+            "pull_request.base_repository",
+            REPOSITORY_PATTERN,
         ),
-        "head_ref": _identifier(item["head_ref"], "pull_request.head_ref", REF_PATTERN),
-        "base_ref": _identifier(item["base_ref"], "pull_request.base_ref", REF_PATTERN),
+        "head_ref": _identifier(
+            item["head_ref"],
+            "pull_request.head_ref",
+            REF_PATTERN,
+        ),
+        "base_ref": _identifier(
+            item["base_ref"],
+            "pull_request.base_ref",
+            REF_PATTERN,
+        ),
         "mergeable": mergeable,
         "merge_state_status": merge_state,
         "review_decision": review_decision,
@@ -272,7 +345,7 @@ def _validate_pull_request(value: Any) -> dict[str, Any]:
 def _validate_reviews(value: Any) -> list[dict[str, Any]]:
     """Validate submitted review-state evidence."""
 
-    result: list[dict[str, Any]] = []
+    reviews: list[dict[str, Any]] = []
     for index, raw in enumerate(_sequence(value, "reviews")):
         label = f"reviews[{index}]"
         item = _mapping(raw, label)
@@ -280,20 +353,27 @@ def _validate_reviews(value: Any) -> list[dict[str, Any]]:
         state = _sanitize_text(item["state"], f"{label}.state", 64).upper()
         if state not in ALLOWED_REVIEW_STATES:
             raise ValueError(f"{label}.state is invalid")
-        result.append(
+        reviews.append(
             {
-                "author": _sanitize_text(item["author"], f"{label}.author", 256),
+                "author": _sanitize_text(
+                    item["author"],
+                    f"{label}.author",
+                    256,
+                ),
                 "state": state,
-                "submitted_at": _timestamp(item["submitted_at"], f"{label}.submitted_at"),
+                "submitted_at": _timestamp(
+                    item["submitted_at"],
+                    f"{label}.submitted_at",
+                ),
             }
         )
-    return result
+    return reviews
 
 
 def _validate_threads(value: Any) -> list[dict[str, Any]]:
     """Validate current and historical review-thread evidence."""
 
-    result: list[dict[str, Any]] = []
+    threads: list[dict[str, Any]] = []
     for index, raw in enumerate(_sequence(value, "threads")):
         label = f"threads[{index}]"
         item = _mapping(raw, label)
@@ -301,24 +381,36 @@ def _validate_threads(value: Any) -> list[dict[str, Any]]:
         for key in ("is_resolved", "is_outdated"):
             if not isinstance(item[key], bool):
                 raise ValueError(f"{label}.{key} must be a boolean")
-        result.append(
+        threads.append(
             {
                 "id": _identifier(item["id"], f"{label}.id", ID_PATTERN),
                 "is_resolved": item["is_resolved"],
                 "is_outdated": item["is_outdated"],
-                "path": _sanitize_text(item["path"], f"{label}.path", 1_024),
+                "path": _sanitize_text(
+                    item["path"],
+                    f"{label}.path",
+                    1_024,
+                ),
                 "line": _optional_line(item["line"], f"{label}.line"),
-                "author": _sanitize_text(item["author"], f"{label}.author", 256),
-                "body": _sanitize_text(item["body"], f"{label}.body", 4_000),
+                "author": _sanitize_text(
+                    item["author"],
+                    f"{label}.author",
+                    256,
+                ),
+                "body": _sanitize_text(
+                    item["body"],
+                    f"{label}.body",
+                    4_000,
+                ),
             }
         )
-    return result
+    return threads
 
 
 def _validate_checks(value: Any) -> list[dict[str, Any]]:
     """Validate exact-head Check-run and status-context evidence."""
 
-    result: list[dict[str, Any]] = []
+    checks: list[dict[str, Any]] = []
     for index, raw in enumerate(_sequence(value, "checks")):
         label = f"checks[{index}]"
         item = _mapping(raw, label)
@@ -328,36 +420,84 @@ def _validate_checks(value: Any) -> list[dict[str, Any]]:
             raise ValueError(f"{label}.kind is invalid")
         conclusion = item["conclusion"]
         if conclusion is not None:
-            conclusion = _sanitize_text(conclusion, f"{label}.conclusion", 64).upper()
-        result.append(
+            conclusion = _sanitize_text(
+                conclusion,
+                f"{label}.conclusion",
+                64,
+            ).upper()
+        checks.append(
             {
                 "kind": kind,
-                "name": _sanitize_text(item["name"], f"{label}.name", 512),
-                "status": _sanitize_text(item["status"], f"{label}.status", 64).upper(),
+                "name": _sanitize_text(
+                    item["name"],
+                    f"{label}.name",
+                    512,
+                ),
+                "status": _sanitize_text(
+                    item["status"],
+                    f"{label}.status",
+                    64,
+                ).upper(),
                 "conclusion": conclusion,
                 "details_url": _https_github_url(
-                    item["details_url"], f"{label}.details_url"
+                    item["details_url"],
+                    f"{label}.details_url",
                 ),
             }
         )
-    return result
+    return checks
 
 
-def validate_evidence(value: Any, *, max_text_bytes: int = DEFAULT_MAX_TEXT_BYTES) -> dict[str, Any]:
+def _walk_strings(value: Any) -> list[str]:
+    """Collect strings recursively for one aggregate evidence budget."""
+
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, Mapping):
+        result: list[str] = []
+        for item in value.values():
+            result.extend(_walk_strings(item))
+        return result
+    if isinstance(value, Sequence) and not isinstance(
+        value,
+        (str, bytes, bytearray),
+    ):
+        result = []
+        for item in value:
+            result.extend(_walk_strings(item))
+        return result
+    return []
+
+
+def validate_evidence(
+    value: Any,
+    *,
+    max_text_bytes: int = DEFAULT_MAX_TEXT_BYTES,
+) -> dict[str, Any]:
     """Return one strict canonical version-1 steward evidence document."""
 
     document = _mapping(value, "evidence")
     _exact_keys(document, TOP_LEVEL_KEYS, "evidence")
     if document["schema_version"] != SCHEMA_VERSION:
         raise ValueError("schema_version is unsupported")
+
     errors = [
         _sanitize_text(item, f"api_errors[{index}]", 1_024)
-        for index, item in enumerate(_sequence(document["api_errors"], "api_errors"))
+        for index, item in enumerate(
+            _sequence(document["api_errors"], "api_errors")
+        )
     ]
     normalized = {
         "schema_version": SCHEMA_VERSION,
-        "repository": _identifier(document["repository"], "repository", REPOSITORY_PATTERN),
-        "generated_at": _timestamp(document["generated_at"], "generated_at"),
+        "repository": _identifier(
+            document["repository"],
+            "repository",
+            REPOSITORY_PATTERN,
+        ),
+        "generated_at": _timestamp(
+            document["generated_at"],
+            "generated_at",
+        ),
         "pull_request": _validate_pull_request(document["pull_request"]),
         "reviews": _validate_reviews(document["reviews"]),
         "threads": _validate_threads(document["threads"]),
@@ -373,45 +513,36 @@ def validate_evidence(value: Any, *, max_text_bytes: int = DEFAULT_MAX_TEXT_BYTE
     return normalized
 
 
-def _walk_strings(value: Any) -> list[str]:
-    """Collect strings recursively for one aggregate evidence budget."""
-
-    if isinstance(value, str):
-        return [value]
-    if isinstance(value, Mapping):
-        result: list[str] = []
-        for item in value.values():
-            result.extend(_walk_strings(item))
-        return result
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        result = []
-        for item in value:
-            result.extend(_walk_strings(item))
-        return result
-    return []
-
-
 def _read_regular_file(path: Path, maximum_bytes: int) -> bytes:
     """Read one stable regular file without following symbolic links."""
 
     try:
         before = path.lstat()
     except OSError as exc:
-        raise ValueError("evidence source must be a readable regular file") from exc
+        raise ValueError(
+            "evidence source must be a readable regular file"
+        ) from exc
     if stat.S_ISLNK(before.st_mode) or not stat.S_ISREG(before.st_mode):
         raise ValueError("evidence source must be a regular file")
+
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
     try:
         descriptor = os.open(path, flags)
     except OSError as exc:
-        raise ValueError("evidence source must be a readable regular file") from exc
+        raise ValueError(
+            "evidence source must be a readable regular file"
+        ) from exc
     try:
         opened = os.fstat(descriptor)
         if not stat.S_ISREG(opened.st_mode):
             raise ValueError("evidence source must be a regular file")
         if (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino):
             raise ValueError("evidence source identity changed while opening")
-        with os.fdopen(descriptor, "rb", closefd=True) as handle:
+        with os.fdopen(
+            descriptor,
+            "rb",
+            closefd=True,
+        ) as handle:
             descriptor = -1
             payload = handle.read(maximum_bytes + 1)
     finally:
@@ -427,16 +558,29 @@ def _write_private_json(path: Path, value: Mapping[str, Any]) -> None:
 
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp")
-    try:
-        temporary.unlink()
-    except FileNotFoundError:
-        pass
-    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    temporary.unlink(missing_ok=True)
+    descriptor = os.open(
+        temporary,
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+        0o600,
+    )
     try:
         os.fchmod(descriptor, 0o600)
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n", closefd=True) as handle:
+        with os.fdopen(
+            descriptor,
+            "w",
+            encoding="utf-8",
+            newline="\n",
+            closefd=True,
+        ) as handle:
             descriptor = -1
-            json.dump(value, handle, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            json.dump(
+                value,
+                handle,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
             handle.write("\n")
             handle.flush()
             os.fsync(handle.fileno())
@@ -454,7 +598,7 @@ def write_canonical_evidence(
     max_source_bytes: int = DEFAULT_MAX_SOURCE_BYTES,
     max_text_bytes: int = DEFAULT_MAX_TEXT_BYTES,
 ) -> dict[str, Any]:
-    """Validate one untrusted JSON source and privately write canonical evidence."""
+    """Validate untrusted JSON and privately write canonical evidence."""
 
     payload = _read_regular_file(Path(source_path), max_source_bytes)
     try:
@@ -476,39 +620,81 @@ def select_oldest_non_draft(
     """Return the oldest non-draft PR using creation time then number."""
 
     if isinstance(pull_requests, (str, bytes, bytearray)) or not isinstance(
-        pull_requests, Sequence
+        pull_requests,
+        Sequence,
     ):
         raise ValueError("pull_requests must be a list")
+
     eligible: list[tuple[datetime, int, dict[str, Any]]] = []
     for index, raw in enumerate(pull_requests):
         item = _mapping(raw, f"pull_requests[{index}]")
         required = {"number", "created_at", "is_draft"}
         if not required.issubset(item):
-            raise ValueError(f"pull_requests[{index}] is missing queue fields")
-        number = _positive_integer(item["number"], f"pull_requests[{index}].number")
-        created = _timestamp(item["created_at"], f"pull_requests[{index}].created_at")
+            raise ValueError(
+                f"pull_requests[{index}] is missing queue fields"
+            )
+        number = _positive_integer(
+            item["number"],
+            f"pull_requests[{index}].number",
+        )
+        created = _timestamp(
+            item["created_at"],
+            f"pull_requests[{index}].created_at",
+        )
         is_draft = item["is_draft"]
         if not isinstance(is_draft, bool):
-            raise ValueError(f"pull_requests[{index}].is_draft must be a boolean")
+            raise ValueError(
+                f"pull_requests[{index}].is_draft must be a boolean"
+            )
         if not is_draft:
-            instant = datetime.fromisoformat(created.replace("Z", "+00:00"))
+            instant = datetime.fromisoformat(
+                created.replace("Z", "+00:00")
+            )
             eligible.append((instant, number, dict(item)))
+
     if not eligible:
         return None
     eligible.sort(key=lambda candidate: (candidate[0], candidate[1]))
     return eligible[0][2]
 
 
-def _latest_review_states(reviews: Sequence[Mapping[str, Any]]) -> dict[str, str]:
+def _latest_review_states(
+    reviews: Sequence[Mapping[str, Any]],
+) -> dict[str, str]:
     """Return each reviewer's latest submitted review state."""
 
     latest: dict[str, tuple[datetime, str]] = {}
     for review in reviews:
-        submitted = datetime.fromisoformat(review["submitted_at"].replace("Z", "+00:00"))
+        submitted = datetime.fromisoformat(
+            review["submitted_at"].replace("Z", "+00:00")
+        )
         current = latest.get(review["author"])
         if current is None or submitted > current[0]:
             latest[review["author"]] = (submitted, review["state"])
-    return {author: state for author, (_, state) in latest.items()}
+    return {
+        author: state
+        for author, (_, state) in latest.items()
+    }
+
+
+def _required_check_gaps(checks: Sequence[Mapping[str, Any]]) -> list[str]:
+    """Return required exact-head check groups without a successful result."""
+
+    successful_names = {
+        check["name"].casefold()
+        for check in checks
+        if check["status"] not in PENDING_CHECK_STATUSES
+        and check["conclusion"] in SUCCESS_CHECK_CONCLUSIONS
+    }
+    gaps: list[str] = []
+    for group, aliases in REQUIRED_CHECK_GROUPS.items():
+        if not any(
+            alias in name
+            for alias in aliases
+            for name in successful_names
+        ):
+            gaps.append(f"required_check_missing:{group}")
+    return gaps
 
 
 def decide_action(evidence: Mapping[str, Any]) -> StewardDecision:
@@ -517,7 +703,8 @@ def decide_action(evidence: Mapping[str, Any]) -> StewardDecision:
     normalized = validate_evidence(evidence)
     pull_request = normalized["pull_request"]
     same_repository = (
-        pull_request["head_repository"] == pull_request["base_repository"]
+        pull_request["head_repository"]
+        == pull_request["base_repository"]
     )
     identity = {
         "pr_number": pull_request["number"],
@@ -525,22 +712,33 @@ def decide_action(evidence: Mapping[str, Any]) -> StewardDecision:
         "base_sha": pull_request["base_sha"],
         "same_repository": same_repository,
     }
+
     if normalized["api_errors"]:
-        return StewardDecision("wait", ("api_inventory_incomplete",), **identity)
+        return StewardDecision(
+            "wait",
+            ("api_inventory_incomplete",),
+            **identity,
+        )
     if (
         pull_request["mergeable"] == "CONFLICTING"
         or pull_request["merge_state_status"] == "DIRTY"
     ):
-        return StewardDecision("wait", ("merge_conflict_requires_human",), **identity)
+        return StewardDecision(
+            "wait",
+            ("merge_conflict_requires_human",),
+            **identity,
+        )
 
     repair_reasons: list[str] = []
     latest_reviews = _latest_review_states(normalized["reviews"])
     if pull_request["review_decision"] == "CHANGES_REQUESTED" or any(
-        state == "CHANGES_REQUESTED" for state in latest_reviews.values()
+        state == "CHANGES_REQUESTED"
+        for state in latest_reviews.values()
     ):
         repair_reasons.append("changes_requested")
     if any(
-        not thread["is_resolved"] and not thread["is_outdated"]
+        not thread["is_resolved"]
+        and not thread["is_outdated"]
         for thread in normalized["threads"]
     ):
         repair_reasons.append("unresolved_thread")
@@ -559,15 +757,26 @@ def decide_action(evidence: Mapping[str, Any]) -> StewardDecision:
             wait_reasons.append("check_state_unknown")
 
     if repair_reasons:
-        unique = tuple(dict.fromkeys(repair_reasons))
+        unique_repair_reasons = tuple(dict.fromkeys(repair_reasons))
         if not same_repository:
             return StewardDecision(
-                "wait", ("external_fork_repair_forbidden", *unique), **identity
+                "wait",
+                (
+                    "external_fork_repair_forbidden",
+                    *unique_repair_reasons,
+                ),
+                **identity,
             )
-        return StewardDecision("repair", unique, **identity)
+        return StewardDecision(
+            "repair",
+            unique_repair_reasons,
+            **identity,
+        )
 
-    if pull_request["review_decision"] == "REVIEW_REQUIRED":
-        wait_reasons.append("review_required")
+    if pull_request["review_decision"] != "APPROVED":
+        wait_reasons.append("review_not_approved")
+    wait_reasons.extend(_required_check_gaps(normalized["checks"]))
+
     merge_state = pull_request["merge_state_status"]
     if pull_request["mergeable"] == "UNKNOWN" or merge_state == "UNKNOWN":
         wait_reasons.append("mergeability_unknown")
@@ -577,26 +786,42 @@ def decide_action(evidence: Mapping[str, Any]) -> StewardDecision:
         wait_reasons.append("merge_blocked")
     elif merge_state == "UNSTABLE":
         wait_reasons.append("merge_state_unstable")
-    elif merge_state not in {"CLEAN", "HAS_HOOKS"}:
+    elif merge_state != "CLEAN":
         wait_reasons.append("merge_state_not_ready")
+
     if wait_reasons:
         return StewardDecision(
-            "wait", tuple(dict.fromkeys(wait_reasons)), **identity
+            "wait",
+            tuple(dict.fromkeys(wait_reasons)),
+            **identity,
         )
-    return StewardDecision("queue_merge", ("exact_head_green",), **identity)
+    return StewardDecision(
+        "queue_merge",
+        ("exact_head_green",),
+        **identity,
+    )
 
 
 def _sanitize_failed_logs(value: str, maximum_bytes: int) -> str:
     """Bound diagnostic logs and remove credential-looking assignments."""
 
-    cleaned = _sanitize_text(value, "failed_logs", max(maximum_bytes * 2, 1))
+    cleaned = _sanitize_text(
+        value,
+        "failed_logs",
+        max(maximum_bytes * 2, 1),
+    )
     redacted = "\n".join(
-        "[redacted credential-like line]" if CREDENTIAL_LINE.match(line) else line
+        "[redacted credential-like line]"
+        if CREDENTIAL_LINE.match(line)
+        else line
         for line in cleaned.splitlines()
     )
     encoded = redacted.encode("utf-8")
     if len(encoded) > maximum_bytes:
-        redacted = encoded[:maximum_bytes].decode("utf-8", errors="ignore")
+        redacted = encoded[:maximum_bytes].decode(
+            "utf-8",
+            errors="ignore",
+        )
     return redacted
 
 
@@ -606,13 +831,16 @@ def render_repair_prompt(
     *,
     max_log_bytes: int = DEFAULT_MAX_LOG_BYTES,
 ) -> str:
-    """Render a bounded repair brief that treats reviews and logs as untrusted data."""
+    """Render a bounded repair brief with untrusted review and Check data."""
 
     normalized = validate_evidence(evidence)
     decision = decide_action(normalized)
     logs = _sanitize_failed_logs(failed_logs, max_log_bytes)
     evidence_json = json.dumps(
-        normalized, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        normalized,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
     )
     return f"""Repair one exact-head pull request for Four Pillars.
 
@@ -640,7 +868,10 @@ Make the smallest coherent repair supported by repository tests and documentatio
 """
 
 
-def _load_json(path: Path, maximum_bytes: int = DEFAULT_MAX_SOURCE_BYTES) -> Any:
+def _load_json(
+    path: Path,
+    maximum_bytes: int = DEFAULT_MAX_SOURCE_BYTES,
+) -> Any:
     """Read one regular UTF-8 JSON file for a CLI operation."""
 
     payload = _read_regular_file(path, maximum_bytes)
@@ -650,14 +881,20 @@ def _load_json(path: Path, maximum_bytes: int = DEFAULT_MAX_SOURCE_BYTES) -> Any
         raise ValueError("input must be valid UTF-8 JSON") from exc
 
 
-def _write_github_output(path: Path | None, values: Mapping[str, Any]) -> None:
+def _write_github_output(
+    path: Path | None,
+    values: Mapping[str, Any],
+) -> None:
     """Append bounded single-line values to one trusted GitHub output file."""
 
     if path is None:
         return
     with path.open("a", encoding="utf-8", newline="\n") as handle:
         for key, value in values.items():
-            text = json.dumps(value, ensure_ascii=False) if isinstance(value, (list, dict)) else str(value)
+            if isinstance(value, (list, dict)):
+                text = json.dumps(value, ensure_ascii=False)
+            else:
+                text = str(value)
             if "\n" in text or "\r" in text:
                 raise ValueError(f"GitHub output {key} must be one line")
             handle.write(f"{key}={text}\n")
@@ -669,21 +906,33 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
 
-    select = commands.add_parser("select", help="select the oldest non-draft PR")
+    select = commands.add_parser(
+        "select",
+        help="select the oldest non-draft PR",
+    )
     select.add_argument("source", type=Path)
     select.add_argument("output", type=Path)
     select.add_argument("--github-output", type=Path)
 
-    canonicalize = commands.add_parser("canonicalize", help="validate evidence")
+    canonicalize = commands.add_parser(
+        "canonicalize",
+        help="validate evidence",
+    )
     canonicalize.add_argument("source", type=Path)
     canonicalize.add_argument("output", type=Path)
 
-    decide = commands.add_parser("decide", help="classify one exact-head snapshot")
+    decide = commands.add_parser(
+        "decide",
+        help="classify one exact-head snapshot",
+    )
     decide.add_argument("source", type=Path)
     decide.add_argument("output", type=Path)
     decide.add_argument("--github-output", type=Path)
 
-    prompt = commands.add_parser("prompt", help="render one bounded repair prompt")
+    prompt = commands.add_parser(
+        "prompt",
+        help="render one bounded repair prompt",
+    )
     prompt.add_argument("source", type=Path)
     prompt.add_argument("logs", type=Path)
     prompt.add_argument("output", type=Path)
@@ -691,16 +940,19 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Execute one deterministic selection, validation, decision, or prompt command."""
+    """Run one selection, validation, decision, or prompt command."""
 
     arguments = _build_parser().parse_args(argv)
     try:
         if arguments.command == "select":
             raw = _load_json(arguments.source)
-            records = raw.get("pull_requests") if isinstance(raw, Mapping) else raw
+            records = (
+                raw.get("pull_requests")
+                if isinstance(raw, Mapping)
+                else raw
+            )
             selected = select_oldest_non_draft(records)
-            document = {"selected": selected}
-            _write_private_json(arguments.output, document)
+            _write_private_json(arguments.output, {"selected": selected})
             _write_github_output(
                 arguments.github_output,
                 {
@@ -709,7 +961,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 },
             )
         elif arguments.command == "canonicalize":
-            write_canonical_evidence(arguments.source, arguments.output)
+            write_canonical_evidence(
+                arguments.source,
+                arguments.output,
+            )
         elif arguments.command == "decide":
             evidence = validate_evidence(_load_json(arguments.source))
             decision = decide_action(evidence)
@@ -719,16 +974,23 @@ def main(argv: Sequence[str] | None = None) -> int:
                 {
                     **decision.as_dict(),
                     "reasons": ",".join(decision.reasons),
-                    "same_repository": str(decision.same_repository).lower(),
+                    "same_repository": str(
+                        decision.same_repository
+                    ).lower(),
                 },
             )
         else:
             evidence = validate_evidence(_load_json(arguments.source))
-            logs = _read_regular_file(arguments.logs, DEFAULT_MAX_LOG_BYTES).decode(
-                "utf-8", errors="replace"
-            )
+            logs = _read_regular_file(
+                arguments.logs,
+                DEFAULT_MAX_LOG_BYTES,
+            ).decode("utf-8", errors="replace")
             prompt = render_repair_prompt(evidence, logs)
-            arguments.output.write_text(prompt, encoding="utf-8", newline="\n")
+            arguments.output.write_text(
+                prompt,
+                encoding="utf-8",
+                newline="\n",
+            )
             os.chmod(arguments.output, 0o600)
     except (OSError, TypeError, ValueError) as exc:
         print(f"pr steward decision failed: {exc}", file=sys.stderr)
