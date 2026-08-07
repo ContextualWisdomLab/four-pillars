@@ -2,148 +2,143 @@
 
 ## Claim boundary
 
-The steward automates bounded repository maintenance. It does not prove semantic
-correctness, replace independent review, establish that an LLM repair is safe,
-or grant a model authority to approve, merge, release, or deploy. GitHub branch
-protection, required reviews, unresolved-conversation policy, exact-head Checks,
-deterministic tests, security scanning, and human escalation remain authoritative.
+The minute-07 steward is a repository-maintenance control plane for both
+**standalone** Four Pillars operation and **modular** MSA reuse by central
+`.github`, `naruon`, and other ContextualWisdomLab repositories. It does not prove
+semantic correctness, replace independent review, establish that an LLM repair
+is safe, or grant a model authority to approve, merge, release, or deploy.
 
-A successful digest proves artifact identity, not meaning. A successful test
-suite proves only the encoded test contract. Automated review can miss defects
-or produce false positives. LLM-generated changes remain untrusted until a fresh
-credential-free verifier executes the exact patch and ordinary repository
-governance accepts the resulting head.
+A digest proves artifact identity, not meaning. A green test suite proves only
+its encoded contract. Automated reviewers and LLMs can miss defects or create
+false positives. Branch protection, exact-head Checks, current review state,
+current unresolved threads, deterministic tests, Security Scan, SAST, and human
+escalation remain authoritative.
 
-The controls described here support future CSAP and SOC 2 readiness. Four
-Pillars has not undergone the required independent assessment, and this document
+The controls below support future CSAP and SOC 2 evidence collection. This file
 is **not a certification**, attestation, audit report, legal opinion, or claim of
 conformity with CSAP, SOC 2, ISO/IEC 42001, ISO/IEC 23894, or NIST publications.
 
+## Trust-zone design
+
+```mermaid
+flowchart LR
+    I[Read-only inspector] --> D[Deterministic decision]
+    D -->|wait| H[Next hourly observation]
+    D -->|repair| P[NVIDIA NIM / OpenCode proposer]
+    P --> A[Immutable bounded patch]
+    A --> V[Fresh uncredentialed verifier]
+    V --> U[Non-executing publisher]
+    U -->|normal fast-forward commit| H
+    D -->|queue_merge| M[Late App-token merge gate]
+    M --> G[GitHub governed squash auto-merge]
+```
+
+The model runner receives only `NVIDIA_NIM_API_KEY`. It receives no GitHub,
+OIDC, Actions runtime/cache, command-file, reviewer, publication, or merge
+credential. `COPILOT_GITHUB_TOKEN` is prohibited. The verifier receives neither
+model nor publication credentials. The publisher executes no proposed code and
+mints the existing repository-scoped Maintainer App token only after exact
+artifact and branch revalidation.
+
 ## Source-to-control trace
 
-| Design decision | Evidence | Implemented control |
+| Decision | Evidence basis | Repository control |
 |---|---|---|
-| Keep generated changes inside normal PR governance | GitHub protected-branch and auto-merge documentation | The steward queues normal squash auto-merge with an exact-head match and never uses `--admin`, submits approval, dismisses review, tags, releases, or deploys. |
-| Use short-lived, least-privilege mutation credentials | GitHub App authentication and Actions hardening documentation | The established repository-scoped Maintainer App token is minted only in non-model publisher/merge jobs after immutable evidence revalidation. |
-| Treat build inputs and automation outputs as untrusted | GitHub Actions hardening; NIST SP 800-218; NIST SP 800-218A | Review/Check data is schema-validated, byte-bounded, Unicode-normalized, and explicitly labelled untrusted. Proposed code executes only on a fresh verifier without model or publication credentials. |
-| Separate preparation, verification, and authority | NIST SP 800-218/218A; ISO/IEC 42001:2023; ISO/IEC 23894:2023 | Read-only inspection, NIM-only proposal, fresh verification, non-executing publication, and governed merge are separate jobs and credential zones. |
-| Preserve operational evidence without blanket PII masking | CSAP scope/evidence framing; AICPA Trust Services Criteria privacy/confidentiality concepts | Evidence is purpose-limited to one PR and excludes birth inputs, customer records, report content, emails, credentials, environment values, production artifacts, and unrelated issues. Useful Korean diagnostics remain readable. |
-| Keep evidence available only as long as needed | GitHub Actions artifact controls; minimization and retention principles | Evidence and repair artifacts use **one-day retention** and owner-only canonical JSON before upload. |
-| Allocate model compute to bounded task complexity | Fugu; Conductor; TRINITY | One exact-head repair starts as one routed worker. Selection, verification, publication, and merge remain deterministic roles. Deeper conduct requires a separately reviewed ablation. |
-| Preserve deterministic facts above generated narrative | Existing Four Pillars calculation architecture | The steward may repair code/tests but cannot override chart facts, fingerprints, calendar boundaries, or quality policy. |
-| Preserve complete release evidence | ISO/IEC 25010:2023 and project release policy | Every repair runs both Python lanes, product-gap, lint/docstring, compile, document/prompt, 100% statement/branch coverage, package, container, security, and SAST gates. |
+| Keep changes inside ordinary PR governance | GitHub protected-branch and auto-merge documentation | The steward uses exact-head squash auto-merge and never uses `--admin`, approval, review dismissal, force push, tag, release, or deployment. |
+| Use short-lived least privilege | GitHub App authentication and Actions hardening | App credentials are minted only in publisher and merge jobs after immutable evidence validation. |
+| Treat automation inputs as untrusted | GitHub Actions hardening; NIST SP 800-218; NIST SP 800-218A | Review text and failed logs are strict-schema, byte-bounded untrusted evidence; proposed code runs only on a fresh verifier. |
+| Separate preparation, verification, and authority | NIST SP 800-218/218A; ISO/IEC 42001:2023; ISO/IEC 23894:2023 | Inspection, NIM proposal, credential-free verification, non-executing publication, and merge are separate jobs. |
+| Preserve useful diagnostics without blanket masking | CSAP evidence framing; AICPA Trust Services Criteria | Collection excludes customer data and secrets while retaining bounded Korean source/review diagnostics. |
+| Minimize retention | GitHub artifact controls and data-minimization principles | Evidence and repair artifacts use **one-day retention**. |
+| Bind every handoff | Secure change-management and integrity principles | PR number, head/base SHA, numeric artifact ID, server digest, patch SHA-256, file/byte counts, and Git modes are revalidated. |
+| Allocate model compute by task | Fugu; Conductor; TRINITY | One bounded repair starts with one routed worker; deterministic selection, verification, publication, and merge are separate roles. |
+| Preserve release evidence | ISO/IEC 25010:2023 and repository policy | Python 3.11/3.12, 100% statement and branch coverage, docstrings, package, container, security, and SAST gates remain mandatory. |
 
 ## Current standards status reviewed on 2026-08-07
 
-NIST SP 800-218 Version 1.1 remains the final SSDF publication. NIST published
-SP 800-218 Rev. 1 as the initial public draft of SSDF Version 1.2 on December 17,
-2025; the public-comment period is closed, so the draft is informative rather
-than a final compliance baseline. NIST SP 800-218A is final and augments SSDF
-with AI-model-development practices. The steward therefore cites final SP
-800-218 and SP 800-218A as normative engineering guidance and tracks the 1.2
-draft for future reviewed adoption.
+NIST SP 800-218 Version 1.1 remains final. NIST published SP 800-218 Rev. 1 as
+the initial public draft of SSDF Version 1.2 on December 17, 2025; its public
+comment period is closed, so the draft is informative rather than a final
+compliance baseline. NIST SP 800-218A is final and augments SSDF for AI-model
+development. Four Pillars therefore uses final SP 800-218 and SP 800-218A as
+engineering guidance and tracks the Version 1.2 draft for later reviewed
+adoption.
 
-KISA describes CSAP as a statutory certification process for covered cloud
-services and publishes formal assessment, remediation, committee, certificate,
-and recurring-surveillance steps. Engineering documentation can prepare control
-evidence, but only the designated assessment and certification process can
+KISA describes CSAP as a statutory certification process with application,
+assessment, remediation, committee, certificate, and recurring surveillance
+steps. Repository controls can prepare evidence; only the designated process can
 issue CSAP certification.
 
 AICPA describes SOC 2 as an examination of a service organization's system and
 controls relevant to security, availability, processing integrity,
-confidentiality, or privacy. The 2017 Trust Services Criteria with revised 2022
-points of focus are criteria for attestation or consulting engagements. Internal
-checklists or automation cannot self-issue a SOC 2 report.
-
-## GitHub governance reviewed
-
-GitHub auto-merge waits for configured branch-protection and required Check
-conditions. The steward therefore queues auto-merge rather than polling until it
-can perform an administrative merge. It never submits approval or dismisses a
-review.
-
-GitHub App installation tokens are short-lived and limited by both the App
-installation and requested permissions. The steward reuses the established Four
-Pillars Maintainer App identity and requests only repository contents and
-pull-request mutation needed for one normal repair push or governed merge. It
-does not rename, reuse, or expose existing reviewer-agent credentials.
-
-Pull-request bodies, review text, branch names, workflow outputs, logs, and
-contributed code can be attacker controlled. The inspector never interpolates
-review bodies into shell syntax. A trusted standard-library parser canonicalizes
-strict JSON. OpenCode receives that evidence only after GitHub, OIDC, Actions
-runtime/cache, command-file, reviewer, and publication channels are removed.
+confidentiality, or privacy. The Trust Services Criteria support attestation or
+consulting work; internal automation cannot self-issue a SOC 2 report.
 
 ## PII and confidentiality alternative to blanket masking
 
-PII masking is not used as a universal control because indiscriminate redaction
-would destroy code paths, Korean diagnostics, stack traces, and reviewer context
-needed to repair failures. The replacement control set is:
+Blanket PII masking is not used for source, Korean diagnostics, review text, or
+stack traces because it would make repairs unreliable. The replacement is:
 
-1. **Purpose limitation:** only exact PR identity, review states/threads, Check
-   states, and bounded failed-job logs.
-2. **Data exclusion:** no customer birth data, user context, generated reports,
-   model traces, artifact paths, email addresses, API keys, tokens, environment
-   dumps, or unrelated issue content.
+1. **Purpose limitation:** only exact PR identity, reviews, threads, Check states,
+   and bounded failed-job diagnostics.
+2. **Data exclusion:** no birth input, user context, generated report, model
+   trace, artifact path, customer record, email address, API key, token,
+   environment dump, or unrelated issue.
 3. **Least privilege:** read-only inspector, `NVIDIA_NIM_API_KEY`-only proposer,
    uncredentialed verifier, and late repository-scoped App token.
-4. **Content controls:** strict schemas, allow-listed URLs/identifiers, Unicode
-   normalization, control/bidirectional removal, byte/item caps, symlink and
-   gitlink rejection, and credential-looking log-line redaction.
+4. **Content controls:** strict schemas, allow-listed URLs and identifiers,
+   Unicode normalization, control/bidirectional removal, item/byte caps,
+   credential-looking log-line redaction, and symlink/gitlink rejection.
 5. **Retention:** one-day retention for evidence and repair artifacts.
-6. **Integrity and audit:** exact head/base, numeric artifact ID, server digest,
-   patch SHA-256, file/byte counts, Git modes, normal commits, review history,
-   and GitHub Actions logs.
+6. **Integrity and audit:** exact SHA/digest binding, normal commits, review
+   history, Check history, GitHub Actions logs, and deterministic reason codes.
 7. **Change management:** no force push, self-approval, review dismissal,
    administrative merge, tag, release, or deployment.
 
 ## Orchestration research application
 
-**Fugu.** Fugu motivates routing between direct model use and deeper coordinated
-execution rather than applying one expensive pattern to every task. One bounded
-repair defaults to a single routed worker.
+**Fugu** motivates routing between direct model work and deeper coordinated
+execution. A single exact-head repair defaults to a single routed worker.
 
-**Conductor.** Conductor motivates explicit decomposition, access lists, and
-controlled delegation. The steward fixes stages and denies task delegation
-inside OpenCode. Any future contextual-orchestrator adapter must preserve the
-same evidence and credential boundaries.
+**Conductor** motivates explicit decomposition, access lists, and controlled
+delegation. The steward fixes the stages and denies task delegation inside
+OpenCode.
 
-**TRINITY.** TRINITY motivates specialized thinker, worker, verifier, and
-synthesis roles. Here the model is only a worker/proposer; deterministic
-selection, verification, publication, and GitHub governance are independent
-roles. Private chain-of-thought is not operational evidence.
+**TRINITY** motivates specialized thinker, worker, verifier, and synthesis roles.
+The model is only a worker/proposer; deterministic selection, verification,
+publication, and GitHub governance are independent roles. Private
+chain-of-thought is not operational evidence.
 
-These sources support design hypotheses, not a claim that multi-agent
-orchestration improves every repair. A future ablation must compare routed and
-bounded-conducted execution on the same PR fixtures, tests, provider-reported
-usage, failure rates, review outcomes, and security findings. Speed is not the
-optimization target, but cost bounds and reproducibility remain mandatory.
+These papers support design hypotheses, not a claim that multi-agent conduct
+improves every repair. A future ablation must compare routed and bounded-conduct
+execution on identical PR fixtures, deterministic tests, provider-reported
+usage, review outcomes, failure rates, and security findings. Speed is not the
+primary objective, but reproducibility and bounded cost remain mandatory.
 
 ## Residual risks
 
-- The ephemeral verifier has ordinary network egress unless runner networking is
-  separately constrained.
-- Malicious tests may consume resources or probe the runner; timeouts, secret
-  removal, and fresh runners reduce but do not eliminate the risk.
-- Prompt injection may be present in reviews or failed logs; schema validation
-  and explicit untrusted-data boundaries do not prove model obedience.
-- Compromise of the repository Maintainer App remains a publication risk; late,
-  short-lived tokens do not replace key rotation, installation review, and audit.
-- GitHub API, runner, or reviewer outages can delay merge; unknown state fails
-  closed and is observed again on the next hourly run.
+- An ephemeral verifier has ordinary egress unless runner networking is further
+  constrained.
+- Malicious tests can consume resources or probe the runner; fresh runners,
+  timeouts, and secret removal reduce but do not eliminate this risk.
+- Prompt injection can exist in reviews and logs; schema validation and explicit
+  untrusted-data labels do not prove model obedience.
+- A compromised Maintainer App remains a mutation risk; short-lived late tokens
+  do not replace key rotation, installation review, and audit.
+- GitHub API, runner, or reviewer outages delay progress. Unknown state fails
+  closed and is observed on the next hourly run.
 - Green Checks can coexist with untested behavior; realistic domain fixtures and
-  independent review remain mandatory.
-- `semgrep scan --config auto` may use remote rule resolution when locally
-  available; repository-required SAST remains the authoritative post-publication
-  exact-head Check.
+  independent review remain necessary.
+- Locally available `semgrep scan --config auto` may resolve remote rules;
+  repository-required exact-head SAST remains authoritative.
 
 ## Research-service limitation
 
 Consensus was queried on 2026-08-07 for recent autonomous secure-software-agent
 research, but the connected account reported its monthly quota exhausted. No
 paper result from that query is represented as evidence. Primary official
-sources and the repository's already catalogued Fugu, Conductor, and TRINITY
-sources were used instead.
+sources and the repository's existing Fugu, Conductor, and TRINITY sources were
+used instead.
 
 ## APA 7th references
 
