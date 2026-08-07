@@ -9,7 +9,7 @@ from four_pillars import __version__
 from four_pillars.api import app
 
 RELEASE_VERSION = "0.8.0"
-RELEASE_DATE = "2026-08-06"
+RELEASE_DATE = "2026-08-07"
 
 
 def test_release_version_is_consistent_across_public_surfaces() -> None:

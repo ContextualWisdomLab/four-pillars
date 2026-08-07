@@ -6,6 +6,15 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ## [Unreleased]
 
+### Planned
+
+- PostgreSQL and object-storage adapters for horizontally scalable multi-node deployments.
+- Additional independent golden-chart fixtures near solar-term boundaries.
+- RFC 9457 Problem Details and W3C Trace Context propagation through a separately versioned compatibility change.
+- Stage-aware test-time compute allocation and ablation across routed and conducted interpretation stages.
+
+## [0.8.0] - 2026-08-07
+
 ### Added
 
 - A proposal-only hourly OpenCode development workflow at minute 47 using `NVIDIA_NIM_API_KEY`, bounded NVIDIA NIM model fallback, a zero-open-PR single-flight gate, and separate proposal, verification, and publication runners.
@@ -23,12 +32,11 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 - The fresh publisher executes no proposed code, validates exact artifact ID, digest, base SHA, patch digest, byte/file limits, and Git modes, parses bounded metadata, then mints a repository-scoped Maintainer App token only for one branch and one pull request.
 - `COPILOT_GITHUB_TOKEN` remains prohibited for model execution, and existing review-agent identities and credential names are unchanged.
 
-### Planned
+### Release assurance
 
-- PostgreSQL and object-storage adapters for horizontally scalable multi-node deployments.
-- Additional independent golden-chart fixtures near solar-term boundaries.
-- RFC 9457 Problem Details and W3C Trace Context propagation through a separately versioned compatibility change.
-- Stage-aware test-time compute allocation and ablation across routed and conducted interpretation stages.
+- The hourly OpenCode control plane runs at minute 47 through a three-runner proposal, verification, and publication boundary with an immutable handoff.
+- Direct model execution uses only `NVIDIA_NIM_API_KEY`; `COPILOT_GITHUB_TOKEN` remains prohibited and existing reviewer credentials are unchanged.
+- Release evidence includes APA 7 doctoring, no merge from the model workflow, and 100% statement and branch coverage.
 
 ## [0.8.0] - 2026-08-06
 
