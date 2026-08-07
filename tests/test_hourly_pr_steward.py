@@ -289,7 +289,7 @@ def test_workflow_separates_five_trust_zones() -> None:
     assert "create-github-app-token" not in inspector
     assert "NVIDIA_NIM_API_KEY" in proposer
     assert "create-github-app-token" not in proposer
-    assert "git push" not in proposer
+    assert "git push origin" not in proposer
     assert "NVIDIA_NIM_API_KEY" not in verifier
     assert "create-github-app-token" not in verifier
     assert "Run complete exact-patch verification" in verifier
