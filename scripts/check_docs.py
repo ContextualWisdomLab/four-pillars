@@ -9,6 +9,9 @@ REQUIRED = (
     "CHANGELOG.md",
     "SECURITY.md",
     "CONTRIBUTING.md",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "ARCHITECTURE.md",
     "docs/product/PRD.md",
     "docs/technical/TRD.md",
     "docs/technical/CALCULATION.md",
@@ -17,6 +20,11 @@ REQUIRED = (
     "docs/operations/NIM.md",
     "docs/operations/RUNBOOK.md",
     "docs/operations/HOURLY_PRODUCT_LOOP.md",
+    "docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md",
+    "docs/operations/HOURLY_PR_STEWARD.md",
+    "docs/doctoring/hourly-nim-opencode-development.md",
+    "docs/doctoring/hourly-pr-steward.md",
+    "docs/doctoring/kasi-solar-term-golden-fixtures.md",
     "docs/standards/REFERENCES.md",
     "docs/standards/TRACEABILITY.md",
     "docs/uml/architecture.md",
@@ -46,11 +54,27 @@ STANDARDS_TOKENS = {
         "100% statement and branch coverage",
         "traditional interpretation",
     ),
+    "docs/doctoring/hourly-pr-steward.md": (
+        "APA 7th",
+        "NIST SP 800-218",
+        "NIST SP 800-218A",
+        "ISO/IEC 23894:2023",
+        "ISO/IEC 42001:2023",
+        "CSAP",
+        "SOC 2",
+        "Fugu",
+        "Conductor",
+        "TRINITY",
+        "not a certification",
+        "NVIDIA_NIM_API_KEY",
+        "one-day retention",
+    ),
 }
 
 
 def main() -> None:
     """Fail when required doctoring is missing, too short, or incomplete."""
+
     failures: list[str] = []
     for name in REQUIRED:
         path = Path(name)
