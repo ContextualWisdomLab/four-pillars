@@ -123,7 +123,7 @@ class Chart(BaseModel):
     current_jie: SolarTerm
     next_jie: SolarTerm
     boundary_warnings: list[str]
-    calculation_version: str = "calendar-1.0.0"
+    calculation_version: str = "calendar-1.1.0"
     fingerprint: str
 
 
