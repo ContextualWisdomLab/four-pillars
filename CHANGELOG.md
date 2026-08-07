@@ -6,6 +6,23 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ## [Unreleased]
 
+### Added
+
+- A proposal-only hourly OpenCode development workflow at minute 47 using `NVIDIA_NIM_API_KEY`, bounded NVIDIA NIM model fallback, a zero-open-PR single-flight gate, and separate proposal, verification, and publication runners.
+- A trusted PR-message parser that rejects symlinks, non-regular files, malformed UTF-8, control and bidirectional characters, and UTF-8 byte-budget violations before publication credentials exist.
+- Root `ARCHITECTURE.md`, `CLAUDE.md`, expanded `AGENTS.md`, an operations runbook, APA 7 doctoring, and executable workflow-security contracts for standalone and modular MSA maintenance.
+
+### Changed
+
+- The deterministic minute-17 quality sentinel remains read-only and model-free; commercial product development is isolated in a separate minute-47 workflow that may create at most one pull request and never merges, approves, releases, or deploys.
+- Autonomous LLM increments must preserve immutable calculation evidence and evaluate single-model routing versus deep multi-agent execution with explicit stages, access lists, bounded recursion, role-specific reasoning effort, and ablation grounded in Fugu, Conductor, and TRINITY.
+
+### Security
+
+- The OpenCode runner receives NVIDIA NIM access but no GitHub write, OIDC, Actions runtime/cache, command-file, or reviewer credential; the fresh verifier receives neither model nor publication credentials.
+- The fresh publisher executes no proposed code, validates exact artifact ID, digest, base SHA, patch digest, byte/file limits, and Git modes, parses bounded metadata, then mints a repository-scoped Maintainer App token only for one branch and one pull request.
+- `COPILOT_GITHUB_TOKEN` remains prohibited for model execution, and existing review-agent identities and credential names are unchanged.
+
 ### Planned
 
 - PostgreSQL and object-storage adapters for horizontally scalable multi-node deployments.
