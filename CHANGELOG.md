@@ -30,6 +30,31 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 - RFC 9457 Problem Details and W3C Trace Context propagation through a separately versioned compatibility change.
 - Stage-aware test-time compute allocation and ablation across routed and conducted interpretation stages.
 
+## [0.8.0] - 2026-08-06
+
+### Added
+
+- An hourly OpenCode product-development control plane scheduled at minute 47 that uses `NVIDIA_NIM_API_KEY`, bounded NVIDIA NIM model fallback, and a zero-open-PR single-flight gate to propose exactly one buyer-visible increment.
+- A three-runner trust boundary separating the model-bearing proposal runner, the uncredentialed exact-artifact verifier, and the non-executing publication runner.
+- An immutable handoff contract binding the exact base SHA, numeric artifact ID, artifact digest, patch SHA-256, changed-file count, diff-byte budget, and Git modes before verification or publication.
+- A trusted PR-message parser that rejects symlinks, non-regular files, malformed UTF-8, control and bidirectional characters, and UTF-8 byte-budget violations before publication credentials exist.
+- Root `ARCHITECTURE.md`, `CLAUDE.md`, expanded `AGENTS.md`, an operations runbook, Mermaid control-plane diagrams, executable workflow-security contracts, and APA 7 doctoring for GitHub Actions, OpenCode, NVIDIA NIM, NIST SP 800-218, Fugu, Conductor, and TRINITY.
+
+### Changed
+
+- Package and API versions advance to `0.8.0`; deterministic calculation-policy, prompt, database, cursor, idempotency, report schema, browser-history, artifact, and standalone/modular MSA contracts remain unchanged.
+- The deterministic minute-17 quality sentinel remains read-only and model-free; commercial product development is isolated in the separate minute-47 workflow with no merge, approval, release, or deployment authority.
+- Autonomous LLM increments must preserve immutable calculation evidence and evaluate single-model routing versus deep multi-agent execution with explicit workflow stages, access lists, bounded recursive depth, role-specific reasoning effort, and reasoning-level ablation grounded in Fugu, Conductor, and TRINITY.
+- Exact-head CI continues to require Python 3.11 and 3.12 verification, container validation, dependency integrity, product-gap and documentation audits, public docstrings, package builds, and 100% statement and branch coverage.
+
+### Security
+
+- OpenCode model execution uses only `NVIDIA_NIM_API_KEY`; `COPILOT_GITHUB_TOKEN` remains prohibited and existing reviewer-agent identities, secret names, and provider routing are unchanged.
+- The proposal runner receives no GitHub write token, OIDC token, Actions runtime/cache channel, GitHub command-file channel, reviewer credential, or publication credential; fallback dependency installation explicitly removes the NIM secret.
+- The verifier receives neither model nor publication credentials, removes GitHub/OIDC/Actions runtime and command-file variables before every proposed verification command, and proves the post-verification patch digest is unchanged.
+- The publisher executes no proposed code, validates artifact and patch identities plus queue and live-base state, preserves a trusted metadata parser before applying the proposal, and mints a repository-scoped Maintainer App token only for one branch and one pull request.
+- Symlink and gitlink proposals are rejected, artifact identifiers and digests are validated lexically before API use, and remote branch inventory distinguishes absence from lookup failure so publication fails closed.
+
 ## [0.7.0] - 2026-08-06
 
 ### Added
@@ -167,7 +192,8 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 - Calculation data is the immutable source of truth; model output may interpret but cannot replace pillars, date boundaries, Ten Gods, interactions, or the calculation fingerprint.
 - Hosted model and evaluation model identifiers remain deployment configuration so operators can choose a currently available free NVIDIA NIM model.
 
-[Unreleased]: https://github.com/ContextualWisdomLab/four-pillars/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/ContextualWisdomLab/four-pillars/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/ContextualWisdomLab/four-pillars/releases/tag/v0.8.0
 [0.7.0]: https://github.com/ContextualWisdomLab/four-pillars/releases/tag/v0.7.0
 [0.6.0]: https://github.com/ContextualWisdomLab/four-pillars/releases/tag/v0.6.0
 [0.5.0]: https://github.com/ContextualWisdomLab/four-pillars/releases/tag/v0.5.0
