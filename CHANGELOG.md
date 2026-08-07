@@ -8,13 +8,24 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ### Added
 
+- An hourly exact-head pull-request steward scheduled at minute 07 that selects only the oldest open non-draft PR, classifies bounded review and Check evidence as `wait`, `repair`, or `queue_merge`, and exposes the same contract through `workflow_call` for standalone or modular MSA use.
+- A deterministic standard-library PR-steward decision engine, realistic review/Check/fork/conflict fixtures, bounded Korean diagnostic preservation without blanket PII masking, and one-day immutable evidence/repair artifacts.
+- A five-zone trust boundary for read-only inspection, `NVIDIA_NIM_API_KEY`-only OpenCode repair, fresh credential-free verification, non-executing repair publication, and late-bound governed squash auto-merge.
 - Independent KASI/NAOJ 2026 golden fixtures for all twelve month-changing solar terms, enforcing a two-minute timing budget and five-minute year/month pillar transition checks without network or test-only ephemeris dependencies.
 - Offline authority-fixture governance that detects missing evidence, provenance, tolerance, traceability, and calculation-version contracts in the hourly product-gap audit.
 
 ### Changed
 
+- The three hourly control-plane loops are non-overlapping: exact-head PR stewardship at minute 07, deterministic model-free quality validation at minute 17, and buyer-gap OpenCode proposal at minute 47.
+- The steward reuses existing reviewer identities and Maintainer App credential names, publishes only normal fast-forward repair commits, recollects the unchanged exact head before merge, and never approves, dismisses review, bypasses branch protection, force-pushes, tags, releases, or deploys.
 - Apparent solar longitude now uses a bounded VSOP87 Earth series in Terrestrial Time with FK5, nutation, and aberration corrections; deterministic calculation evidence advances to `calendar-1.1.0`.
 - Calculation and standards doctoring now trace the official Korean calendar basis, independent NAOJ cross-check, IERS time-scale policy, JPL DE440 claim boundary, signed before/after model errors, and residual historical-time risks.
+
+### Security
+
+- Review text and failed-job logs are purpose-limited, allow-listed, Unicode-normalized, byte-bounded untrusted evidence; customer birth data, generated reports, emails, credentials, environment values, unrelated issues, and production artifacts are excluded rather than indiscriminately masked.
+- Repair proposals bind PR number, exact head/base SHAs, numeric artifact ID, artifact digest, patch SHA-256, file/byte counts, and Git modes. Model execution receives no GitHub, OIDC, Actions runtime/cache, command-file, reviewer, publication, or merge credential.
+- CSAP and SOC 2 are treated as future control-evidence objectives, not certification claims; least privilege, short retention, immutable audit trails, normal change management, and fail-closed API/branch revalidation are documented in APA 7 doctoring.
 
 ### Planned
 
@@ -165,7 +176,7 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ### Added
 
-- Deterministic Four Pillars calculation for solar and Korean lunar input, IANA time zones, optional solar-time correction, Li Chun year boundaries, twelve month-changing solar terms, year, month, day, and hour pillars, Ten Gods, hidden stems, Twelve Growth Stages, element balance, interactions, and evidence fingerprints.
+- Deterministic Four Pillars calculation for solar and Korean lunar input, IANA time zones, optional solar-time correction, Li Chun year boundaries, twelve month-changing solar terms, year, month, day, and hour pillars, Ten Gods, hidden stems, Twelve Growth Stages, element balance, combinations and clashes, and evidence fingerprints.
 - Deterministic daewoon, annual luck, and monthly luck output with explicit date boundaries and interaction evidence.
 - Versioned natal, daewoon, annual, monthly, practical-skills, synthesis, editorial-repair, and LLM-judge prompts for NVIDIA NIM.
 - Schema-validated NVIDIA NIM generation with bounded network retries, bounded repair, prompt hashes, and no silent provider fallback.

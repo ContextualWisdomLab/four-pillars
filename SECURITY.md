@@ -12,7 +12,7 @@ Do not open a public issue for a vulnerability that could expose birth data, gen
 
 Birth date, birth time, location, calendar choice, relationship notes, work notes, and generated reports can identify a person or reveal sensitive circumstances. Production deployments must encrypt transport, restrict storage access, set a retention period, avoid logging raw prompts or reports, and provide deletion.
 
-`NVIDIA_NIM_API_KEY`, `CONTEXTUAL_ORCHESTRATOR_TOKEN`, API authentication values, database credentials, and organization gateway credentials must be stored as secrets and never committed. Direct NVIDIA NIM and Contextual Orchestrator credentials are separate trust boundaries and must not be substituted, forwarded, or copied into one another's configuration.
+`NVIDIA_NIM_API_KEY`, `CONTEXTUAL_ORCHESTRATOR_TOKEN`, API authentication values, database credentials, Maintainer App private keys, reviewer-agent credentials, and organization gateway credentials must be stored as secrets and never committed. Direct NVIDIA NIM and Contextual Orchestrator credentials are separate trust boundaries and must not be substituted, forwarded, or copied into one another's configuration. `COPILOT_GITHUB_TOKEN` is not a permitted model credential.
 
 ## Security boundaries
 
@@ -24,14 +24,26 @@ Usage attribution must never contain subject labels, birth data, user notes, cal
 
 HTML is escaped, artifact names are allow-listed, UUID directories prevent personal data in filenames, and API keys are compared through SHA-256 digests using constant-time comparison. Public report-history views and cursors exclude stored requests, private context, fingerprints, idempotency material, generated copy, traces, and internal paths.
 
+## GitHub automation security
+
+The minute-07 exact-head PR steward, minute-17 deterministic quality sentinel, and minute-47 NVIDIA NIM product proposer are separate non-overlapping control planes.
+
+The PR steward collects only exact PR identity, submitted review states, review-thread state, exact-head Check summaries, and bounded failed-job diagnostics. Blanket PII masking is not used because it would destroy source and Korean diagnostic evidence needed to repair failures. Instead the workflow excludes customer birth inputs, generated reports, emails, credentials, environment values, production artifacts, and unrelated issues; enforces strict schemas, Unicode and byte bounds, credential-looking log-line removal, one-day retention, and exact artifact/head/base integrity.
+
+OpenCode receives only `NVIDIA_NIM_API_KEY` and explicitly untrusted evidence. It receives no GitHub, OIDC, Actions runtime/cache, command-file, reviewer, publication, or merge credential. The fresh verifier receives neither model nor publication credentials. The publisher executes no proposed code and mints the existing repository-scoped Maintainer App token only after immutable-patch verification. Repair publication is a normal fast-forward commit; force push is forbidden. Governed merge recollects the unchanged exact head and may queue ordinary squash auto-merge, but cannot approve, dismiss review, use administrative bypass, tag, release, or deploy.
+
+Existing central `.github` and repository reviewer-agent identity, secret names, and provider routing are not modified by the steward.
+
 ## Deployment responsibilities
 
 Production deployments must use TLS for the public API and non-loopback model gateways, restrict egress to approved providers, rotate secrets, separate API and worker permissions, encrypt backups, and document provider or orchestrator subprocessors, data residency, retention, and incident obligations.
 
-A central `.github`, `naruon`, or platform deployment may add organization controls, but it must not bypass the repository's deterministic, privacy, quality, or no-fallback contracts. Hosted model secrets are excluded from ordinary pull-request, hourly, release, and untrusted-fork workflows.
+A central `.github`, `naruon`, or platform deployment may add organization controls, but it must not bypass the repository's deterministic, privacy, quality, exact-head, or no-fallback contracts. Hosted model secrets are excluded from ordinary pull-request, deterministic hourly, release, and untrusted-fork workflows.
+
+CSAP and SOC 2 requirements must be handled as formal control and evidence programs. Repository controls can support readiness, but only designated assessors and the applicable certification or attestation process can issue a CSAP certificate or SOC 2 report. No document or badge may imply certification without that evidence.
 
 ## Verification
 
 Required checks include Ruff, compilation, document and prompt validation, all offline tests with exactly 100 percent statement and branch coverage, package and container builds, Security Scan, and Semgrep. Hosted tests are opt-in: direct NIM tests use the GitHub Secret `NVIDIA_NIM_API_KEY`; a hosted Contextual Orchestrator test requires a separately managed gateway token and deployment.
 
-The standards and research control mapping is maintained in `docs/standards/REFERENCES.md` and `docs/standards/TRACEABILITY.md`. That mapping supports engineering governance but is not an accredited security or AI-management certification.
+The standards and research control mapping is maintained in `docs/standards/REFERENCES.md`, `docs/standards/TRACEABILITY.md`, and the feature-specific `docs/doctoring` records. That mapping supports engineering governance but is not an accredited security, cloud, privacy, or AI-management certification.

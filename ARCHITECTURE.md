@@ -15,9 +15,12 @@ standalone service or as a modular MSA component inside ContextualWisdomLab.
    Pydantic schemas and deterministic quality gates.
 4. **Ports preserve modularity.** Persistence, interpretation, report history,
    idempotency, and artifact publishing are structural interfaces.
-5. **Automation proposes; governance decides.** Hourly OpenCode development may
-   create one pull request, but it has no merge, release, deployment, or reviewer
-   identity.
+5. **Automation proposes; governance decides.** OpenCode can propose bounded
+   product or repair patches, but it has no review, approval, merge, release,
+   deployment, or reviewer identity.
+6. **Exact-head identity crosses every control-plane boundary.** Review evidence,
+   patches, verification, publication, and merge bind the PR number, head SHA,
+   base SHA, artifact identity, digest, file count, byte count, and Git modes.
 
 ## Mermaid system view
 
@@ -33,7 +36,9 @@ flowchart LR
     CO[Contextual Orchestrator]
     Worker[Report worker]
     Review[PR review and exact-head Checks]
-    Hourly[Hourly OpenCode proposal loop]
+    Quality[Minute-17 deterministic sentinel]
+    Product[Minute-47 OpenCode product proposer]
+    Steward[Minute-07 exact-head PR steward]
 
     User --> API
     API --> Calc
@@ -44,8 +49,10 @@ flowchart LR
     Worker -->|explicit nvidia_nim| NIM
     Worker -->|explicit contextual_orchestrator| CO
     Worker --> Artifacts
-    Hourly -->|one bounded PR only| Review
-    Review -->|human/governance merge| API
+    Quality --> Review
+    Product -->|one bounded PR only when queue is empty| Review
+    Steward -->|wait, verified repair, or governed auto-merge| Review
+    Review -->|unchanged green head| API
 ```
 
 ## Data plane
@@ -63,16 +70,44 @@ calculation package.
 
 ## Control plane
 
-The minute-17 hourly quality loop is a deterministic sentinel. The minute-47
-hourly NVIDIA NIM OpenCode loop is a proposal-only developer. Its three fresh
-runners separate model execution, uncredentialed verification, and late-bound
-publication. The publisher reconstructs an immutable patch without executing
-proposed code, then uses a repository-scoped Maintainer App to open one pull
-request.
+The minute-17 hourly quality loop is a deterministic, model-free sentinel. The
+minute-47 NVIDIA NIM/OpenCode loop selects one buyer-visible product Gap only
+when open-PR inventory is readable and empty. Its proposal, credential-free
+verification, and non-executing publication runners are isolated; the publisher
+may open one PR but cannot approve, merge, tag, release, or deploy.
+
+The minute-07 exact-head PR steward advances at most the oldest open non-draft
+PR. Its deterministic decision engine consumes a strict versioned JSON snapshot
+and returns `wait`, `repair`, or `queue_merge`. Review text and failed-job logs are
+bounded untrusted evidence, not executable instructions.
+
+```mermaid
+flowchart LR
+    I[Read-only inspector] --> D[Deterministic decision]
+    D -->|wait| H[Next hourly observation]
+    D -->|repair| P[NIM-only OpenCode proposer]
+    P --> A[Immutable full-index patch]
+    A --> V[Fresh uncredentialed verifier]
+    V --> U[Fresh non-executing publisher]
+    U -->|normal fast-forward commit| H
+    D -->|queue_merge| M[Late App-token merge gate]
+    M -->|branch protection, reviews, exact-head Checks| G[Governed squash merge]
+```
+
+The model runner receives `NVIDIA_NIM_API_KEY` but no GitHub, OIDC, Actions
+runtime/cache, command-file, publication, reviewer, or merge credential. The
+verifier receives neither model nor publication credentials and executes the
+exact patch on Python 3.11 and 3.12 before package, container, security, and SAST
+validation. The publisher reconstructs but never executes the patch, mints the
+existing repository-scoped Maintainer App token late, rechecks queue position and
+head/base identities, then performs one non-force repair push. The merge job
+recollects evidence and queues ordinary squash auto-merge with a head-commit
+match. It cannot approve, dismiss review, bypass branch protection, force push,
+tag, release, or deploy.
 
 Existing central `.github` and repository review agents keep their current
-identity and credential contracts. The product-development loop never approves,
-merges, tags, releases, or deploys.
+identity, secret names, and provider routing. The steward complements rather
+than replaces those reviewers.
 
 ## Standalone and modular MSA deployment
 
@@ -83,18 +118,33 @@ the same domain models and evidence fingerprint. `naruon` and other CWL products
 integrate through explicit HTTP or structural ports rather than importing
 private state.
 
-## Trust boundaries
+The PR steward is a repository control-plane module, not an application runtime
+dependency. Its workflow supports `workflow_call`, and its standard-library
+selection/decision contract can be consumed by central `.github`, `naruon`, or
+another repository. Disabling all GitHub automation does not affect the service,
+CLI, API, calculation core, worker, database, prompts, or report artifacts.
 
-- Birth data and report text are confidential application data.
+## Trust boundaries and PII strategy
+
+- Birth data and report text are confidential application data and never enter
+  PR-steward evidence.
 - Provider credentials stay in environment or secret management and never enter
   prompts, artifacts, traces, or attribution.
 - Contextual Orchestrator attribution contains organization labels only.
-- GitHub Actions model execution receives `NVIDIA_NIM_API_KEY` but no GitHub
-  write token, OIDC token, Actions runtime token, or reviewer credential.
+- Blanket masking is not used for operational source/review evidence because it
+  would destroy the diagnostics needed for repair. Instead, collection is
+  purpose-limited to one PR, allow-listed, Unicode-normalized, byte-bounded,
+  retained for one day, and stripped of customer data, emails, secrets, tokens,
+  environment values, report artifacts, and unrelated issues.
 - The verifier receives no model or publication credential.
 - The publisher receives no model credential and executes no proposed code.
+- Exact SHA and artifact digest binding, late short-lived App tokens, normal Git
+  history, and immutable GitHub audit logs support future CSAP and SOC 2 control
+  evidence; they do not constitute certification or attestation.
 
 Detailed operational and standards evidence lives in
 `docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md`,
-`docs/doctoring/hourly-nim-opencode-development.md`, and
+`docs/operations/HOURLY_PR_STEWARD.md`,
+`docs/doctoring/hourly-nim-opencode-development.md`,
+`docs/doctoring/hourly-pr-steward.md`, and
 `docs/standards/TRACEABILITY.md`.

@@ -1,0 +1,844 @@
+name: Hourly Exact-Head PR Steward
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Inspect and classify without model, publication, or merge mutation
+        required: false
+        default: false
+        type: boolean
+  workflow_call:
+    inputs:
+      default_branch:
+        description: Repository default branch
+        required: false
+        default: main
+        type: string
+      maintainer_app_client_id:
+        description: Existing repository-scoped Maintainer App client ID
+        required: false
+        default: ""
+        type: string
+    secrets:
+      NVIDIA_NIM_API_KEY:
+        required: false
+      FOUR_PILLARS_MAINTAINER_APP_PRIVATE_KEY:
+        required: false
+  schedule:
+    - cron: "7 * * * *"
+
+concurrency:
+  group: hourly-pr-steward-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+  pull-requests: read
+  statuses: read
+
+env:
+  DEFAULT_BRANCH: ${{ inputs.default_branch || 'main' }}
+  OPENCODE_VERSION: "1.17.13"
+  OPENCODE_SHA256: 157afa289d1a8d9372de0ce19ac726119b937a1f6b201808d46f06e4e59bb348
+  OPENCODE_MODELS: >-
+    nvidia-nim/nvidia/llama-3.3-nemotron-super-49b-v1.5
+    nvidia-nim/nvidia/nemotron-3-super-120b-a12b
+    nvidia-nim/deepseek-ai/deepseek-v4-pro
+  OPENCODE_RUN_TIMEOUT_SECONDS: "900"
+  OPENCODE_KILL_GRACE_SECONDS: "30"
+  MAX_CHANGED_FILES: "40"
+  MAX_DIFF_BYTES: "500000"
+  MAX_FAILED_LOG_BYTES: "100000"
+
+jobs:
+  inspect_pull_request:
+    name: Inspect oldest non-draft exact head
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      pull-requests: read
+      statuses: read
+    outputs:
+      selected: ${{ steps.select.outputs.selected }}
+      action: ${{ steps.policy.outputs.action || steps.select.outputs.action }}
+      reasons: ${{ steps.policy.outputs.reasons || steps.select.outputs.reasons }}
+      pr_number: ${{ steps.identity.outputs.pr_number || steps.select.outputs.pr_number }}
+      head_sha: ${{ steps.identity.outputs.head_sha }}
+      base_sha: ${{ steps.identity.outputs.base_sha }}
+      head_ref: ${{ steps.identity.outputs.head_ref }}
+      base_ref: ${{ steps.identity.outputs.base_ref }}
+      head_repository: ${{ steps.identity.outputs.head_repository }}
+      same_repository: ${{ steps.policy.outputs.same_repository }}
+      evidence_artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      evidence_artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
+    steps:
+      - name: Check out trusted default-branch control code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.DEFAULT_BRANCH }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Select exactly one oldest non-draft pull request
+        id: select
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          inventory="$RUNNER_TEMP/open-pull-requests.json"
+          queue="$RUNNER_TEMP/pr-queue.json"
+          selection="$RUNNER_TEMP/pr-selection.json"
+          if ! gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 101 \
+            --json number,createdAt,isDraft >"$inventory"; then
+            {
+              echo 'selected=false'
+              echo 'action=wait'
+              echo 'reasons=pull_request_inventory_unavailable'
+              echo 'pr_number='
+            } >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$(jq 'length' "$inventory")" -gt 100 ]; then
+            {
+              echo 'selected=false'
+              echo 'action=wait'
+              echo 'reasons=pull_request_inventory_pagination_incomplete'
+              echo 'pr_number='
+            } >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          jq '{pull_requests: [.[] | {number, created_at: .createdAt, is_draft: .isDraft}]}' \
+            "$inventory" >"$queue"
+          python scripts/pr_steward_decision.py select "$queue" "$selection" \
+            --github-output "$GITHUB_OUTPUT"
+          if [ "$(jq -r '.selected == null' "$selection")" = true ]; then
+            {
+              echo 'action=none'
+              echo 'reasons=no_non_draft_pull_request'
+            } >>"$GITHUB_OUTPUT"
+          fi
+
+      - name: Collect exact-head reviews, reviewThreads, statusCheckRollup, and failed-job logs
+        id: collect
+        if: steps.select.outputs.selected == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.select.outputs.pr_number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY%%/*}"
+          name="${GITHUB_REPOSITORY#*/}"
+          pr_json="$RUNNER_TEMP/pr.json"
+          graph_json="$RUNNER_TEMP/pr-graph.json"
+          errors="$RUNNER_TEMP/api-errors.txt"
+          failed_logs="$RUNNER_TEMP/failed-job.log"
+          : >"$errors"
+          : >"$failed_logs"
+
+          if ! gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" >"$pr_json"; then
+            echo 'pull_request_inventory_unavailable' >>"$errors"
+            printf '{}\n' >"$pr_json"
+          fi
+          if ! gh api graphql \
+            -f owner="$owner" -f name="$name" -F number="$PR_NUMBER" \
+            -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewDecision reviews(first:100){totalCount nodes{author{login} state submittedAt}} reviewThreads(first:100){totalCount nodes{id isResolved isOutdated path line comments(last:1){nodes{author{login} body}}}} commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100){totalCount nodes{__typename ... on CheckRun{name status conclusion detailsUrl} ... on StatusContext{context state targetUrl}}}}}}}}}}' \
+            >"$graph_json"; then
+            echo 'review_check_inventory_unavailable' >>"$errors"
+            printf '{"data":{"repository":{"pullRequest":null}}}\n' >"$graph_json"
+          fi
+
+          for count_path in \
+            '.data.repository.pullRequest.reviews.totalCount' \
+            '.data.repository.pullRequest.reviewThreads.totalCount' \
+            '.data.repository.pullRequest.commits.nodes[0].commit.statusCheckRollup.contexts.totalCount'; do
+            count="$(jq -r "${count_path} // 0" "$graph_json")"
+            if ! [[ "$count" =~ ^[0-9]+$ ]] || [ "$count" -gt 100 ]; then
+              echo 'bounded_graphql_inventory_incomplete' >>"$errors"
+            fi
+          done
+
+          jq '[.data.repository.pullRequest.reviews.nodes[]? | {
+                author: (.author.login // "ghost"),
+                state: .state,
+                submitted_at: .submittedAt
+              }]' "$graph_json" >"$RUNNER_TEMP/reviews.json"
+          jq '[.data.repository.pullRequest.reviewThreads.nodes[]? | {
+                id,
+                is_resolved: .isResolved,
+                is_outdated: .isOutdated,
+                path: (.path // ""),
+                line,
+                author: (.comments.nodes[-1].author.login // "ghost"),
+                body: (.comments.nodes[-1].body // "")
+              }]' "$graph_json" >"$RUNNER_TEMP/threads.json"
+          jq '[.data.repository.pullRequest.commits.nodes[0].commit.statusCheckRollup.contexts.nodes[]? |
+                if .__typename == "CheckRun" then {
+                  kind: "check_run",
+                  name: .name,
+                  status: .status,
+                  conclusion: .conclusion,
+                  details_url: (.detailsUrl // "")
+                } else {
+                  kind: "status_context",
+                  name: .context,
+                  status: (if .state == "PENDING" then "PENDING" else "COMPLETED" end),
+                  conclusion: (if .state == "PENDING" then null else .state end),
+                  details_url: (.targetUrl // "")
+                } end]' "$graph_json" >"$RUNNER_TEMP/checks.json"
+
+          jq -r '.[] | select(.conclusion != null and (.conclusion | IN("FAILURE","ERROR","CANCELLED","TIMED_OUT","ACTION_REQUIRED","STARTUP_FAILURE","STALE"))) | .details_url' \
+            "$RUNNER_TEMP/checks.json" | while IFS= read -r details_url; do
+              if [[ "$details_url" =~ /actions/runs/([1-9][0-9]*) ]]; then
+                run_id="${BASH_REMATCH[1]}"
+                {
+                  printf '\n===== failed-job run %s =====\n' "$run_id"
+                  gh run view "$run_id" --repo "$GITHUB_REPOSITORY" --log-failed || \
+                    printf 'failed-job log unavailable for run %s\n' "$run_id"
+                } >>"$failed_logs"
+              fi
+            done
+          head -c "$MAX_FAILED_LOG_BYTES" "$failed_logs" >"$failed_logs.bounded"
+          mv "$failed_logs.bounded" "$failed_logs"
+
+          jq -R -s 'split("\n") | map(select(length > 0))' "$errors" >"$RUNNER_TEMP/errors.json"
+          jq -n \
+            --arg schema_version '1.0.0' \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg generated_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --slurpfile pr "$pr_json" \
+            --slurpfile graph "$graph_json" \
+            --slurpfile reviews "$RUNNER_TEMP/reviews.json" \
+            --slurpfile threads "$RUNNER_TEMP/threads.json" \
+            --slurpfile checks "$RUNNER_TEMP/checks.json" \
+            --slurpfile errors_json "$RUNNER_TEMP/errors.json" '
+            {
+              schema_version: $schema_version,
+              repository: $repository,
+              generated_at: $generated_at,
+              pull_request: {
+                number: ($pr[0].number // 1),
+                created_at: ($pr[0].created_at // $generated_at),
+                is_draft: ($pr[0].draft // false),
+                head_sha: ($pr[0].head.sha // "0000000000000000000000000000000000000000"),
+                base_sha: ($pr[0].base.sha // "0000000000000000000000000000000000000000"),
+                head_repository: ($pr[0].head.repo.full_name // $repository),
+                base_repository: ($pr[0].base.repo.full_name // $repository),
+                head_ref: ($pr[0].head.ref // "unknown"),
+                base_ref: ($pr[0].base.ref // "main"),
+                mergeable: (if $pr[0].mergeable == true then "MERGEABLE" elif $pr[0].mergeable == false then "CONFLICTING" else "UNKNOWN" end),
+                merge_state_status: (($pr[0].mergeable_state // "unknown") | ascii_upcase),
+                review_decision: ($graph[0].data.repository.pullRequest.reviewDecision // null)
+              },
+              reviews: $reviews[0],
+              threads: $threads[0],
+              checks: $checks[0],
+              api_errors: $errors_json[0]
+            }' >"$RUNNER_TEMP/pr-steward-raw.json"
+
+      - name: Canonicalize evidence and choose none, wait, repair, or queue_merge
+        id: decision
+        if: steps.select.outputs.selected == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/pr_steward_decision.py canonicalize \
+            "$RUNNER_TEMP/pr-steward-raw.json" "$RUNNER_TEMP/pr-steward-evidence.json"
+          python scripts/pr_steward_decision.py decide \
+            "$RUNNER_TEMP/pr-steward-evidence.json" "$RUNNER_TEMP/pr-steward-decision.json" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Export immutable PR identity
+        id: identity
+        if: steps.select.outputs.selected == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -r '.pull_request | to_entries[] | select(.key | IN("number","head_sha","base_sha","head_ref","base_ref","head_repository")) | "\(.key)=\(.value)"' \
+            "$RUNNER_TEMP/pr-steward-evidence.json" >>"$GITHUB_OUTPUT"
+          echo "pr_number=$(jq -r '.pull_request.number' "$RUNNER_TEMP/pr-steward-evidence.json")" >>"$GITHUB_OUTPUT"
+
+      - name: Apply credential and dry-run policy without weakening the decision
+        id: policy
+        if: steps.select.outputs.selected == 'true'
+        env:
+          RAW_ACTION: ${{ steps.decision.outputs.action }}
+          RAW_REASONS: ${{ steps.decision.outputs.reasons }}
+          RAW_SAME_REPOSITORY: ${{ steps.decision.outputs.same_repository }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+          NIM_CONFIGURED: ${{ secrets.NVIDIA_NIM_API_KEY != '' }}
+          APP_KEY_CONFIGURED: ${{ secrets.FOUR_PILLARS_MAINTAINER_APP_PRIVATE_KEY != '' }}
+          APP_CLIENT_ID: ${{ inputs.maintainer_app_client_id || vars.FOUR_PILLARS_MAINTAINER_APP_CLIENT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          action="$RAW_ACTION"
+          reasons="$RAW_REASONS"
+          if [ "$DRY_RUN" = true ]; then
+            action=wait
+            reasons="${reasons},dry_run"
+          elif [ "$action" = repair ] && [ "$NIM_CONFIGURED" != true ]; then
+            action=wait
+            reasons="${reasons},nim_api_key_unavailable"
+          elif [ "$action" = repair ] && [ "$RAW_SAME_REPOSITORY" != true ]; then
+            action=wait
+            reasons="${reasons},external_fork_repair_forbidden"
+          elif { [ "$action" = repair ] || [ "$action" = queue_merge ]; } \
+            && { [ "$APP_KEY_CONFIGURED" != true ] || [ -z "$APP_CLIENT_ID" ]; }; then
+            action=wait
+            reasons="${reasons},maintainer_app_unavailable"
+          fi
+          {
+            echo "action=$action"
+            echo "reasons=${reasons#,}"
+            echo "same_repository=$RAW_SAME_REPOSITORY"
+          } >>"$GITHUB_OUTPUT"
+          printf '### PR steward decision\n\n- action: `%s`\n- reasons: `%s`\n' \
+            "$action" "${reasons#,}" >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Upload bounded exact-head evidence
+        id: upload
+        if: steps.select.outputs.selected == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr-steward-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/pr-steward-evidence.json
+            ${{ runner.temp }}/pr-steward-decision.json
+            ${{ runner.temp }}/failed-job.log
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+          overwrite: false
+
+  propose_repair:
+    name: Propose one bounded NIM repair
+    if: needs.inspect_pull_request.outputs.action == 'repair'
+    needs: inspect_pull_request
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      has_changes: ${{ steps.patch.outputs.has_changes }}
+      patch_sha256: ${{ steps.patch.outputs.patch_sha256 }}
+      changed_files: ${{ steps.patch.outputs.changed_files }}
+      diff_bytes: ${{ steps.patch.outputs.diff_bytes }}
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
+    steps:
+      - name: Check out exact trusted base control code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ needs.inspect_pull_request.outputs.base_sha }}
+          path: trusted-control
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Preserve trusted decision engine outside the proposal tree
+        run: install -m 0500 trusted-control/scripts/pr_steward_decision.py "$RUNNER_TEMP/pr_steward_decision.py"
+
+      - name: Check out the credential-free exact head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ needs.inspect_pull_request.outputs.head_sha }}
+          path: proposal
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up immutable Python environment before exposing NIM
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: proposal/requirements/ci.txt
+
+      - name: Install immutable repository dependencies
+        working-directory: proposal
+        run: python -m pip install --require-hashes -r requirements/ci.txt
+
+      - name: Download exact evidence by numeric artifact ID
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ needs.inspect_pull_request.outputs.evidence_artifact_id }}
+          path: ${{ runner.temp }}/pr-steward-evidence
+
+      - name: Verify evidence artifact identity and render an untrusted-data repair brief
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_id="${{ needs.inspect_pull_request.outputs.evidence_artifact_id }}"
+          expected_digest="${{ needs.inspect_pull_request.outputs.evidence_artifact_digest }}"
+          [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]]
+          [[ "$expected_digest" =~ ^[0-9a-f]{64}$ ]]
+          artifact_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}")"
+          [ "$(jq -r '.digest' <<<"$artifact_json")" = "sha256:${expected_digest}" ]
+          jq -e --argjson artifact_id "$artifact_id" --argjson run_id "$GITHUB_RUN_ID" \
+            '.id == $artifact_id and .expired == false and .workflow_run.id == $run_id' \
+            <<<"$artifact_json" >/dev/null
+          python "$RUNNER_TEMP/pr_steward_decision.py" prompt \
+            "$RUNNER_TEMP/pr-steward-evidence/pr-steward-evidence.json" \
+            "$RUNNER_TEMP/pr-steward-evidence/failed-job.log" \
+            "$RUNNER_TEMP/pr-steward-repair-prompt.md"
+
+      - name: Install checksum-pinned OpenCode CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/opencode-linux-x64.tar.gz"
+          curl --fail --silent --show-error --location --proto '=https' \
+            --connect-timeout 10 --max-time 120 --output "$archive" \
+            "https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_VERSION}/opencode-linux-x64.tar.gz"
+          printf '%s  %s\n' "$OPENCODE_SHA256" "$archive" | sha256sum -c -
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          install -D -m 0755 "$RUNNER_TEMP/opencode" "$HOME/.opencode/bin/opencode"
+          echo "$HOME/.opencode/bin" >>"$GITHUB_PATH"
+
+      - name: Configure OpenCode for NVIDIA NIM only
+        shell: bash
+        run: |
+          cat >"$RUNNER_TEMP/opencode.json" <<'CONFIG'
+          {
+            "$schema": "https://opencode.ai/config.json",
+            "share": "disabled",
+            "autoupdate": false,
+            "lsp": false,
+            "mcp": {},
+            "enabled_providers": ["nvidia-nim"],
+            "permission": {
+              "*": "allow",
+              "external_directory": "deny",
+              "task": "deny",
+              "question": "deny",
+              "webfetch": "deny",
+              "websearch": "deny",
+              "bash": {
+                "*": "allow",
+                "curl *": "deny",
+                "wget *": "deny",
+                "ssh *": "deny",
+                "git clone *": "deny",
+                "git fetch *": "deny",
+                "git pull *": "deny",
+                "git commit *": "deny",
+                "git push *": "deny",
+                "git tag *": "deny",
+                "git remote *": "deny",
+                "gh *": "deny"
+              }
+            },
+            "provider": {
+              "nvidia-nim": {
+                "npm": "@ai-sdk/openai-compatible",
+                "name": "NVIDIA NIM",
+                "options": {
+                  "baseURL": "https://integrate.api.nvidia.com/v1",
+                  "apiKey": "{env:NVIDIA_NIM_API_KEY}"
+                },
+                "models": {
+                  "nvidia/llama-3.3-nemotron-super-49b-v1.5": {"tool_call": true},
+                  "nvidia/nemotron-3-super-120b-a12b": {"tool_call": true},
+                  "deepseek-ai/deepseek-v4-pro": {"tool_call": true}
+                }
+              }
+            }
+          }
+          CONFIG
+          chmod 0400 "$RUNNER_TEMP/opencode.json"
+
+      - name: Run bounded OpenCode repair over UNTRUSTED REVIEW AND CHECK EVIDENCE
+        working-directory: proposal
+        env:
+          NVIDIA_NIM_API_KEY: ${{ secrets.NVIDIA_NIM_API_KEY }}
+          OPENCODE_CONFIG: ${{ runner.temp }}/opencode.json
+          OPENCODE_DISABLE_AUTOUPDATE: 'true'
+          XDG_CONFIG_HOME: ${{ runner.temp }}/opencode-config
+          XDG_CACHE_HOME: ${{ runner.temp }}/opencode-cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          prompt="$(cat "$RUNNER_TEMP/pr-steward-repair-prompt.md")"
+          status=1
+          read -r -a models <<<"$OPENCODE_MODELS"
+          for model in "${models[@]}"; do
+            if timeout --kill-after="${OPENCODE_KILL_GRACE_SECONDS}s" \
+              "${OPENCODE_RUN_TIMEOUT_SECONDS}s" \
+              env -u GH_TOKEN -u GITHUB_TOKEN -u REPOSITORY_TOKEN \
+              -u ACTIONS_ID_TOKEN_REQUEST_TOKEN -u ACTIONS_ID_TOKEN_REQUEST_URL \
+              -u ACTIONS_RUNTIME_TOKEN -u ACTIONS_RUNTIME_URL \
+              -u ACTIONS_RESULTS_URL -u ACTIONS_CACHE_URL \
+              -u GITHUB_ENV -u GITHUB_OUTPUT -u GITHUB_PATH \
+              -u GITHUB_STATE -u GITHUB_STEP_SUMMARY \
+              opencode run "$prompt" --agent build --model "$model"; then
+              status=0
+              break
+            fi
+            git reset --hard HEAD
+            git clean -fdx
+          done
+          [ "$status" -eq 0 ] || { echo '::error::All NIM repair candidates failed'; exit 1; }
+
+      - name: Bound the repair and export one immutable full-index patch
+        id: patch
+        working-directory: proposal
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -n "$(git status --porcelain)" ] || { echo '::error::repair_produced_no_change'; exit 1; }
+          git add -A
+          git diff --cached --check
+          ! git diff --cached --raw | grep -Eq '(^| )(120000|160000)( |$)'
+          protected='^(\.github/workflows/hourly-pr-steward\.yml|scripts/pr_steward_decision\.py|scripts/prepare_pr_steward_evidence\.py|tests/test_hourly_pr_steward\.py|tests/test_pr_steward_evidence\.py|docs/operations/HOURLY_PR_STEWARD\.md|docs/doctoring/hourly-pr-steward\.md)$'
+          if git diff --cached --name-only | grep -Eq "$protected"; then
+            echo '::error::steward_control_plane_self_modification_forbidden'
+            exit 1
+          fi
+          changed_files="$(git diff --cached --name-only -z | python -c 'import sys; print(len([x for x in sys.stdin.buffer.read().split(b"\0") if x]))')"
+          proposal_dir="$RUNNER_TEMP/pr-steward-repair"
+          install -d -m 0700 "$proposal_dir"
+          git diff --cached --binary --full-index >"$proposal_dir/repair.patch"
+          diff_bytes="$(wc -c <"$proposal_dir/repair.patch" | tr -d '[:space:]')"
+          [ "$changed_files" -le "$MAX_CHANGED_FILES" ]
+          [ "$diff_bytes" -le "$MAX_DIFF_BYTES" ]
+          patch_sha256="$(sha256sum "$proposal_dir/repair.patch" | awk '{print $1}')"
+          {
+            echo 'has_changes=true'
+            echo "patch_sha256=$patch_sha256"
+            echo "changed_files=$changed_files"
+            echo "diff_bytes=$diff_bytes"
+          } >>"$GITHUB_OUTPUT"
+
+      - name: Upload immutable repair artifact
+        id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr-steward-repair-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pr-steward-repair/repair.patch
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+          overwrite: false
+
+  verify_repair:
+    name: Verify repair on fresh uncredentialed runners
+    if: needs.propose_repair.outputs.has_changes == 'true'
+    needs:
+      - inspect_pull_request
+      - propose_repair
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Check out exact pre-repair head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ needs.inspect_pull_request.outputs.head_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Download exact immutable repair
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ needs.propose_repair.outputs.artifact_id }}
+          path: ${{ runner.temp }}/pr-steward-repair
+
+      - name: Verify artifact identity and apply exact patch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          patch="$RUNNER_TEMP/pr-steward-repair/repair.patch"
+          artifact_id="${{ needs.propose_repair.outputs.artifact_id }}"
+          expected_digest="${{ needs.propose_repair.outputs.artifact_digest }}"
+          expected_patch="${{ needs.propose_repair.outputs.patch_sha256 }}"
+          [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]]
+          [[ "$expected_digest" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$expected_patch" =~ ^[0-9a-f]{64}$ ]]
+          artifact_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}")"
+          [ "$(jq -r '.digest' <<<"$artifact_json")" = "sha256:${expected_digest}" ]
+          jq -e --argjson artifact_id "$artifact_id" --argjson run_id "$GITHUB_RUN_ID" \
+            '.id == $artifact_id and .expired == false and .workflow_run.id == $run_id' \
+            <<<"$artifact_json" >/dev/null
+          printf '%s  %s\n' "$expected_patch" "$patch" | sha256sum -c -
+          [ "$(wc -c <"$patch" | tr -d '[:space:]')" = "${{ needs.propose_repair.outputs.diff_bytes }}" ]
+          git apply --check --binary "$patch"
+          git apply --index --binary "$patch"
+          git diff --cached --check
+          ! git diff --cached --raw | grep -Eq '(^| )(120000|160000)( |$)'
+          actual_files="$(git diff --cached --name-only -z | python -c 'import sys; print(len([x for x in sys.stdin.buffer.read().split(b"\0") if x]))')"
+          [ "$actual_files" = "${{ needs.propose_repair.outputs.changed_files }}" ]
+
+      - name: Set up Python 3.11 verification lane
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements/ci.txt
+
+      - name: Run complete exact-patch verification on Python 3.11
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset GH_TOKEN GITHUB_TOKEN REPOSITORY_TOKEN
+          unset ACTIONS_ID_TOKEN_REQUEST_TOKEN ACTIONS_ID_TOKEN_REQUEST_URL
+          unset ACTIONS_RUNTIME_TOKEN ACTIONS_RUNTIME_URL ACTIONS_RESULTS_URL ACTIONS_CACHE_URL
+          unset GITHUB_ENV GITHUB_OUTPUT GITHUB_PATH GITHUB_STATE GITHUB_STEP_SUMMARY
+          python -m pip install --require-hashes -r requirements/ci.txt
+          python -m pip check
+          python scripts/product_gap_audit.py
+          ruff check .
+          python -m compileall -q src tests scripts
+          python scripts/check_docs.py
+          python scripts/check_prompts.py
+          pytest -m 'not nim_live' -W error::ResourceWarning \
+            --cov=four_pillars --cov-report=term-missing
+
+      - name: Set up Python 3.12 verification lane
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements/ci.txt
+
+      - name: Run complete exact-patch verification on Python 3.12
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset GH_TOKEN GITHUB_TOKEN REPOSITORY_TOKEN
+          unset ACTIONS_ID_TOKEN_REQUEST_TOKEN ACTIONS_ID_TOKEN_REQUEST_URL
+          unset ACTIONS_RUNTIME_TOKEN ACTIONS_RUNTIME_URL ACTIONS_RESULTS_URL ACTIONS_CACHE_URL
+          unset GITHUB_ENV GITHUB_OUTPUT GITHUB_PATH GITHUB_STATE GITHUB_STEP_SUMMARY
+          python -m pip install --require-hashes -r requirements/ci.txt
+          python -m pip check
+          python scripts/product_gap_audit.py
+          ruff check .
+          python -m compileall -q src tests scripts
+          python scripts/check_docs.py
+          python scripts/check_prompts.py
+          pytest -m 'not nim_live' -W error::ResourceWarning \
+            --cov=four_pillars --cov-report=term-missing
+          python -m build --no-isolation
+          docker build --pull=false -t four-pillars-pr-steward-verify .
+          if command -v semgrep >/dev/null 2>&1; then
+            semgrep scan --config auto --error
+          else
+            echo 'semgrep remains a required exact-head SAST Check after publication'
+          fi
+          [ -z "$(git diff --name-only)" ]
+          [ -z "$(git ls-files --others --exclude-standard)" ]
+          post_patch="$RUNNER_TEMP/post-verify.patch"
+          git diff --cached --binary --full-index >"$post_patch"
+          [ "$(sha256sum "$post_patch" | awk '{print $1}')" = "${{ needs.propose_repair.outputs.patch_sha256 }}" ]
+
+  publish_repair:
+    name: Publish one non-force repair commit without executing it
+    if: needs.verify_repair.result == 'success'
+    needs:
+      - inspect_pull_request
+      - propose_repair
+      - verify_repair
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out exact trusted base control code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ needs.inspect_pull_request.outputs.base_sha }}
+          path: trusted-control
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Preserve trusted decision engine before patch application
+        run: install -m 0500 trusted-control/scripts/pr_steward_decision.py "$RUNNER_TEMP/pr_steward_decision.py"
+
+      - name: Check out exact pre-repair head for non-executing publication
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ needs.inspect_pull_request.outputs.head_sha }}
+          path: publication
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Download the same immutable repair
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ needs.propose_repair.outputs.artifact_id }}
+          path: ${{ runner.temp }}/pr-steward-repair
+
+      - name: Validate and apply the repair without importing or executing it
+        working-directory: publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          patch="$RUNNER_TEMP/pr-steward-repair/repair.patch"
+          artifact_id="${{ needs.propose_repair.outputs.artifact_id }}"
+          expected_digest="${{ needs.propose_repair.outputs.artifact_digest }}"
+          expected_patch="${{ needs.propose_repair.outputs.patch_sha256 }}"
+          [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]]
+          artifact_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}")"
+          [ "$(jq -r '.digest' <<<"$artifact_json")" = "sha256:${expected_digest}" ]
+          printf '%s  %s\n' "$expected_patch" "$patch" | sha256sum -c -
+          git apply --check --binary "$patch"
+          git apply --index --binary "$patch"
+          git diff --cached --check
+          ! git diff --cached --raw | grep -Eq '(^| )(120000|160000)( |$)'
+
+      - name: Mint the existing repository-scoped Maintainer App token late
+        id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
+        with:
+          client-id: ${{ inputs.maintainer_app_client_id || vars.FOUR_PILLARS_MAINTAINER_APP_CLIENT_ID }}
+          private-key: ${{ secrets.FOUR_PILLARS_MAINTAINER_APP_PRIVATE_KEY }}
+          owner: ContextualWisdomLab
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-metadata: read
+          permission-pull-requests: read
+
+      - name: Revalidate queue order, base, head, branch ownership, and fast-forward state
+        working-directory: publication
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pr_number="${{ needs.inspect_pull_request.outputs.pr_number }}"
+          expected_head="${{ needs.inspect_pull_request.outputs.head_sha }}"
+          expected_base="${{ needs.inspect_pull_request.outputs.base_sha }}"
+          expected_ref="${{ needs.inspect_pull_request.outputs.head_ref }}"
+          pr_json="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}")"
+          [ "$(jq -r '.state' <<<"$pr_json")" = open ]
+          [ "$(jq -r '.draft' <<<"$pr_json")" = false ]
+          [ "$(jq -r '.head.repo.full_name' <<<"$pr_json")" = "$GITHUB_REPOSITORY" ] || {
+            echo '::error::external_fork_repair_forbidden'; exit 1;
+          }
+          [ "$(jq -r '.head.ref' <<<"$pr_json")" = "$expected_ref" ]
+          [ "$(jq -r '.head.sha' <<<"$pr_json")" = "$expected_head" ] || {
+            echo '::error::head_branch_advanced'; exit 1;
+          }
+          [ "$(jq -r '.base.sha' <<<"$pr_json")" = "$expected_base" ] || {
+            echo '::error::base_branch_advanced'; exit 1;
+          }
+          oldest="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 100 \
+            --json number,createdAt,isDraft --jq '[.[] | select(.isDraft == false)] | sort_by(.createdAt,.number) | .[0].number // 0')"
+          [ "$oldest" = "$pr_number" ] || { echo '::error::oldest_pull_request_changed'; exit 1; }
+          remote_head="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${expected_ref}" --jq '.object.sha')"
+          [ "$remote_head" = "$expected_head" ] || { echo '::error::head_branch_advanced'; exit 1; }
+
+      - name: Create and fast-forward one auditable repair commit
+        working-directory: publication
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="${{ needs.inspect_pull_request.outputs.head_ref }}"
+          git config user.name 'four-pillars-maintainer[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c steward-repair
+          git -c core.hooksPath=/dev/null commit -m "fix: repair PR #${{ needs.inspect_pull_request.outputs.pr_number }} exact-head failures"
+          gh auth setup-git
+          git push origin "HEAD:refs/heads/${branch}"
+
+  queue_governed_merge:
+    name: Queue governed exact-head squash auto-merge
+    if: needs.inspect_pull_request.outputs.action == 'queue_merge'
+    needs: inspect_pull_request
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      checks: read
+      contents: read
+      pull-requests: read
+      statuses: read
+    steps:
+      - name: Check out exact trusted base decision engine
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ needs.inspect_pull_request.outputs.base_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Mint the existing Maintainer App token only for governed merge
+        id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
+        with:
+          client-id: ${{ inputs.maintainer_app_client_id || vars.FOUR_PILLARS_MAINTAINER_APP_CLIENT_ID }}
+          private-key: ${{ secrets.FOUR_PILLARS_MAINTAINER_APP_PRIVATE_KEY }}
+          owner: ContextualWisdomLab
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-metadata: read
+          permission-pull-requests: write
+
+      - name: Recollect exact-head governance evidence and require queue_merge again
+        env:
+          READ_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.inspect_pull_request.outputs.pr_number }}
+          EXPECTED_HEAD: ${{ needs.inspect_pull_request.outputs.head_sha }}
+          EXPECTED_BASE: ${{ needs.inspect_pull_request.outputs.base_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GH_TOKEN="$READ_TOKEN"
+          owner="${GITHUB_REPOSITORY%%/*}"
+          name="${GITHUB_REPOSITORY#*/}"
+          gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" >"$RUNNER_TEMP/merge-pr.json"
+          [ "$(jq -r '.head.sha' "$RUNNER_TEMP/merge-pr.json")" = "$EXPECTED_HEAD" ] || {
+            echo '::error::head_branch_advanced'; exit 1;
+          }
+          [ "$(jq -r '.base.sha' "$RUNNER_TEMP/merge-pr.json")" = "$EXPECTED_BASE" ] || {
+            echo '::error::base_branch_advanced'; exit 1;
+          }
+          oldest="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 100 \
+            --json number,createdAt,isDraft --jq '[.[] | select(.isDraft == false)] | sort_by(.createdAt,.number) | .[0].number // 0')"
+          [ "$oldest" = "$PR_NUMBER" ] || { echo '::error::oldest_pull_request_changed'; exit 1; }
+          gh api graphql -f owner="$owner" -f name="$name" -F number="$PR_NUMBER" \
+            -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewDecision reviews(first:100){nodes{author{login} state submittedAt}} reviewThreads(first:100){nodes{id isResolved isOutdated path line comments(last:1){nodes{author{login} body}}}} commits(last:1){nodes{commit{statusCheckRollup{contexts(first:100){nodes{__typename ... on CheckRun{name status conclusion detailsUrl} ... on StatusContext{context state targetUrl}}}}}}}}}}' \
+            >"$RUNNER_TEMP/merge-graph.json"
+          jq '[.data.repository.pullRequest.reviews.nodes[]? | {author:(.author.login // "ghost"),state,submitted_at:.submittedAt}]' \
+            "$RUNNER_TEMP/merge-graph.json" >"$RUNNER_TEMP/merge-reviews.json"
+          jq '[.data.repository.pullRequest.reviewThreads.nodes[]? | {id,is_resolved:.isResolved,is_outdated:.isOutdated,path:(.path // ""),line,author:(.comments.nodes[-1].author.login // "ghost"),body:(.comments.nodes[-1].body // "")}]' \
+            "$RUNNER_TEMP/merge-graph.json" >"$RUNNER_TEMP/merge-threads.json"
+          jq '[.data.repository.pullRequest.commits.nodes[0].commit.statusCheckRollup.contexts.nodes[]? | if .__typename == "CheckRun" then {kind:"check_run",name,status,conclusion,details_url:(.detailsUrl // "")} else {kind:"status_context",name:.context,status:(if .state == "PENDING" then "PENDING" else "COMPLETED" end),conclusion:(if .state == "PENDING" then null else .state end),details_url:(.targetUrl // "")} end]' \
+            "$RUNNER_TEMP/merge-graph.json" >"$RUNNER_TEMP/merge-checks.json"
+          jq -n \
+            --arg generated_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --slurpfile pr "$RUNNER_TEMP/merge-pr.json" \
+            --slurpfile graph "$RUNNER_TEMP/merge-graph.json" \
+            --slurpfile reviews "$RUNNER_TEMP/merge-reviews.json" \
+            --slurpfile threads "$RUNNER_TEMP/merge-threads.json" \
+            --slurpfile checks "$RUNNER_TEMP/merge-checks.json" '{schema_version:"1.0.0",repository:$repository,generated_at:$generated_at,pull_request:{number:$pr[0].number,created_at:$pr[0].created_at,is_draft:$pr[0].draft,head_sha:$pr[0].head.sha,base_sha:$pr[0].base.sha,head_repository:$pr[0].head.repo.full_name,base_repository:$pr[0].base.repo.full_name,head_ref:$pr[0].head.ref,base_ref:$pr[0].base.ref,mergeable:(if $pr[0].mergeable == true then "MERGEABLE" elif $pr[0].mergeable == false then "CONFLICTING" else "UNKNOWN" end),merge_state_status:(($pr[0].mergeable_state // "unknown") | ascii_upcase),review_decision:($graph[0].data.repository.pullRequest.reviewDecision // null)},reviews:$reviews[0],threads:$threads[0],checks:$checks[0],api_errors:[]}' \
+            >"$RUNNER_TEMP/merge-evidence.json"
+          python scripts/pr_steward_decision.py decide \
+            "$RUNNER_TEMP/merge-evidence.json" "$RUNNER_TEMP/merge-decision.json"
+          [ "$(jq -r '.action' "$RUNNER_TEMP/merge-decision.json")" = queue_merge ]
+
+      - name: Queue normal squash auto-merge with exact-head binding
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          gh pr merge "${{ needs.inspect_pull_request.outputs.pr_number }}" \
+            --repo "$GITHUB_REPOSITORY" --squash --auto \
+            --match-head-commit "${{ needs.inspect_pull_request.outputs.head_sha }}"
