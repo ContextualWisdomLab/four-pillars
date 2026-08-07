@@ -164,7 +164,6 @@ _RADIUS: Series = (
 
 def _series_value(terms: SeriesOrder, tau: float) -> float:
     """Evaluate one VSOP87 polynomial order at a Julian-millennia value."""
-
     return math.fsum(
         amplitude * math.cos(phase + frequency * tau)
         for amplitude, phase, frequency in terms
@@ -173,7 +172,6 @@ def _series_value(terms: SeriesOrder, tau: float) -> float:
 
 def _vsop87_value(series: Series, tau: float) -> float:
     """Evaluate and scale all bounded orders in one VSOP87 coordinate."""
-
     return math.fsum(
         _series_value(order, tau) * tau**power
         for power, order in enumerate(series)
@@ -182,7 +180,6 @@ def _vsop87_value(series: Series, tau: float) -> float:
 
 def _tai_minus_utc_seconds(moment: datetime) -> float:
     """Return the tabled TAI-UTC offset effective at one aware UTC instant."""
-
     utc = moment.astimezone(UTC)
     index = bisect_right(_LEAP_SECOND_EFFECTIVE_UTC, utc) - 1
     return _TAI_MINUS_UTC_SECONDS[index]
@@ -190,7 +187,6 @@ def _tai_minus_utc_seconds(moment: datetime) -> float:
 
 def _julian_ephemeris_date(moment: datetime) -> float:
     """Convert one aware civil instant to Julian Ephemeris Date in TT."""
-
     utc = moment.astimezone(UTC)
     j2000_utc = datetime(2000, 1, 1, 12, tzinfo=UTC)
     julian_utc = 2451545.0 + (utc - j2000_utc).total_seconds() / 86400.0
@@ -200,7 +196,6 @@ def _julian_ephemeris_date(moment: datetime) -> float:
 
 def _nutation_longitude(julian_centuries: float) -> float:
     """Return the dominant nutation-in-longitude correction in degrees."""
-
     t = julian_centuries
     node = math.radians(
         125.04452 - 1934.136261 * t + 0.0020708 * t * t + t**3 / 450000.0
@@ -229,7 +224,6 @@ def apparent_solar_longitude(moment: datetime) -> float:
     Raises:
         ValueError: If ``moment`` has no timezone information.
     """
-
     if moment.tzinfo is None:
         raise ValueError("Solar longitude requires a timezone-aware datetime")
     julian_ephemeris_date = _julian_ephemeris_date(moment)
