@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from four_pillars.calendar import calculate_chart, jie_terms
+from four_pillars.calendar import apparent_solar_longitude, calculate_chart, jie_terms
 from four_pillars.models import BirthInput
 
 FIXTURE = Path("tests/fixtures/kasi_2026_jie_terms.json")
@@ -75,6 +75,13 @@ def test_kasi_fixture_schema_and_scope_are_bounded() -> None:
     )
 
 
+def test_apparent_solar_longitude_requires_an_aware_datetime() -> None:
+    """Reject ambiguous civil time before any ephemeris calculation occurs."""
+
+    with pytest.raises(ValueError, match="timezone-aware"):
+        apparent_solar_longitude(datetime(2026, 1, 1))
+
+
 @pytest.mark.parametrize("record", _records(), ids=lambda record: record["name_ko"])
 def test_calculated_jie_matches_kasi_within_two_minutes(
     record: dict[str, Any],
@@ -116,3 +123,4 @@ def test_kasi_lichun_changes_the_2026_year_pillar() -> None:
 
     assert before.year.hanja == "乙巳"
     assert after.year.hanja == "丙午"
+    assert after.calculation_version == "calendar-1.1.0"
