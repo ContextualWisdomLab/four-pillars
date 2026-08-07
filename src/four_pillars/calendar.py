@@ -30,14 +30,9 @@ from .constants import (
     TEN_GODS_KO,
 )
 from .models import BirthInput, CalendarKind, Chart, Interaction, Pillar, SolarTerm, TimeBasis
+from .solar import apparent_solar_longitude
 
-CALCULATION_VERSION = "calendar-1.0.0"
-
-
-def _julian_date(moment: datetime) -> float:
-    if moment.tzinfo is None:
-        raise ValueError("Julian date requires a timezone-aware datetime")
-    return moment.astimezone(UTC).timestamp() / 86400.0 + 2440587.5
+CALCULATION_VERSION = "calendar-1.1.0"
 
 
 def _julian_day_number(value: date) -> int:
@@ -55,35 +50,8 @@ def _julian_day_number(value: date) -> int:
     )
 
 
-def _normalize_angle(value: float) -> float:
-    return value % 360.0
-
-
 def _angle_delta(longitude: float, target: float) -> float:
     return (longitude - target + 180.0) % 360.0 - 180.0
-
-
-def apparent_solar_longitude(moment: datetime) -> float:
-    """Return the Sun's apparent geocentric ecliptic longitude in degrees.
-
-    This is the compact Meeus/NOAA series. Around modern solar-term boundaries its
-    error is normally much smaller than the six-hour warning window used by this
-    service. The algorithm is deterministic and does not require a remote ephemeris.
-    """
-    jd = _julian_date(moment)
-    t = (jd - 2451545.0) / 36525.0
-    mean_longitude = _normalize_angle(280.46646 + 36000.76983 * t + 0.0003032 * t * t)
-    mean_anomaly = math.radians(
-        _normalize_angle(357.52911 + 35999.05029 * t - 0.0001537 * t * t)
-    )
-    equation = (
-        (1.914602 - 0.004817 * t - 0.000014 * t * t) * math.sin(mean_anomaly)
-        + (0.019993 - 0.000101 * t) * math.sin(2 * mean_anomaly)
-        + 0.000289 * math.sin(3 * mean_anomaly)
-    )
-    true_longitude = mean_longitude + equation
-    omega = math.radians(125.04 - 1934.136 * t)
-    return _normalize_angle(true_longitude - 0.00569 - 0.00478 * math.sin(omega))
 
 
 @lru_cache(maxsize=1024)
@@ -217,7 +185,11 @@ def ten_god(day_stem: int, target_stem: int) -> str:
 def growth_stage(day_stem: int, branch_index: int) -> str:
     """Return the Twelve Growth Stage for a day stem at one earthly branch."""
     start = GROWTH_START_BRANCH[day_stem]
-    offset = (branch_index - start) % 12 if day_stem % 2 == 0 else (start - branch_index) % 12
+    offset = (
+        (branch_index - start) % 12
+        if day_stem % 2 == 0
+        else (start - branch_index) % 12
+    )
     return GROWTH_STAGES[offset]
 
 
@@ -235,14 +207,20 @@ def make_pillar(index: int, day_master_stem: int | None = None) -> Pillar:
         korean=STEMS_KO[stem_index] + BRANCHES_KO[branch_index],
         hanja=STEMS_HANJA[stem_index] + BRANCHES_HANJA[branch_index],
         sexagenary_index=index,
-        ten_god=ten_god(day_master_stem, stem_index) if day_master_stem is not None else None,
+        ten_god=ten_god(day_master_stem, stem_index)
+        if day_master_stem is not None
+        else None,
         hidden_stems=tuple(STEMS_HANJA[item] for item in hidden_indexes),
         hidden_ten_gods=(
             tuple(ten_god(day_master_stem, item) for item in hidden_indexes)
             if day_master_stem is not None
             else ()
         ),
-        growth_stage=(growth_stage(day_master_stem, branch_index) if day_master_stem is not None else None),
+        growth_stage=(
+            growth_stage(day_master_stem, branch_index)
+            if day_master_stem is not None
+            else None
+        ),
     )
 
 
@@ -287,7 +265,11 @@ def _element_balance(pillars: list[Pillar]) -> dict[str, float]:
     for pillar in pillars:
         balance[STEM_ELEMENT[pillar.stem_index]] += 1.0
         balance[BRANCH_ELEMENT[pillar.branch_index]] += 0.8
-        for weight, hidden in zip(hidden_weights, HIDDEN_STEMS[pillar.branch_index], strict=False):
+        for weight, hidden in zip(
+            hidden_weights,
+            HIDDEN_STEMS[pillar.branch_index],
+            strict=False,
+        ):
             balance[STEM_ELEMENT[hidden]] += weight
     return {key: round(value, 2) for key, value in balance.items()}
 
@@ -298,7 +280,10 @@ def _year_index(moment: datetime) -> tuple[int, SolarTerm]:
     return (pillar_year - 1984) % 60, lichun
 
 
-def _month_index(moment: datetime, year_stem: int) -> tuple[int, SolarTerm, SolarTerm]:
+def _month_index(
+    moment: datetime,
+    year_stem: int,
+) -> tuple[int, SolarTerm, SolarTerm]:
     terms = _surrounding_terms(moment)
     previous = max(
         (term for term in terms if term.occurs_at <= moment),
@@ -337,15 +322,25 @@ def calculate_chart(value: BirthInput) -> Chart:
     year = make_pillar(year_index, day_stem)
     month = make_pillar(month_index, day_stem)
     day = make_pillar(day_index, day_stem)
-    hour = make_pillar(_hour_index(moment, day_stem), day_stem) if value.birth_time_known else None
+    hour = (
+        make_pillar(_hour_index(moment, day_stem), day_stem)
+        if value.birth_time_known
+        else None
+    )
     pillars = [year, month, day, *([hour] if hour is not None else [])]
 
     warnings: list[str] = []
-    for label, boundary in (("입춘", lichun.occurs_at), (current_jie.name_ko, current_jie.occurs_at), (next_jie.name_ko, next_jie.occurs_at)):
+    boundaries = (
+        ("입춘", lichun.occurs_at),
+        (current_jie.name_ko, current_jie.occurs_at),
+        (next_jie.name_ko, next_jie.occurs_at),
+    )
+    for label, boundary in boundaries:
         distance = abs((moment - boundary).total_seconds())
         if distance <= 6 * 3600:
             warnings.append(
-                f"출생 시각이 {label} 경계에서 6시간 이내입니다. 원자료의 시각과 시간대 설정을 다시 확인하십시오."
+                f"출생 시각이 {label} 경계에서 6시간 이내입니다. "
+                "원자료의 시각과 시간대 설정을 다시 확인하십시오."
             )
     if not value.birth_time_known:
         warnings.append("출생 시각이 없어 시주는 확정하지 않았습니다.")
@@ -363,7 +358,12 @@ def calculate_chart(value: BirthInput) -> Chart:
         "version": CALCULATION_VERSION,
     }
     fingerprint = hashlib.sha256(
-        json.dumps(raw, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+        json.dumps(
+            raw,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
     ).hexdigest()
 
     return Chart(
