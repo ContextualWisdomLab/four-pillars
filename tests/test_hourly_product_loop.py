@@ -143,8 +143,20 @@ def test_standards_contract_audit_detects_missing_tokens(tmp_path: Path) -> None
     )
 
 
+def test_authority_fixture_contract_audit_detects_missing_tokens(
+    tmp_path: Path,
+) -> None:
+    """Keep official solar-term evidence and provenance inside the hourly gate."""
+    module = load_audit_module()
+    assert_token_contract_detects_missing_entries(
+        tmp_path,
+        module.AUTHORITY_FIXTURE_CONTRACTS,
+        "audit_authority_fixture_contract",
+    )
+
+
 def test_standards_doctoring_contains_authoritative_and_peer_reviewed_sources() -> None:
-    """Document current software, AI, HTTP, tracing, and LLM-evaluation evidence."""
+    """Document current software, astronomy, AI, HTTP, tracing, and evaluation evidence."""
     references = REFERENCES.read_text(encoding="utf-8")
     traceability = TRACEABILITY.read_text(encoding="utf-8")
 
@@ -156,6 +168,10 @@ def test_standards_doctoring_contains_authoritative_and_peer_reviewed_sources() 
         "NIST AI 600-1",
         "RFC 9457",
         "W3C recommendation",
+        "Korea Astronomy and Space Science Institute",
+        "National Astronomical Observatory of Japan",
+        "Planetary theories in rectangular",
+        "10.3847/1538-3881/abd414",
         "10.18653/v1/2024.emnlp-main.427",
         "10.18653/v1/2024.emnlp-main.474",
     ):
@@ -165,6 +181,7 @@ def test_standards_doctoring_contains_authoritative_and_peer_reviewed_sources() 
         "ContextualOrchestratorClient",
         "traditional interpretation",
         "100% statement and branch coverage",
+        "kasi_2026_jie_terms.json",
     ):
         assert token in traceability
 
