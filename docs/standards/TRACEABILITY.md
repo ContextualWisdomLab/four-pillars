@@ -17,7 +17,7 @@ Traditional Four Pillars analysis is presented as symbolic and conditional. Dete
 
 | Quality concern | Four Pillars control | Verification evidence | Residual limitation |
 |---|---|---|---|
-| Functional suitability | Golden four-pillar fixtures, Li Chun and `jie` boundaries, ten-god and luck calculations, immutable report evidence | `tests/test_calendar.py`, `tests/test_fortune.py`, edge and golden-fixture tests | Astronomical approximation near boundaries is disclosed by warnings |
+| Functional suitability | Golden four-pillar fixtures, Li Chun and `jie` boundaries, ten-god and luck calculations, immutable report evidence | `tests/test_calendar.py`, `tests/test_fortune.py`, edge and golden-fixture tests, and the independently sourced `tests/fixtures/kasi_2026_jie_terms.json` authority fixture | Astronomical approximation near boundaries is disclosed by warnings |
 | Performance efficiency | Deterministic calculation has no network dependency; long model calls run in a worker | calculation unit tests, API/worker separation | Hosted model latency is provider-dependent |
 | Compatibility | FastAPI/JSON interfaces, OpenAI-compatible model adapters, structural repository/interpreter/publisher ports | `ports.py`, API tests, modular service tests | Remote PostgreSQL/object-storage adapters remain operator work |
 | Interaction capability | Accessible calculation-first browser workflow and recent-job recovery | `tests/test_web.py`, editable Figma desktop/mobile frames | Full assistive-technology certification is not claimed |
