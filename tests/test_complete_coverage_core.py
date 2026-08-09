@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 from fastapi import HTTPException
+from pydantic import ValidationError
 
 import four_pillars.api as api_module
 import four_pillars.calendar as calendar_module
@@ -16,7 +17,7 @@ from four_pillars.fortune import (
     calculate_monthly_luck,
 )
 from four_pillars.jobs import JobStore
-from four_pillars.models import BirthInput, CalendarKind, Gender, TimeBasis
+from four_pillars.models import BirthInput, CalendarKind, Gender, JobStatus, TimeBasis
 from four_pillars.service import ReportService
 from four_pillars.settings import Settings, get_settings
 
@@ -69,6 +70,20 @@ def test_default_service_and_settings_are_loaded_from_environment(
     get_settings.cache_clear()
 
 
+def test_public_job_view_bounds_operational_error_text() -> None:
+    """Keep the canonical status API from becoming an unbounded diagnostic channel."""
+    now = datetime.now(UTC)
+
+    with pytest.raises(ValidationError):
+        api_module.ReportJobView(
+            id="00000000-0000-0000-0000-000000000001",
+            status=JobStatus.FAILED,
+            created_at=now,
+            updated_at=now,
+            error="x" * 4001,
+        )
+
+
 def test_delete_report_handles_terminal_jobs_without_artifacts(tmp_path: Path) -> None:
     service = configured_service(tmp_path)
     job = service.store.create({"subject_name": "failed"})
@@ -88,6 +103,20 @@ def test_delete_report_rejects_a_non_terminal_job(tmp_path: Path) -> None:
 
     assert captured.value.status_code == 409
     assert service.store.get(job.id) is not None
+
+
+@pytest.mark.parametrize("missing_job_id", ["missing-job", "../escape"])
+def test_delete_report_rejects_missing_jobs_without_a_trusted_orphan(
+    missing_job_id: str,
+    tmp_path: Path,
+) -> None:
+    """Return not-found without deleting outside or nonexistent artifact roots."""
+    service = configured_service(tmp_path)
+
+    with pytest.raises(HTTPException) as captured:
+        api_module.delete_report(missing_job_id, service)
+
+    assert captured.value.status_code == 404
 
 
 def test_delete_report_preserves_artifacts_when_terminal_row_delete_is_refused(
