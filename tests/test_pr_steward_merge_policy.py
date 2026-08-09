@@ -105,6 +105,19 @@ def test_clean_or_has_hooks_head_can_queue_after_every_explicit_gate_passes() ->
         assert module.decide_action(evidence).action == "queue_merge"
 
 
+def test_explicit_review_required_state_waits_for_independent_review() -> None:
+    """Never queue merge while GitHub explicitly reports that review is required."""
+
+    evidence = _green()
+    evidence["pull_request"]["review_decision"] = "REVIEW_REQUIRED"
+
+    decision = _module().decide_action(evidence)
+
+    assert decision.action == "wait"
+    assert "review_required" in decision.reasons
+    assert "exact_head_green" not in decision.reasons
+
+
 def test_review_change_request_always_requires_repair_before_queueing() -> None:
     """Keep a reviewer veto authoritative even when every Check is successful."""
 
