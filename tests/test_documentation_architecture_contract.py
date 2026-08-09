@@ -17,11 +17,16 @@ def test_canonical_documentation_families_exist() -> None:
     """Require every acquisition-grade architecture document family."""
     required = (
         "docs/standards/DOCUMENTATION_AUDIT.md",
+        "docs/standards/ARCHITECTURE_TRACEABILITY.md",
+        "docs/doctoring/canonical-architecture-documentation.md",
         "docs/adr/README.md",
         "docs/adr/0004-purpose-bound-personal-data.md",
         "docs/adr/0005-architecture-description-and-maturity.md",
+        "docs/adr/0006-calculation-evidence-provenance.md",
+        "docs/adr/0007-autonomous-development-authority.md",
         "docs/architecture/SYSTEM_ARCHITECTURE.md",
         "docs/architecture/DATA_MODEL.md",
+        "docs/uml/governance-and-data.md",
         "docs/security/THREAT_MODEL.md",
         "docs/technical/TEST_STRATEGY.md",
         "docs/operations/OPERABILITY.md",
@@ -60,6 +65,8 @@ def test_adr_index_names_existing_and_cross_cutting_decisions() -> None:
         "0003-explicit-contextual-orchestrator-backend.md",
         "0004-purpose-bound-personal-data.md",
         "0005-architecture-description-and-maturity.md",
+        "0006-calculation-evidence-provenance.md",
+        "0007-autonomous-development-authority.md",
     ):
         assert decision in index
     assert "supersed" in index.casefold()
@@ -160,3 +167,30 @@ def test_prd_and_trd_link_the_canonical_architecture_graph() -> None:
     ):
         assert path in combined
     assert "purpose-bound" in combined.casefold()
+
+
+def test_doctoring_tracks_current_and_draft_standards_separately() -> None:
+    """Do not silently promote a public draft to final normative guidance."""
+    doctoring = _text("docs/doctoring/canonical-architecture-documentation.md")
+    assert "ISO/IEC/IEEE 42010:2022" in doctoring
+    assert "ISO/IEC 25010:2023" in doctoring
+    assert "ISO/IEC 42001:2023" in doctoring
+    assert "ISO/IEC 23894:2023" in doctoring
+    assert "NIST AI 600-1" in doctoring
+    assert "SSDF Version 1.1" in doctoring
+    assert "Version 1.2" in doctoring
+    assert "Initial Public Draft" in doctoring
+
+
+def test_traceability_maps_conversation_level_requirements_to_repository_evidence() -> None:
+    """Keep cross-cutting architecture requirements connected to real evidence."""
+    traceability = _text("docs/standards/ARCHITECTURE_TRACEABILITY.md")
+    for requirement in (
+        "Deterministic calculation is authoritative",
+        "Purpose-bound personal data",
+        "Safe idempotency",
+        "Standalone + modular MSA",
+        "Work-conserving autonomous development",
+        "Backup/restore/retention/incident ownership",
+    ):
+        assert requirement in traceability
