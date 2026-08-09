@@ -1,129 +1,269 @@
 # Four Pillars Technical Requirements Document
 
+**Document maturity:** protected-main behavior is `implemented_on_protected_main`; open-PR/future behavior is labeled explicitly.
+
 ## 1. Architecture principles
 
-The system has four trust boundaries. The **calculation core** accepts validated birth input and produces immutable chart/luck models. The **interpretation boundary** serializes those models as untrusted evidence and calls one explicitly selected OpenAI-compatible adapter: direct NVIDIA NIM by default or optional Contextual Orchestrator for organization routing and governance. The **quality boundary** validates schema, fingerprint, completeness, balance, Korean copy, and safety. The **delivery boundary** stores and renders only approved results. No layer may silently assume responsibilities owned by an earlier layer.
+Four Pillars has four application trust boundaries:
 
-The selected interpretation adapter never changes deterministic evidence and never silently fails over to another backend. Traditional Four Pillars prose is symbolic and conditional; standards traceability governs software and AI operations rather than asserting scientific prediction.
+1. **Calculation boundary** — validated birth/time policy produces immutable typed chart/luck evidence.
+2. **Interpretation boundary** — one explicitly selected structured-generation adapter receives immutable evidence plus untrusted user context.
+3. **Quality boundary** — schema, fingerprint, completeness, balance, copy and safety rules decide whether prose may be published.
+4. **Delivery boundary** — only approved results become durable artifacts and completed job state.
+
+No layer may silently assume authority owned by an earlier layer. In particular, an LLM may interpret but cannot change deterministic evidence, and a persistence/provider adapter cannot change calendar policy.
+
+The canonical technical architecture is split across this TRD plus:
+
+- `docs/architecture/SYSTEM_ARCHITECTURE.md`
+- `docs/uml/architecture.md`
+- `docs/architecture/DATA_MODEL.md`
+- `docs/adr/README.md`
+- `docs/security/THREAT_MODEL.md`
+- `docs/technical/TEST_STRATEGY.md`
+- `docs/operations/OPERABILITY.md`
+- `docs/standards/DOCUMENTATION_AUDIT.md`
 
 ## 2. Technology stack
 
+Current protected-main stack:
+
 - Python 3.11 and 3.12
-- Pydantic 2 and Pydantic Settings 2 for data, LLM, and configuration contracts
-- FastAPI and Uvicorn for HTTP
-- Typer for CLI
-- SQLite WAL for the durable work queue
-- HTTPX for direct NVIDIA NIM and optional Contextual Orchestrator
+- Pydantic 2 / Pydantic Settings 2
+- FastAPI + Uvicorn
+- Typer CLI
+- SQLite WAL for the built-in single-node queue/history adapter
+- HTTPX for direct NVIDIA NIM and explicit Contextual Orchestrator integration
 - ReportLab CJK CID fonts for searchable Korean PDF
-- Korean Lunar Calendar for solar/lunar input conversion
-- Pytest, pytest-cov, Ruff, and GitHub Actions for verification
-- Docker Compose for separate API and worker processes
+- Korean Lunar Calendar for supported Korean lunar/solar input conversion
+- Pytest + pytest-cov + Ruff
+- GitHub Actions with pinned/reviewed third-party actions where repository policy requires
+- Docker/Compose for independent API + worker deployment.
 
-## 3. Components
+No Rust/GPU arithmetic requirement is introduced because Four Pillars is not a psychometric/numerical-optimization product whose current workload justifies a new native compute plane. Deterministic astronomical/calendar code remains auditable Python; a future performance rewrite would require parity evidence and a separate ADR.
 
-### 3.1 `calendar.py` and `solar.py`
+## 3. Deterministic calculation components
 
-`solar.py` evaluates a bounded VSOP87 Earth longitude/radius series in Terrestrial Time and applies FK5, dominant nutation, and aberration corrections without a network or third-party ephemeris dependency. `calendar.py` locates the month-changing roots, normalizes birth time, calculates four pillars, ten gods, hidden stems, growth stages, element balance, interactions, boundary warnings, and the SHA-256 fingerprint.
+### 3.1 `solar.py`
 
-All twelve 2026 `jie` boundaries are checked against committed KASI/NAOJ minute-precision evidence with a two-minute budget and buyer-visible five-minute year/month transition tests. The calculation evidence version is `calendar-1.1.0`.
+`solar.py` evaluates the bounded VSOP87 Earth longitude/radius series in Terrestrial Time and applies the repository's documented FK5/nutation/aberration corrections without a network or hosted ephemeris dependency. Root solving locates apparent-solar-longitude crossings used by the Four Pillars calendar policy.
 
-### 3.2 `fortune.py`
+The implementation is independently checked against KASI/NAOJ 2026 solar-term evidence. All twelve production month-changing `jie` boundaries are covered with a minute-level budget, and buyer-visible year/month transition tests exercise both sides of relevant boundaries. Current calculation evidence version: `calendar-1.1.0`.
 
-Consumes a `Chart` and creates daewoon scenarios, annual snapshots, and monthly snapshots. It preserves the chart day master when assigning ten gods and returns interactions between temporary pillars and natal pillars.
+### 3.2 `calendar.py`
 
-### 3.3 `generation.py`, `nim.py`, `contextual_orchestrator.py`, and `analysis.py`
+Responsibilities:
 
-`StructuredGenerationClient` is the structural boundary consumed by staged report generation. `nim.py` owns the shared OpenAI-compatible structured-generation transport: Bearer authentication, timeouts, retry, JSON extraction, Pydantic validation, and bounded schema repair. `NimClient` configures that behavior for direct hosted NVIDIA NIM.
+- validate/normalize solar or supported Korean lunar input;
+- apply IANA timezone and configured local mean/apparent solar-time policy;
+- determine Li Chun year and current/next month-changing `jie`;
+- calculate year/month/day/hour pillars;
+- preserve configurable midnight/late-Zi rollover;
+- leave hour pillar unresolved when birth time is unknown;
+- derive Ten Gods, hidden stems, Twelve Growth stages, element balance and supported interactions;
+- emit boundary warnings;
+- generate the immutable SHA-256 calculation fingerprint.
 
-`ContextualOrchestratorClient` configures the same behavior for `POST /v1/chat/completions` on the organization gateway. It adds prompt-safe attribution—always `service=four-pillars` plus optional account, team, group, and company—and synchronous routing metadata. It uses `response_format={"type":"json_object"}` so provider features survive the orchestrator's structured-output passthrough. No birth data, user notes, report content, fingerprint, path, or credential is used as attribution.
+Calculation policy changes require calculation-version review, independent fixtures, test-strategy update, and ADR review if the source-of-truth semantics change.
 
-`analysis.py` calls versioned stage prompts through the structural client, synthesizes the report, and requests one editorial repair only when deterministic quality checks fail. The trace contract remains compatible across backends.
+### 3.3 `fortune.py`
 
-### 3.4 `quality.py`
+Consumes the natal `Chart` and returns daewoon scenarios, annual snapshots and monthly snapshots. It preserves the natal day master for Ten-God relations and calculates supported interactions between temporary and natal pillars.
 
-The quality gate compares calculation fingerprints, verifies required chapters, requires opportunity/caution/action lists, tests constructive relationship guidance, scans forbidden/vague copy, rejects deterministic event certainty and medical directions, and validates the disclaimer. Failure becomes a `quality_failed` job after the bounded repair attempt.
+Annual luck changes at Li Chun; monthly luck changes at the relevant `jie`, not at Gregorian month boundaries. When the direction cannot be uniquely selected from configured gender policy, both scenarios are returned rather than guessed.
 
-### 3.5 `jobs.py`, `history.py`, `service.py`, and `api.py`
+## 4. Structured generation and interpretation
 
-SQLite stores queued, running, completed, failed, and quality-failed jobs. `BEGIN IMMEDIATE` provides atomic keyed creation and claim operations. `history.py` encodes strict versioned continuation cursors containing only a UTC timestamp and random UUID. `JobStore` implements indexed `(created_at DESC, id DESC)` keyset traversal with exact optional status filtering. The service calculates, invokes the selected interpreter, writes to a temporary artifact directory, and atomically renames it. FastAPI exposes calculation, enqueue, redacted history, individual status, deletion, and allow-listed artifact endpoints.
+### 4.1 Structural boundary
 
-The required `ReportJobRepository` remains backward compatible. Atomic keyed creation and history traversal are separate runtime-checkable capabilities, so an existing organization or MSA adapter can continue serving required operations and fails explicitly only when an unsupported optional endpoint is invoked.
+`StructuredGenerationClient` is the application protocol for structured generation. The implementation must be provider-neutral at the application layer while provider selection remains explicit at configuration/deployment time.
 
-When no interpreter is injected, `build_report_interpreter(settings)` selects `NimReportInterpreter` for `nvidia_nim` or `ContextualOrchestratorReportInterpreter` for `contextual_orchestrator`. Explicitly injected MSA interpreters remain authoritative.
+### 4.2 Direct NVIDIA NIM
 
-### 3.6 `reporting.py`
+`NimClient` uses direct hosted NVIDIA NIM under `NVIDIA_NIM_API_KEY`. It implements:
 
-The renderer escapes HTML, uses fixed semantic colors, builds searchable Korean PDF with CJK CID fonts, emits intermediate calculation/report JSON, and records SHA-256 hashes in `manifest.json`. It deliberately omits footers and page numbers from the default report.
+- Bearer authentication;
+- request timeout;
+- bounded transient retries;
+- JSON object response mode;
+- Pydantic schema validation;
+- bounded schema repair;
+- trace/model/attempt metadata.
 
-## 4. Data flow
+A direct NIM failure is visible; it never silently changes provider.
 
-1. API or CLI validates `BirthInput` and `ReportRequest`.
-2. Calculation core creates `Chart`, `DaewoonResult`, annual `LuckSnapshot`, and monthly `LuckSnapshot`.
-3. The chart fingerprint and full immutable JSON are passed to each prompt.
-4. The selected structured-generation backend returns a Pydantic-validated section or draft.
-5. Synthesis returns the full report structure.
-6. Quality gate compares report and deterministic source.
-7. Optional editorial repair changes copy but cannot change calculations.
-8. Renderer writes JSON, HTML, PDF, traces, and manifest to a temporary UUID directory.
-9. Successful generation atomically publishes the directory and marks the job completed.
-10. Authenticated history reads return only redacted job summaries and an opaque exclusive keyset boundary; they never read or serialize stored report requests.
+### 4.3 Contextual Orchestrator
 
-## 5. Calculation policy
+`ContextualOrchestratorClient` is an explicit optional OpenAI-compatible organization adapter using `CONTEXTUAL_ORCHESTRATOR_TOKEN`. It adds prompt-safe organization attribution and permits the gateway to implement approved routing/conduct behavior without exposing provider administration credentials to Four Pillars.
 
-Modern Gregorian dates use integer Julian day numbers for the sexagenary day and the bounded VSOP87 apparent-solar-longitude implementation for `jie` crossings. UTC is converted to Terrestrial Time through tabled `TAI-UTC` plus 32.184 seconds. The year changes at 315 degrees apparent solar longitude (Li Chun). Month branches start at Xiao Han, Li Chun, Jing Zhe, Qing Ming, Li Xia, Mang Zhong, Xiao Shu, Li Qiu, Bai Lu, Han Lu, Li Dong, and Da Xue.
+Attribution may include `service=four-pillars` and approved organization dimensions. It must not contain personal subject labels, birth/context input, prompt/report text, calculation fingerprint, internal paths, API credentials, or model-provider credentials.
 
-The service records calculation version `calendar-1.1.0` and warns within six hours of a boundary. The KASI 2026 fixture and signed timing deltas are independently reviewable; historical timezone and pre-1972 timescale limitations remain explicit. See `CALCULATION.md` and `docs/doctoring/kasi-solar-term-golden-fixtures.md`.
+Four Pillars does not import Contextual Orchestrator internals and does not access its private database. The gateway is an external/deployment boundary.
 
-## 6. Interpretation backend contract
+### 4.4 Analysis pipeline
 
-### Direct NVIDIA NIM
+`analysis.py` runs versioned prompt stages for natal, daewoon, annual, monthly, practical skills, synthesis, and a bounded editorial repair when required. Prompt/model identities and response schema are versioned/traceable.
 
-The direct key is supplied only through `NVIDIA_NIM_API_KEY`. The base URL, model, timeout, retry budget, and repair budget use the `NIM_*` settings. The client sends `response_format={"type":"json_object"}` and includes Pydantic JSON Schema in a bounded repair instruction when the first output is invalid.
+User context and model output are untrusted data. A model cannot change the fingerprint or deterministic source values. LLM-as-a-judge is supplementary and cannot authorize publication, merge, release, or a calculation change.
 
-### Contextual Orchestrator
+## 5. Quality component
 
-The gateway token is supplied only through `CONTEXTUAL_ORCHESTRATOR_TOKEN`. The base URL, model, timeout, retry budget, repair budget, and organizational attribution use `CONTEXTUAL_ORCHESTRATOR_*` settings. The gateway may route to NVIDIA workers or other organization-approved providers, but Four Pillars sees one explicit orchestrator boundary and does not receive provider administration credentials.
+`quality.py` must fail closed when:
 
-### Shared reliability
+- calculation fingerprint/facts are inconsistent;
+- required chapters are absent;
+- constructive possibilities, cautions or actions are missing;
+- relationship guidance becomes warning-only;
+- copy uses known ambiguous/malformed patterns that alter meaning;
+- generated text makes deterministic event-certainty claims;
+- generated text gives diagnosis/treatment instructions;
+- generated text presents the model/app as empirical authority for real-world outcomes;
+- disclaimer/real-world evidence boundaries are absent where required.
 
-HTTP 408, 429, and 5xx responses are retried using integer `Retry-After` or bounded exponential delay. Network timeouts and connection failures are retried. Other 4xx responses fail immediately. A selected backend failure is visible and never triggers implicit fallback.
+One bounded editorial-repair path may improve prose but may not change calculations.
 
-## 7. Reliability and failure handling
+## 6. Persistence, history and idempotency
 
-The queue persists before model work begins. Workers claim one job atomically. Partial artifact directories are hidden with a dot prefix and deleted after failure. Terminal errors are truncated before database storage. A worker restart leaves already-running jobs visible for operational inspection; a future recovery command may requeue them after an operator confirms that no worker owns them. Calculation and quality errors are distinguished from network/model errors.
+### 6.1 Standalone `JobStore`
 
-History pages fetch one more row than requested and emit a cursor only when another row exists. Equal timestamps use the UUID as a deterministic tie-breaker. New concurrent inserts appear on a future first-page read rather than inside an existing continuation sequence. Unsupported cursor versions and malformed payloads fail closed.
+`jobs.py` owns the built-in SQLite `report_jobs` table. Exact fields, lifecycle, indexes, sensitivity, and ERD are documented in `docs/architecture/DATA_MODEL.md`.
 
-## 8. Security and privacy
+`BEGIN IMMEDIATE` is used for atomic keyed creation/claim boundaries. Existing additive migration code backfills request fingerprints and adds idempotency/history fields/indexes without introducing single-word application-owned database objects.
 
-Birth context is untrusted data enclosed in a JSON input boundary. API keys use digest comparison. Provider and orchestrator credentials use Authorization headers. Artifact names are allow-listed and path-resolved. HTML is escaped. UUIDs avoid personal filenames. Container execution uses a non-root account. Production must use TLS, restricted artifact storage, secret management, log redaction, and retention/deletion procedures.
+### 6.2 Repository capabilities
 
-Report-history responses and cursors exclude subject labels, birth data, user notes, request fingerprints, idempotency material, generated copy, model traces, and artifact paths. The history cursor is not an authorization credential; the same optional API-key dependency protects the endpoint.
+`ReportJobRepository` remains the required application port. Atomic idempotent creation and history traversal are separate optional runtime-checkable capabilities so existing MSA adapters remain compatible and unsupported endpoints fail explicitly rather than pretending success.
 
-Interpretation attribution contains organizational labels only. It must never contain personal information, prompt content, generated copy, fingerprints, paths, or credentials.
+### 6.3 History
 
-## 9. Observability
+`history.py` owns strict versioned cursors containing only an exclusive UTC timestamp and opaque job UUID. Stable order is `(created_at DESC, id DESC)` with exact optional status filtering. The API fetches one extra row to decide whether to issue a continuation cursor.
 
-Health checks prove process availability; readiness verifies artifact writes and database reads. Job rows record state and timestamps. `traces.json` records model, request-attempt count, and schema-repair count without storing credentials or model content. `manifest.json` records calculation fingerprint, model, prompt versions, and file hashes. Contextual Orchestrator may maintain its own usage and cost ledger by approved organizational dimensions.
+History output never serializes `request_json`, personal context, request fingerprints, idempotency material, generated report text, traces, or internal artifact paths.
 
-Current generation traces are not W3C distributed traces. A future separately reviewed change may propagate `traceparent` and `tracestate` under the target-state controls in `docs/standards/TRACEABILITY.md`.
+### 6.4 Idempotency
 
-## 10. Test strategy
+The raw client idempotency key is not stored. The standalone repository persists a SHA-256 key digest and canonical request fingerprint under an atomic uniqueness boundary. Same key/same request replays the job; same key/different request raises a stable conflict error.
 
-Unit tests cover known pillars, all twelve externally published 2026 solar-term instants and transitions, time policies, ten gods, daewoon direction, monthly period dates, queue transitions, idempotent creation, strict history cursors, stable multi-page traversal, privacy redaction, optional adapter behavior, quality rules, report rendering, and API authentication.
+Any multi-node adapter must preserve equivalent atomic semantics.
 
-Structured-generation contract tests use `httpx.MockTransport` to verify both direct NIM and orchestrator authentication, endpoint shape, JSON mode, attribution, routing, schema validation, bounded repair, transient retry, terminal error, backend selection, and no-fallback behavior. Live direct NIM tests are marked and skipped without `NVIDIA_NIM_API_KEY`.
+## 7. Service/application composition
 
-CI compiles source, validates documents/prompts, runs Ruff, enforces exactly 100 percent statement and branch coverage, builds distributions, and verifies the pinned runtime container. LLM judge results are supplementary because peer-reviewed research documents adversarial and judgment-bias risks.
+`ReportService` composes calculation, durable repository, selected/injected interpreter, quality validation, and `ArtifactPublisher`.
 
-## 11. Deployment
+Settings-based interpreter selection runs only when a custom interpreter has not been injected. An organization adapter can therefore replace interpretation/persistence/artifact components without forking the deterministic package.
 
-The same image runs API or worker commands. Docker Compose mounts one shared artifact volume. SQLite is appropriate for a single-node deployment; a multi-node edition should replace `JobStore` with PostgreSQL or a managed queue while preserving required and optional application interfaces. A history-capable remote adapter must preserve deterministic exclusive keyset ordering across every API instance.
+Report generation stages output into a temporary/staging artifact location and publish atomically before the job becomes `completed`.
 
-Direct NIM remains the default independent product. An organization module may select Contextual Orchestrator without installing it as a Python dependency or changing domain/application contracts. The Contextual Orchestrator URL and token are deployment concerns; the gateway may itself be shared with central `.github`, `naruon`, and other services.
+## 8. API and browser boundary
 
-## 12. Standards and research traceability
+FastAPI exposes calculation, luck, report enqueue/status/history/delete and allow-listed artifact retrieval endpoints under the documented API contract.
 
-`docs/standards/REFERENCES.md` records APA 7th references for ISO/IEC 25010:2023, ISO/IEC 42001:2023, ISO/IEC 23894:2023, NIST AI RMF 1.0, NIST AI 600-1, RFC 9457, W3C Trace Context, KASI/NAOJ calendar evidence, VSOP87, IERS timescales, JPL DE440, and peer-reviewed LLM-judge research. `docs/standards/TRACEABILITY.md` maps those sources to code, tests, workflows, and residual gaps.
+The browser studio:
 
-The mapping is maintained by `check_docs.py`, `product_gap_audit.py`, the hourly quality loop, PR review, and semantic releases. It is not an ISO certification statement or scientific validation of traditional interpretation.
+- can calculate first and expose fingerprint/boundaries before generation;
+- can list/filter/append recent redacted jobs;
+- resumes queued/running polling;
+- suppresses stale history/poll responses with sequence guards;
+- renders untrusted API values using safe DOM text operations;
+- bounds error text;
+- uses text/non-color state cues and polite live announcements;
+- keeps API credentials in current page memory, not persistent browser storage;
+- performs authenticated artifact downloads through headers rather than credential-bearing URLs.
+
+## 9. Reporting/artifacts
+
+`reporting.py` escapes HTML, uses the product report design, renders searchable Korean PDF with supported CJK CID fonts, emits calculation/report JSON and privacy-safe traces, and writes a SHA-256 manifest.
+
+Default reports omit footers/page numbers according to the established product decision. Material report-template changes require visual inspection and, when the user flow/layout changes, synchronization with the authoritative Figma design.
+
+## 10. Purpose-bound privacy and security
+
+Four Pillars does not blanket-mask birth/context values required for the requested function. ADR 0004 and `docs/security/THREAT_MODEL.md` require **purpose-bound** processing:
+
+- minimum necessary data sent across each boundary;
+- authentication/authorization;
+- TLS and deployment storage encryption/access control;
+- redacted history and prompt-safe attribution;
+- separate direct-NIM/orchestrator/application/database secrets;
+- bounded retention and explicit deletion;
+- restricted/auditable privileged access;
+- provider/subprocessor/data-residency documentation for production deployment.
+
+`NVIDIA_NIM_API_KEY` is a direct NIM secret. `CONTEXTUAL_ORCHESTRATOR_TOKEN` is a different organization-gateway secret. `COPILOT_GITHUB_TOKEN` is prohibited for repository autonomous development.
+
+Artifact paths are rooted/allow-listed, HTML is escaped, API-key digest comparison is constant-time, and opaque UUIDs prevent subject names from becoming filesystem keys.
+
+## 11. Reliability and recovery
+
+The queue persists before model work. Workers claim atomically. Selected backend failure does not cause automatic provider fallback. Partial artifacts remain non-public and are cleaned after failed generation where the implementation can do so safely.
+
+Current `running` rows remain visible after a worker crash; automatic requeue is not assumed safe without an ownership/lease rule. Backup/restore, incident, SLI/SLO, retention/deletion and multi-node obligations are defined in `docs/operations/OPERABILITY.md`.
+
+## 12. Observability
+
+Health proves process liveness. Readiness verifies the minimum authoritative repository/artifact capabilities for the deployment. Operational metrics distinguish calculation, queue, selected backend, schema repair, quality repair, rendering and artifact publication.
+
+Ordinary telemetry excludes birth/context/request/report text, prompts, credentials, idempotency keys and internal artifact paths. `traces.json` records bounded model/attempt/repair identity evidence rather than published raw model content.
+
+W3C distributed trace propagation is `planned` unless a protected-main implementation says otherwise.
+
+## 13. Standalone and modular MSA deployment
+
+### Standalone — `implemented_on_protected_main`
+
+- SQLite WAL `JobStore`;
+- filesystem artifact publisher;
+- direct NVIDIA NIM by default;
+- API + worker containers/processes;
+- calculation endpoints independent from model availability.
+
+### Organization MSA — supported architecture
+
+An organization can inject a remote repository/queue, object-storage `ArtifactPublisher`, and Contextual Orchestrator while keeping domain/calculation/evidence contracts unchanged.
+
+Cross-service integration with central `.github`, `naruon`, contextual-orchestrator or other CWL services uses explicit APIs/ports/events/artifacts. Direct cross-service application-database access is prohibited.
+
+Multi-node persistence details are `planned` until a concrete adapter/migration is reviewed and tested.
+
+## 14. Autonomous development/control plane
+
+The existing minute-17 deterministic sentinel and minute-47 NVIDIA NIM/OpenCode product-development workflow are `implemented_on_protected_main`.
+
+The work-conserving/no-early-stop contract is documented in `docs/operations/AUTONOMOUS_DEVELOPMENT.md`. One generated PR per product-development run is a writer-safety boundary, not permission to stop after one inventory/RCA/test/document change.
+
+PR #29's minute-07 exact-head PR steward is `active_pr`. It must not be called shipped until protected-main merge and required operational acceptance.
+
+Model-based development uses `NVIDIA_NIM_API_KEY`, not `COPILOT_GITHUB_TOKEN`, and must not receive reviewer/merge/release identity. Independent review/Checks/branch governance remain separate authority.
+
+## 15. Test and release contract
+
+`docs/technical/TEST_STRATEGY.md` is the authoritative detailed test strategy. Required protected-main/release evidence includes:
+
+- independent KASI/NAOJ solar-term fixtures and realistic Li Chun/`jie`/rollover transitions;
+- deterministic chart/luck/derived-relation tests;
+- persistence/idempotency/history/concurrency/privacy tests;
+- offline NIM/orchestrator structured-generation contract tests;
+- opt-in trusted hosted NIM tests using `NVIDIA_NIM_API_KEY`;
+- report rendering/artifact integrity tests;
+- exactly 100% owned production statement and branch coverage;
+- public production docstring completeness;
+- Ruff, compilation, document/prompt checks;
+- package/container build;
+- security/dependency/SAST gates required by repository policy;
+- exact-head review/provenance/version/CHANGELOG acceptance.
+
+Queued, pending, skipped-required, cancelled, stale/predecessor/synthetic-only or failed evidence is not passing evidence.
+
+## 16. Architecture/documentation fitness
+
+ADR 0005 establishes the authority/maturity model. The canonical graph must make product intent, technical ownership, system viewpoints, data/ERD, decisions, threats, testing, operability, standards/research, visual contracts and release history discoverable without chat reconstruction.
+
+A material code/API/model/workflow/persistence/lifecycle/trust-boundary change must update affected canonical documents or prove no impact. Documentation completeness is an engineering quality criterion, not a substitute for executable product work.
+
+## 17. Standards and research traceability
+
+`docs/standards/REFERENCES.md` and `docs/standards/TRACEABILITY.md` contain the broader APA 7th evidence map. `docs/standards/DOCUMENTATION_AUDIT.md` evaluates architecture completeness.
+
+Current primary governance references include ISO/IEC/IEEE 42010:2022, ISO/IEC 25010:2023, ISO/IEC 23894:2023, ISO/IEC 42001:2023, NIST AI RMF 1.0 / NIST AI 600-1, and final NIST SSDF SP 800-218 v1.1. NIST SP 800-218 Rev. 1 / SSDF 1.2 remains a draft as of this baseline and is not treated as a final normative source.
+
+The standards mapping is an engineering/readiness aid, not an ISO, CSAP, SOC 2, NIST or scientific-certification claim.
