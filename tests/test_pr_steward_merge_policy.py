@@ -79,11 +79,26 @@ def test_required_check_neutral_or_skipped_never_counts_as_passing(conclusion: s
     assert "exact_head_green" not in decision.reasons
 
 
-def test_blocked_or_unstable_head_may_queue_but_never_bypass_governance() -> None:
-    """Let GitHub auto-merge wait on residual branch rules after exact checks pass."""
+@pytest.mark.parametrize("state", ["BLOCKED", "UNSTABLE"])
+def test_blocked_or_unstable_head_waits_instead_of_queueing_merge(state: str) -> None:
+    """Require a passing merge state rather than delegating known blockers to auto-merge."""
 
     module = _module()
-    for state in ("BLOCKED", "UNSTABLE", "HAS_HOOKS"):
+    evidence = _green()
+    evidence["pull_request"]["merge_state_status"] = state
+
+    decision = module.decide_action(evidence)
+
+    assert decision.action == "wait"
+    assert "merge_state_not_queueable" in decision.reasons
+    assert "exact_head_green" not in decision.reasons
+
+
+def test_clean_or_has_hooks_head_can_queue_after_every_explicit_gate_passes() -> None:
+    """Allow only GitHub states that already report a passing commit status."""
+
+    module = _module()
+    for state in ("CLEAN", "HAS_HOOKS"):
         evidence = _green()
         evidence["pull_request"]["merge_state_status"] = state
 
