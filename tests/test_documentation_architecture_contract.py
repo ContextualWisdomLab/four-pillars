@@ -28,6 +28,7 @@ def test_canonical_documentation_families_exist() -> None:
         "docs/architecture/DATA_MODEL.md",
         "docs/uml/governance-and-data.md",
         "docs/security/THREAT_MODEL.md",
+        "docs/technical/JOB_STATUS_SCHEMA.md",
         "docs/technical/TEST_STRATEGY.md",
         "docs/operations/OPERABILITY.md",
         "docs/operations/AUTONOMOUS_DEVELOPMENT.md",
@@ -36,24 +37,36 @@ def test_canonical_documentation_families_exist() -> None:
         assert (ROOT / relative_path).is_file(), relative_path
 
 
-def test_documentation_maturity_prevents_plans_from_becoming_shipped_claims() -> None:
-    """Distinguish protected-main facts, accepted decisions, active PRs, and plans."""
-    combined = "\n".join(
-        (
-            _text("docs/standards/DOCUMENTATION_AUDIT.md"),
-            _text("docs/architecture/SYSTEM_ARCHITECTURE.md"),
-            _text("docs/adr/0005-architecture-description-and-maturity.md"),
-        )
-    )
+def test_documentation_maturity_has_canonical_labels_and_semantic_exclusivity() -> None:
+    """Prevent active/planned claims from being classified as protected-main behavior."""
+    audit = _text("docs/standards/DOCUMENTATION_AUDIT.md")
+    architecture = _text("docs/architecture/SYSTEM_ARCHITECTURE.md")
+    decision = _text("docs/adr/0005-architecture-description-and-maturity.md")
+    combined = "\n".join((audit, architecture, decision))
     for maturity in (
         "implemented_on_protected_main",
         "accepted_architecture",
         "active_pr",
         "planned",
+        "deprecated",
         "superseded",
     ):
         assert maturity in combined
-    assert "PR #29" in combined
+
+    pr_steward_lines = [line for line in combined.splitlines() if "PR #29" in line]
+    assert pr_steward_lines
+    assert any("active_pr" in line for line in pr_steward_lines)
+    assert all("implemented_on_protected_main" not in line for line in pr_steward_lines)
+
+    planned_multi_node_lines = [
+        line
+        for line in combined.splitlines()
+        if "multi-node" in line.casefold() and "planned" in line.casefold()
+    ]
+    assert planned_multi_node_lines
+    assert all(
+        "implemented_on_protected_main" not in line for line in planned_multi_node_lines
+    )
 
 
 def test_adr_index_names_existing_and_cross_cutting_decisions() -> None:
@@ -70,10 +83,11 @@ def test_adr_index_names_existing_and_cross_cutting_decisions() -> None:
     ):
         assert decision in index
     assert "supersed" in index.casefold()
+    assert "Accepted with" not in index
 
 
-def test_data_model_records_actual_standalone_schema_and_indexes() -> None:
-    """Describe the durable queue that the standalone adapter really owns."""
+def test_data_model_records_actual_schema_indexes_and_idempotency_syntax() -> None:
+    """Describe the durable queue and its exact public idempotency contract."""
     data_model = _text("docs/architecture/DATA_MODEL.md")
     for database_object in (
         "report_jobs",
@@ -86,6 +100,36 @@ def test_data_model_records_actual_standalone_schema_and_indexes() -> None:
     assert "erDiagram" in data_model
     assert "request_json" in data_model
     assert "idempotency_key_digest" in data_model
+    for phrase in (
+        "RFC 8941 structured-string",
+        "8 through 128",
+        "same key digest + different request fingerprint",
+    ):
+        assert phrase in data_model
+
+
+def test_public_job_status_schema_is_redacted_and_bounded() -> None:
+    """Define one canonical status projection instead of scattered field prose."""
+    schema = _text("docs/technical/JOB_STATUS_SCHEMA.md")
+    for allowed in (
+        "`id`",
+        "`status`",
+        "`created_at`",
+        "`updated_at`",
+        "`error`",
+        "`artifacts`",
+        "4,000",
+        "failed",
+        "quality_failed",
+    ):
+        assert allowed in schema
+    for forbidden_internal in (
+        "`request_json`",
+        "request fingerprint",
+        "idempotency-key digest",
+        "internal artifact directory",
+    ):
+        assert forbidden_internal in schema
 
 
 def test_threat_model_uses_purpose_bound_privacy_not_blanket_masking() -> None:
@@ -149,10 +193,29 @@ def test_autonomous_development_contract_is_work_conserving_and_safe() -> None:
         "mandatory final sweep",
         "exact head",
         "exact live base",
+        "credential-free verification",
+        "fails closed",
         "NVIDIA_NIM_API_KEY",
         "COPILOT_GITHUB_TOKEN",
+        "approved report-generation purpose",
+        "field-level input schema",
     ):
         assert phrase.casefold() in normalized
+
+
+def test_uml_matches_real_port_method_names() -> None:
+    """Keep diagrams from inventing a second MSA contract."""
+    uml = _text("docs/uml/governance-and-data.md")
+    for signature in (
+        "+finish(job_id, artifact_dir) ReportJob",
+        "+fail(job_id, error, quality=false) ReportJob",
+        "+purge(retention_days)",
+        "+generate(subject_name, chart, daewoon, annual, monthly, user_context)",
+        "+publish(directory, report, chart, daewoon, annual, monthly, traces)",
+    ):
+        assert signature in uml
+    assert "+complete(job_id, artifact_dir)" not in uml
+    assert "+publish(staged_path, job_id)" not in uml
 
 
 def test_prd_and_trd_link_the_canonical_architecture_graph() -> None:
