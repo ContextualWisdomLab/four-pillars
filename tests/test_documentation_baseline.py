@@ -3,6 +3,9 @@
 from pathlib import Path
 
 CANONICAL_FILES = (
+    "docs/product/PRD.md",
+    "docs/technical/TRD.md",
+    "docs/technical/MODULARITY.md",
     "docs/architecture/DOCUMENTATION_MAP.md",
     "docs/architecture/DOCUMENTATION_AUDIT_2026-08-09.md",
     "docs/adr/README.md",
@@ -67,6 +70,7 @@ def test_contextual_orchestrator_documentation_matches_production_native_json_mo
 
     for path in (
         "docs/technical/TRD.md",
+        "docs/technical/MODULARITY.md",
         "docs/uml/architecture.md",
         "docs/standards/TRACEABILITY.md",
     ):
@@ -74,6 +78,19 @@ def test_contextual_orchestrator_documentation_matches_production_native_json_mo
         assert "native_json_mode=False" in text
         assert "Pydantic" in text
         assert "no silent" in text.casefold() or "never silently" in text.casefold()
+
+
+def test_modularity_forbids_shared_application_database_coupling() -> None:
+    """Keep standalone and MSA composition behind versioned ports rather than table access."""
+    modularity = _text("docs/technical/MODULARITY.md")
+    for token in (
+        "No shared application database",
+        "versioned APIs, events, structural ports, or immutable artifacts",
+        "must not reach directly into Four Pillars application tables",
+        "must not depend on another service's private tables",
+        "Purpose-bound personal data",
+    ):
+        assert token in modularity
 
 
 def test_data_model_names_only_the_current_application_table_as_persisted() -> None:
