@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+import shutil
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
@@ -54,7 +55,7 @@ class ReportJobView(BaseModel):
     status: JobStatus
     created_at: datetime
     updated_at: datetime
-    error: str | None = None
+    error: str | None = Field(default=None, max_length=4000)
     artifacts: list[str] = Field(default_factory=list)
 
 
@@ -98,6 +99,36 @@ def _job_view(job: ReportJob, service: ReportService) -> ReportJobView:
         error=job.error,
         artifacts=artifacts,
     )
+
+
+def _trusted_artifact_root(
+    service: ReportService,
+    job_id: str,
+    stored_artifact_dir: str | None,
+) -> Path | None:
+    """Return only an exact direct child of the configured artifact root."""
+    configured_root = service.settings.artifact_dir.resolve()
+    candidate = (
+        Path(stored_artifact_dir).resolve()
+        if stored_artifact_dir is not None
+        else (configured_root / job_id).resolve()
+    )
+    if candidate.parent != configured_root or candidate.name != job_id:
+        return None
+    return candidate
+
+
+def _remove_artifact_root(root: Path | None) -> None:
+    """Remove one trusted artifact tree or expose a retryable cleanup failure."""
+    if root is None or not root.exists():
+        return
+    try:
+        shutil.rmtree(root)
+    except OSError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Report row deleted; artifact cleanup incomplete. Retry deletion.",
+        ) from exc
 
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
@@ -144,7 +175,7 @@ def annual(request: LuckRequest) -> LuckSnapshot:
 
 @app.post("/v1/luck/monthly", response_model=LuckSnapshot, dependencies=[Depends(require_api_key)])
 def monthly(request: LuckRequest) -> LuckSnapshot:
-    """Calculate one solar-term-bounded monthly luck snapshot."""
+    """Calculate one solar-term-bounded monthly luck snapshot for one month."""
     return calculate_monthly_luck(calculate_chart(request.birth), request.year, request.month)
 
 
@@ -256,16 +287,16 @@ def get_artifact(
 
 @app.delete("/v1/reports/{job_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_api_key)])
 def delete_report(job_id: str, service: ReportService = Depends(get_service)) -> None:
-    """Delete a terminal job and only its validated UUID artifact directory."""
+    """Delete terminal state first, then remove only its trusted artifact tree."""
     job = service.store.get(job_id)
     if job is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report job not found")
-    if job.artifact_dir:
-        root = Path(job.artifact_dir).resolve()
-        configured_root = service.settings.artifact_dir.resolve()
-        if root.parent == configured_root and root.name == job.id and root.exists():
-            import shutil
+        retry_root = _trusted_artifact_root(service, job_id, None)
+        if retry_root is None or not retry_root.exists():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report job not found")
+        _remove_artifact_root(retry_root)
+        return
 
-            shutil.rmtree(root)
+    artifact_root = _trusted_artifact_root(service, job.id, job.artifact_dir) if job.artifact_dir else None
     if not service.store.delete(job_id):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only terminal jobs can be deleted")
+    _remove_artifact_root(artifact_root)
