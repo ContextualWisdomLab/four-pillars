@@ -27,18 +27,22 @@ When sources conflict, use this order unless a higher-order repository policy ex
 
 Lower-ranked material may discover a defect or future requirement but cannot by itself prove shipped behavior.
 
-### Maturity labels
+### Canonical maturity labels
 
-Architecture descriptions SHALL use these labels where lifecycle ambiguity matters:
+Architecture descriptions SHALL use exactly these labels where lifecycle ambiguity matters:
 
-- `implemented_on_protected_main`
-- `accepted_architecture`
-- `active_pr`
-- `planned`
-- `deprecated`
-- `superseded`
+| Label | Meaning | May be presented as shipped? |
+|---|---|---|
+| `implemented_on_protected_main` | The exact current protected-main source/tests or protected release directly implement the claim; required operational proof is complete where the claim depends on runtime operation. | yes |
+| `accepted_architecture` | An Accepted ADR/design invariant governs future/current implementation, but the label alone does not prove every described capability is shipped. | no, unless separately evidenced as implemented |
+| `active_pr` | The capability/change exists only on one or more open PR heads and remains subject to review, Checks, base movement, and merge. | no |
+| `planned` | Future work or an approved backlog/design direction with no protected-main implementation claim. | no |
+| `deprecated` | A protected-main/released capability still exists for compatibility but new designs should not depend on it and an exit/supersession path is expected. | yes, but only as deprecated current behavior |
+| `superseded` | A historical decision/plan/PR is no longer authoritative because a newer accepted/implemented source replaced it. | no |
 
-An `active_pr` capability may not be presented as `implemented_on_protected_main` until the implementation reaches protected main and any required operational acceptance succeeds.
+These labels are mutually exclusive for one claim at one point in time. A capability can move from `planned` → `active_pr` → `implemented_on_protected_main`; an implementation may later become `deprecated` and eventually `superseded`. `accepted_architecture` describes governing design authority and must be paired with separate implementation evidence when a document needs to assert that the design is shipped.
+
+An `active_pr` or `planned` capability may not also be labeled `implemented_on_protected_main`. PR #29 is the current contract example: it remains `active_pr` until its implementation reaches protected main and any required protected-main operational acceptance succeeds.
 
 ### Canonical documentation graph
 
@@ -56,6 +60,7 @@ The minimum current graph is:
 - `docs/operations/OPERABILITY.md` and runbooks
 - `docs/standards/REFERENCES.md`
 - `docs/standards/TRACEABILITY.md`
+- `docs/standards/ARCHITECTURE_TRACEABILITY.md`
 - `docs/standards/DOCUMENTATION_AUDIT.md`
 - user-facing Figma references when implementation has a visual contract
 - `CHANGELOG.md`, AGENTS/CLAUDE instructions, and release/provenance evidence.
@@ -70,7 +75,9 @@ PR #29 proposes a minute-07 exact-head PR steward. Until that PR reaches protect
 
 ## Machine-checkable fitness
 
-Repository tests should verify existence and high-value cross-links for the canonical document families. The test should not attempt to prove architecture quality by word count alone; it should check stable invariants such as real database object names, explicit maturity labels, security credentials, independent calculation fixtures, purpose-bound privacy, recovery requirements, and links from PRD/TRD into the architecture graph.
+Repository tests should verify existence and high-value cross-links for the canonical document families. The tests must check maturity semantics rather than mere word presence: known `active_pr` and `planned` claims must not share a line/classification entry with `implemented_on_protected_main`, and a documented transition to shipped status must require protected-main/operational evidence.
+
+The documentation test should not attempt to prove architecture quality by word count alone; it should check stable invariants such as real database object names, explicit maturity labels, security credentials, independent calculation fixtures, purpose-bound privacy, recovery requirements, and links from PRD/TRD into the architecture graph.
 
 ## Consequences
 
