@@ -119,6 +119,38 @@ def test_delete_report_rejects_missing_jobs_without_a_trusted_orphan(
     assert captured.value.status_code == 404
 
 
+def test_delete_report_rejects_a_non_uuid_orphan_directory(tmp_path: Path) -> None:
+    """Never treat an arbitrary direct child as a recoverable report artifact."""
+    service = configured_service(tmp_path)
+    unrelated = service.settings.artifact_dir / "operator-backup"
+    unrelated.mkdir(parents=True)
+    marker = unrelated / "keep.txt"
+    marker.write_text("keep", encoding="utf-8")
+
+    with pytest.raises(HTTPException) as captured:
+        api_module.delete_report("operator-backup", service)
+
+    assert captured.value.status_code == 404
+    assert marker.read_text(encoding="utf-8") == "keep"
+
+
+def test_delete_report_rejects_a_staging_directory_name(tmp_path: Path) -> None:
+    """Keep hidden staging directories outside the missing-row orphan recovery path."""
+    service = configured_service(tmp_path)
+    job = service.store.create({"subject_name": "staged"})
+    staged = service.settings.artifact_dir / f".{job.id}.tmp"
+    staged.mkdir(parents=True)
+    marker = staged / "keep.txt"
+    marker.write_text("keep", encoding="utf-8")
+    service.store.delete(job.id)
+
+    with pytest.raises(HTTPException) as captured:
+        api_module.delete_report(f".{job.id}.tmp", service)
+
+    assert captured.value.status_code == 404
+    assert marker.read_text(encoding="utf-8") == "keep"
+
+
 def test_delete_report_preserves_artifacts_when_terminal_row_delete_is_refused(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
