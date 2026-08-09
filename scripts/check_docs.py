@@ -74,7 +74,6 @@ STANDARDS_TOKENS = {
 
 def main() -> None:
     """Fail when required doctoring is missing, too short, or incomplete."""
-
     failures: list[str] = []
     for name in REQUIRED:
         path = Path(name)
