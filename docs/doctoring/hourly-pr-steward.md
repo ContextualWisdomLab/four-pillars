@@ -53,8 +53,62 @@ artifact and branch revalidation.
 | Bind every handoff | Secure change-management and integrity principles | PR number, head/base SHA, numeric artifact ID, server digest, patch SHA-256, file/byte counts, and Git modes are revalidated. |
 | Allocate model compute by task | Fugu; Conductor; TRINITY | One bounded repair starts with one routed worker; deterministic selection, verification, publication, and merge are separate roles. |
 | Preserve release evidence | ISO/IEC 25010:2023 and repository policy | Python 3.11/3.12, 100% statement and branch coverage, docstrings, package, container, security, and SAST gates remain mandatory. |
+| Fail closed on required Check evidence | GitHub MergeStateStatus and protected-branch semantics plus stricter Four Pillars policy | Required groups match exact allowed Check names and require explicit `SUCCESS`; `NEUTRAL`/`SKIPPED` remain non-passing when they are a required group. |
 
-## Current standards status reviewed on 2026-08-07
+## Exact-head Check and merge-state policy
+
+GitHub exposes multiple pieces of merge evidence that must not be collapsed into
+one optimistic boolean. Its GraphQL `MergeStateStatus` distinguishes `CLEAN`
+(passing commit status and mergeable), `HAS_HOOKS` (passing commit status with
+pre-receive hooks), `UNSTABLE` (mergeable but non-passing commit status), and
+`BLOCKED` (merge blocked). Four Pillars therefore allows deterministic
+`queue_merge` classification only for `CLEAN` or `HAS_HOOKS`. `BLOCKED`,
+`UNSTABLE`, `BEHIND`, unknown, conflicting, or dirty states remain a wait/human
+or repair condition appropriate to their evidence.
+
+GitHub branch-protection documentation notes that required status-check handling
+can consider `success`, `skipped`, and `neutral` conclusions acceptable in some
+platform contexts. Four Pillars deliberately uses a **stricter local merge
+contract** for named required groups because the user contract explicitly says a
+skipped-required or neutral-required result is not positive proof that the exact
+head ran and passed the corresponding verification. Therefore:
+
+- an exact required Check group passes only with explicit `SUCCESS`;
+- a required `NEUTRAL`, `SKIPPED`, pending, absent, cancelled, timed-out,
+  action-required, stale, or failed result does not satisfy the group;
+- an optional informational Check may be `NEUTRAL` or `SKIPPED` without creating
+  a synthetic blocker when every independently named required group succeeds;
+- required names are matched by exact case-insensitive alias equality rather
+  than substring containment, preventing an informational name such as
+  `optional quality (3.11) informational` from impersonating the required
+  `quality (3.11)` gate;
+- explicit `reviewDecision=REVIEW_REQUIRED` remains `wait`; it is not inferred as
+  approval merely because automated review Checks happen to be green;
+- `CHANGES_REQUESTED` and current unresolved, non-outdated threads remain repair
+  conditions, subject to same-repository writer-safety constraints.
+
+This policy intentionally differs from the most permissive platform merge
+semantics. It does not alter GitHub branch protection; it makes the steward more
+conservative before it even asks GitHub to queue a governed merge.
+
+## TDD/RCA history for merge-policy hardening
+
+Focused regression cases were added for required neutral/skipped conclusions,
+required-Check name substring spoofing, `BLOCKED`/`UNSTABLE` merge state, and
+explicit `REVIEW_REQUIRED`. Source review showed that the previous classifier
+used `SUCCESS_CHECK_CONCLUSIONS={SUCCESS,NEUTRAL,SKIPPED}` both for optional
+Checks and required-group satisfaction, matched required aliases by substring,
+and classified `BLOCKED`/`UNSTABLE` as queueable. The corrected policy now keeps
+optional informational neutral/skipped outcomes benign while requiring explicit
+`SUCCESS` and exact names for required groups; queueable merge states are limited
+to `CLEAN` and `HAS_HOOKS`; `REVIEW_REQUIRED` waits.
+
+The repository-wide exact-head CI/security/review evidence remains authoritative
+for deciding whether this source change itself is mergeable. The existence of a
+regression test or this doctoring text is not promoted to passing evidence while
+its current-head workflow runs are queued or incomplete.
+
+## Current standards status reviewed on 2026-08-09
 
 NIST SP 800-218 Version 1.1 remains final. NIST published SP 800-218 Rev. 1 as
 the initial public draft of SSDF Version 1.2 on December 17, 2025; its public
@@ -158,19 +212,22 @@ Booth, H., Souppaya, M., Vassilev, A., Ogata, M., Stanley, M., & Scarfone, K.
 foundation models: An SSDF community profile* (NIST SP 800-218A). National
 Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-218A
 
-GitHub. (n.d.-a). *About protected branches*. GitHub Docs. Retrieved August 7,
+GitHub. (n.d.-a). *About protected branches*. GitHub Docs. Retrieved August 9,
 2026, from https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches
 
 GitHub. (n.d.-b). *Automatically merging a pull request*. GitHub Docs. Retrieved
-August 7, 2026, from https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/automatically-merging-a-pull-request
+August 9, 2026, from https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/automatically-merging-a-pull-request
 
 GitHub. (n.d.-c). *Making authenticated API requests with a GitHub App in a
-GitHub Actions workflow*. GitHub Docs. Retrieved August 7, 2026, from
+GitHub Actions workflow*. GitHub Docs. Retrieved August 9, 2026, from
 https://docs.github.com/en/apps/creating-github-apps/writing-code-for-a-github-app/making-authenticated-api-requests-with-a-github-app-in-a-github-actions-workflow
 
 GitHub. (n.d.-d). *Security hardening for GitHub Actions*. GitHub Docs.
-Retrieved August 7, 2026, from
+Retrieved August 9, 2026, from
 https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions
+
+GitHub. (n.d.-e). *MergeStateStatus*. GitHub Docs. Retrieved August 9, 2026,
+from https://docs.github.com/en/graphql/reference/enums#mergestatestatus
 
 International Organization for Standardization. (2023a). *ISO/IEC 23894:2023
 Information technology—Artificial intelligence—Guidance on risk management*.
@@ -189,7 +246,7 @@ Korea Internet & Security Agency. (2025). *2025년 클라우드서비스 보안�
 안내서*. https://isms.kisa.or.kr/main/csap/notice
 
 Korea Internet & Security Agency. (n.d.). *클라우드 보안인증제 제도소개*.
-Retrieved August 7, 2026, from https://isms.kisa.or.kr/main/csap/intro/index.jsp
+Retrieved August 9, 2026, from https://isms.kisa.or.kr/main/csap/intro/index.jsp
 
 National Institute of Standards and Technology. (2022). *Secure software
 development framework (SSDF) version 1.1: Recommendations for mitigating the risk
@@ -201,9 +258,9 @@ Nielsen, S., Cetin, E., Schwendeman, P., Sun, Q., Xu, J., & Tang, Y. (2025).
 [Preprint]. arXiv. https://arxiv.org/abs/2512.04388
 
 NVIDIA. (n.d.). *NVIDIA NIM for large language models documentation*. Retrieved
-August 7, 2026, from https://docs.nvidia.com/nim/large-language-models/latest/
+August 9, 2026, from https://docs.nvidia.com/nim/large-language-models/latest/
 
-OpenCode. (n.d.). *OpenCode documentation*. Retrieved August 7, 2026, from
+OpenCode. (n.d.). *OpenCode documentation*. Retrieved August 9, 2026, from
 https://opencode.ai/docs/
 
 Sakana AI. (2026, June 22). *Sakana Fugu: One model to command them all*.
