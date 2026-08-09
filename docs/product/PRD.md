@@ -1,116 +1,188 @@
 # Four Pillars Product Requirements Document
 
+**Document maturity:** `implemented_on_protected_main` for shipped requirements; explicit `active_pr`/`planned` labels identify work that has not reached protected main.
+
 ## 1. Product vision
 
-Four Pillars converts verified birth data into a transparent Korean manse calendar calculation and then produces a useful, readable report. The product must earn trust by showing exactly which calendar facts were calculated, where a solar-term boundary creates uncertainty, which statements are traditional symbolic interpretation, and which actions are ordinary planning techniques.
+Four Pillars converts verified birth data into a transparent Korean manse calendar calculation and then produces a useful, readable report. The product earns trust by showing exactly which calendar facts were calculated, where a solar-term or time-policy boundary creates uncertainty, which statements are traditional symbolic interpretation, and which suggested actions are ordinary planning techniques rather than predictions.
 
-The product shall work independently with direct hosted NVIDIA NIM and as an organization module through Contextual Orchestrator. Model routing must never alter deterministic evidence, report schemas, prompt provenance, quality gates, or artifact contracts.
+The product works independently with direct hosted NVIDIA NIM and as an organization module through Contextual Orchestrator. Model routing must never alter deterministic evidence, report schemas, prompt provenance, quality gates, artifact contracts, or the user's selected recipient without explicit configuration.
 
-## 2. Users
+The product is not represented as scientifically validated fortune prediction, medical/clinical advice, or a certified ISO/CSAP/SOC 2 system. Engineering standards and research are used to govern software quality, AI risk, security, privacy, and evidence.
 
-- **Individual reader:** wants a clear natal, ten-year, annual, or monthly report without having to learn technical terminology.
-- **Professional consultant:** needs reproducible calculations, editable context, consistent report structure, recoverable recent work, and exportable files.
-- **Platform integrator:** needs an authenticated API, job status and history, deterministic JSON, report artifacts, traceable prompt/model versions, and replaceable MSA adapters.
-- **Operator:** needs health checks, retention, deletion, audit-friendly manifests, safe failure states, explicit backend selection, and prompt-safe model-usage visibility.
+## 2. Users and stakeholder outcomes
+
+- **Individual reader:** wants clear natal, ten-year, annual, and monthly reports without learning specialist terminology; wants visible uncertainty, practical next steps, privacy, and deletion.
+- **Professional consultant:** needs reproducible calculations, editable context, consistent report structure, recoverable recent work, calculation provenance, and exportable files.
+- **Platform integrator:** needs authenticated APIs, durable status/history, deterministic JSON, report artifacts, traceable prompt/model/calculation versions, and replaceable MSA adapters.
+- **Operator:** needs health/readiness, retention/deletion, backup/restore, incident handling, privacy-safe manifests/telemetry, explicit backend selection, and bounded model usage.
+- **Security/privacy/AI reviewer:** needs purpose-bound personal-data flows, explicit trust boundaries, model/provider/secret separation, and evidence that AI cannot rewrite deterministic calculation.
+- **Acquirer:** needs discoverable product/technical architecture, ADRs, ERD, threat model, test strategy, operability evidence, standards traceability, and exact-release provenance.
 
 ## 3. Core jobs to be done
 
-1. Enter solar or Korean lunar birth data, timezone, gender policy, and optional time correction.
-2. Verify year, month, day, and hour pillars together with solar-term boundaries and a calculation fingerprint.
-3. Inspect daewoon, annual luck, and monthly luck without confusing Gregorian month boundaries with solar terms.
-4. Generate a Korean report whose claims remain consistent with the calculation.
-5. Receive constructive possibilities, cautions, decision criteria, and practical techniques rather than a list of warnings.
-6. Recover a recent durable report job after a page refresh, client restart, or operational handoff without exposing stored birth information in the collection response.
-7. Filter recent work by lifecycle status, append older pages, restore active polling, and download completed files from the browser without retaining an individual UUID outside the service.
-8. Download JSON, HTML, PDF, and a generation manifest, then delete the job when it is no longer needed.
-9. Run the product independently or route interpretation through an approved organization gateway without forking calculation or report code.
+1. Enter solar or Korean lunar birth data, IANA timezone, gender policy, and optional supported time correction.
+2. Verify year, month, day, and hour pillars together with solar-term boundaries, calculation policy/version, warnings, and a fingerprint.
+3. Inspect daewoon, annual luck, and monthly luck without confusing Gregorian month/year boundaries with solar-term boundaries.
+4. Generate a Korean report whose facts remain consistent with the immutable calculation evidence.
+5. Receive constructive possibilities, cautions, decision criteria, and practical techniques rather than warning-only or deterministic prose.
+6. Recover recent durable report jobs after refresh/client restart/operational handoff without exposing stored birth/context data in collection responses.
+7. Filter recent work by lifecycle status, append older pages, restore active polling, and download allow-listed completed files.
+8. Download JSON, HTML, PDF, traces/manifest as permitted, and delete jobs when no longer needed.
+9. Run independently or route interpretation through an approved organization gateway without forking calculation/report code.
+10. Give operators and reviewers enough architecture/evidence to tell `implemented_on_protected_main`, `accepted_architecture`, `active_pr`, `planned`, and `superseded` claims apart.
 
 ## 4. Functional requirements
 
 ### 4.1 Deterministic calculation
 
-The service shall calculate solar and Korean lunar input, IANA timezone conversion, optional local mean/apparent solar correction, Li Chun year boundaries, twelve month-changing `jie` boundaries, configurable midnight or late-Zi day rollover, hour pillar, ten gods, hidden stems, twelve growth stages, element balance, and core stem/branch interactions. Unknown birth time shall leave the hour pillar unresolved. A boundary within six hours shall create a visible warning.
+The service SHALL calculate and/or represent:
+
+- solar and supported Korean lunar input, including supported lunar leap-month semantics;
+- IANA timezone conversion;
+- optional local mean/apparent solar correction under explicit policy;
+- Li Chun year boundaries;
+- twelve month-changing `jie` boundaries;
+- configurable midnight or late-Zi day rollover;
+- hour pillar and explicit unknown-birth-time behavior;
+- Ten Gods, hidden stems, Twelve Growth stages, element balance, and supported stem/branch interactions;
+- SHA-256 calculation fingerprint and calculation evidence version;
+- visible warning around configured solar-term boundary uncertainty.
+
+The current modern solar-term implementation is validated against independent KASI/NAOJ evidence, including all twelve 2026 `jie` boundaries. Calculation changes require versioning and independent fixture review rather than model/prompt changes.
 
 ### 4.2 Luck calculations
 
-The service shall calculate forward or reverse daewoon direction, start age from the relevant `jie`, eight configurable ten-year periods, Li Chun annual luck, and monthly luck that starts at the relevant `jie`. When gender is unspecified, the service shall return both direction scenarios rather than silently choosing one.
+The service SHALL calculate forward/reverse daewoon direction, start age from the relevant `jie`, configured ten-year periods, Li Chun annual luck, and monthly luck beginning at the relevant `jie`.
 
-### 4.3 AI analysis and backend selection
+When gender policy does not determine one direction, the service SHALL expose both valid scenarios rather than silently choosing one. Temporary pillars SHALL be interpreted relative to the natal day master and the calculator's supported interaction rules.
 
-Direct NVIDIA NIM shall remain the standalone default for LLM generation and LLM evaluation. An operator may explicitly select Contextual Orchestrator as an OpenAI-compatible organization gateway for report generation. No backend may silently fail over to another provider or adapter.
+### 4.3 AI interpretation and backend selection
 
-AI prompts shall be versioned and cover natal, daewoon, annual, monthly, practical skills, synthesis, editorial repair, and judging. Calculations are immutable input. A model response must pass Pydantic schema validation and deterministic/editorial quality checks before rendering.
+Direct NVIDIA NIM SHALL remain the standalone default. An operator MAY explicitly select Contextual Orchestrator as an organization gateway. No backend may silently fail over to another provider/adapter.
 
-The direct backend shall use only `NVIDIA_NIM_API_KEY`. The optional gateway shall use only `CONTEXTUAL_ORCHESTRATOR_TOKEN`. Missing credentials or backend failures shall be visible job failures rather than implicit routing changes.
+Versioned prompts cover natal, daewoon, annual, monthly, practical skills, synthesis, editorial repair, and judging. Deterministic calculation is read-only evidence. Model output must pass strict Pydantic schema validation plus deterministic/editorial quality gates before publication.
 
-The gateway adapter shall send prompt-safe organizational attribution, including `service=four-pillars` and optional account, team, group, and company values. Attribution shall not contain subject labels, birth information, notes, calculation fingerprints, prompt or report text, artifact paths, or credentials.
+The direct backend uses only `NVIDIA_NIM_API_KEY`. The optional gateway uses only `CONTEXTUAL_ORCHESTRATOR_TOKEN`. Missing credentials or selected-backend failure produces a visible job failure rather than recipient/routing substitution.
+
+The organization gateway receives prompt-safe service/organizational attribution only. Attribution must not contain subject labels, birth information, personal notes, calculation fingerprints, prompt/report text, artifact paths, authentication material, or provider credentials.
+
+LLM-as-a-judge output is supplementary. It cannot bypass deterministic fixtures, schemas, quality/security controls, exact-head review, or human governance.
 
 ### 4.4 Report quality
 
-Every required chapter shall contain a summary, constructive possibilities, cautions, and actions. The relationship chapter shall explain how trust, cooperation, or stability can improve. Copy shall use explicit subjects, objects, reasons, and dates. The service shall reject event certainty, diagnosis, treatment instructions, coercive life decisions, false authority claims, narrow one-off questions presented as universal rules, and known malformed phrases.
+Every required chapter SHALL contain:
 
-LLM-as-a-judge output shall remain supplementary. Deterministic fixtures, Pydantic schemas, rule-based quality checks, security review, and human review shall not be bypassed by a judge score.
+- a plain-language summary;
+- constructive possibilities;
+- cautions/conditions;
+- actionable ordinary-life techniques or decision criteria.
 
-### 4.5 Outputs and interfaces
+The relationship chapter SHALL include how trust, cooperation, or stability may improve rather than presenting only warnings. Copy SHALL use explicit subjects/objects/referents where ambiguity changes meaning and SHALL avoid known malformed contrast phrases.
 
-The service shall provide FastAPI endpoints, a CLI, a durable SQLite job queue, a worker, calculation JSON, report JSON, searchable Korean HTML and A4 PDF, model/prompt traces, and SHA-256 file manifests. Artifacts shall be stored under random job identifiers without personal data in filenames.
+The service SHALL reject or repair:
 
-The authenticated report API shall provide a redacted newest-first job collection with exact lifecycle-status filtering and opaque keyset continuation. Collection items and cursors shall exclude subject labels, birth input, user notes, stored requests, request fingerprints, idempotency material, generated report text, model traces, and artifact paths. The required repository contract shall remain backward compatible; history traversal shall be a separate optional capability for standalone and MSA adapters.
+- claims that a future event is certain;
+- diagnosis/treatment instructions;
+- coercive high-stakes life decisions;
+- claims that the model/app is an authoritative source of truth for real-world outcomes;
+- calculation/report contradictions;
+- one-off narrow questions presented as universal rules;
+- unsupported alteration of deterministic evidence.
 
-The browser studio shall present the collection as a responsive third workflow section based on the editable Figma desktop and mobile design. It shall load the latest 20 jobs, refresh the first page, filter by exact public status, append older pages from `next_cursor`, resume polling for queued or running jobs, and expose only server-supplied allow-listed artifact names for completed jobs. Authentication, cursor validation, ordering, privacy redaction, and adapter capability checks remain server-owned.
+### 4.5 Outputs, jobs, history, and browser
 
-The browser shall render API-derived values only through safe DOM text APIs. It shall suppress stale asynchronous history responses, bound displayed operational-error copy, announce history updates through a polite live region, communicate status with text as well as color, and keep the API key only in current page memory. Authenticated artifact downloads shall use an in-memory request header rather than credentials in URLs or persistent browser storage.
+The service SHALL provide FastAPI endpoints, CLI, a durable standalone SQLite job queue, worker execution, deterministic calculation JSON, report JSON, searchable Korean HTML/PDF, privacy-safe traces, and SHA-256 file manifests. Artifacts use opaque job identifiers rather than personal names in paths.
 
-### 4.6 Modular and organization integration
+Authenticated report history SHALL use a redacted newest-first collection, exact lifecycle-status filtering, and opaque exclusive keyset continuation. Collection items/cursors SHALL exclude stored request content, personal context, request fingerprints, idempotency material, generated report text, model traces, and internal artifact paths.
 
-The calculation package shall import without creating a database, HTTP client, worker, application directory, or model connection. `ReportJobRepository`, `ReportInterpreter`, `ArtifactPublisher`, idempotency, and history capabilities shall remain structural and independently replaceable.
+The browser studio SHALL support recent-job recovery, refresh, status filter, cursor-based older-page append, active polling restoration, and allow-listed artifact download. It SHALL suppress stale asynchronous responses, use safe DOM text APIs, provide accessible status announcements/non-color cues, bound displayed operational error text, and retain API credentials only in current page memory.
 
-Settings-based interpretation selection shall apply only when a custom interpreter was not injected. Central `.github`, `naruon`, and other organization systems may compose or govern the service through documented interfaces without copying product-specific calculation and quality rules.
+Material visual workflow changes SHALL update or explicitly map to the authoritative Figma design. Documentation-only or copy-only changes do not require Figma churn.
+
+### 4.6 Idempotency
+
+Clients MAY send a supported `Idempotency-Key`. The application SHALL store only a digest of the key plus a canonical request fingerprint. Same key/same request returns the existing durable job; same key/different request fails closed. Omitting the key preserves backward-compatible new-job semantics.
+
+### 4.7 Modular standalone/MSA operation
+
+The calculation package SHALL import without creating a database, HTTP client, worker, application directory, artifact store, or model connection.
+
+`ReportJobRepository`, `ReportInterpreter`, `ArtifactPublisher`, and optional idempotency/history capabilities SHALL remain replaceable structural boundaries. Explicitly injected adapters outrank settings-based defaults.
+
+Central `.github`, `naruon`, Contextual Orchestrator, and other CWL products MAY compose/govern Four Pillars through documented APIs, ports, and immutable artifacts. Four Pillars SHALL NOT require direct access to another service's private application database.
+
+### 4.8 Purpose-bound personal-data processing
+
+The application SHALL preserve personal birth/context data when it is required for the requested calculation/interpretation; **blanket masking that changes or breaks product behavior is not the privacy architecture**.
+
+Instead the product SHALL apply purpose-bound controls described in ADR 0004 and `docs/security/THREAT_MODEL.md`: minimum necessary disclosure, authentication/authorization, TLS, secret separation, restricted history/telemetry/attribution, bounded retention/deletion, encryption and access control appropriate to the deployment, and auditable privileged access.
+
+A new provider, external recipient, identity link, telemetry field, or personal-data processing purpose requires architecture/threat/privacy review.
+
+### 4.9 Architecture and documentation completeness
+
+Material changes SHALL keep the canonical documentation graph code-current:
+
+- `docs/architecture/DATA_MODEL.md`
+- `docs/security/THREAT_MODEL.md`
+- `docs/technical/TEST_STRATEGY.md`
+- `docs/operations/OPERABILITY.md`
+- `docs/standards/DOCUMENTATION_AUDIT.md`
+- PRD/TRD, Architecture/UML, ADR index, standards traceability, runbooks, and Figma references when applicable.
+
+Open-PR or planned behavior must not be described as shipped protected-main behavior. Documentation completeness is a repository quality defect, but documentation-only completion is not a valid autonomous-development stopping condition while safe implementation/test/merge work remains.
 
 ## 5. Non-functional requirements
 
-- Deterministic calculation p95 under 250 ms for modern dates on one CPU core.
-- Report job state remains recoverable after API restart.
-- Report-history traversal remains stable for equal timestamps and does not repeat existing rows when new jobs are inserted during a continuation sequence.
-- Browser history remains usable after a page refresh, rejects stale response races, and does not persist credentials or report data locally.
-- Offline CI never requires an external LLM key.
-- Direct hosted NIM tests are opt-in and use the `NVIDIA_NIM_API_KEY` repository secret.
-- A hosted Contextual Orchestrator test requires a separately deployed gateway and separately managed token.
-- Production statement and branch coverage remain exactly 100 percent.
-- Every public production API has a complete docstring.
-- API authentication can be enabled with a SHA-256 API-key digest.
-- Logs exclude raw birth context and generated report text by default.
-- Model traces exclude credentials and raw generated content from published trace metadata.
-- Report retention defaults to 30 days and terminal jobs can be deleted immediately.
-- PDF text remains searchable and Korean glyphs render without shipping proprietary font files.
-- Application-owned database objects use two-or-more-word names, preferably `snake_case`.
-- Standards and peer-reviewed research traceability is maintained in APA 7th form and checked hourly.
+- Deterministic calculation p95 target < 250 ms for representative supported modern dates on one CPU core.
+- Report-job state remains recoverable/inspectable after API restart under supported single-node semantics.
+- History traversal is stable for equal timestamps and does not repeat existing rows if new jobs are inserted during a continuation sequence.
+- Browser history remains usable after refresh and does not persist credentials/report data locally.
+- Offline CI never requires an external model key.
+- Direct hosted NIM tests are opt-in and use repository secret `NVIDIA_NIM_API_KEY` only on trusted workflows.
+- Contextual Orchestrator hosted tests require separately managed gateway credentials/deployment.
+- Owned production statement coverage = 100%; owned production branch coverage = 100%.
+- Every public production API has a beginner-readable complete docstring.
+- Application-owned database objects use descriptive two-or-more-word names, preferably `snake_case`.
+- Logs/ordinary telemetry exclude raw birth context, user notes, prompt/report text, credentials, and internal artifact paths by default.
+- Report retention defaults to 30 days and terminal jobs support explicit deletion.
+- PDF text is searchable and Korean glyphs render without redistributing proprietary font files.
+- Standards/research traceability is maintained in APA 7th form; standards mapping is not a certification claim.
+- Backup/restore, retention/deletion, incident, queue-age/failure and artifact-integrity responsibilities are defined in `docs/operations/OPERABILITY.md`.
 
 ## 6. Success metrics
 
-- 100 percent pass rate for committed golden calculation fixtures.
+- 100% pass rate for committed independent/golden calculation fixtures.
 - 0 deterministic contradictions in released reports.
-- At least 95 percent schema-valid first-pass responses for each approved backend/model route in its evaluation set.
-- At least 90 percent of evaluated reports score 3 or higher on completeness, balance, clarity, safety, and actionability, with deterministic fidelity fixed at 4.
-- Less than 1 percent report-generation jobs end in an unclassified failure.
-- 0 personal-data fields in report-history items, cursors, browser history rows, or orchestrator usage attribution.
-- 0 duplicate job identifiers while traversing a stable continuation sequence.
-- A user can recover an existing queued, running, completed, or failed job from the browser without re-entering its UUID.
-- A platform operator can change the selected interpretation adapter without changing deterministic calculation or artifact formats.
-- User can identify the relevant calculation evidence and one practical next step from each major chapter.
+- At least 95% schema-valid first-pass responses for each approved backend/model route in its maintained evaluation set, with model availability/version stated.
+- At least 90% of maintained evaluated reports score 3+ on completeness, balance, clarity, safety, and actionability, with deterministic fidelity fixed at the maximum category.
+- <1% report-generation jobs end in an unclassified failure under the measured production/evaluation environment.
+- 0 confidential personal-data fields in report-history items/cursors or prompt-safe organization attribution.
+- 0 duplicate job identifiers while traversing one stable continuation sequence.
+- A user can recover queued/running/completed/failed/quality-failed work without manually retaining a UUID outside the service.
+- An operator can change interpretation adapter without changing deterministic calculation/artifact schemas.
+- A reviewer can trace every material architecture claim to protected-main evidence, an Accepted ADR, an `active_pr`, or a `planned` item without reconstructing chat history.
 
-## 7. Release scope
+## 7. Release scope and exclusions
 
-The current product includes one-person natal and luck reporting, Korean output, direct NIM and optional Contextual Orchestrator integration, API, CLI, queue, recent-work recovery, PDF/HTML/JSON output, quality gates, Docker, CI, standards traceability, and product documentation.
+Current protected-main product scope includes single-person natal/luck reporting, Korean output, deterministic calculation with independently checked modern solar-term evidence, direct NIM, optional Contextual Orchestrator, API/CLI/queue, recent-work recovery, idempotency, PDF/HTML/JSON, quality/security gates, Docker, CI, standards traceability, and product documentation.
 
-Compatibility matching, payments, multi-tenant billing, consultant editing UI, event prediction, medical diagnosis, automatic decisions, automatic provider fallback, ISO certification, and scientific validation of traditional interpretation are deliberately excluded until separate requirements and safety review exist.
+`active_pr`: PR #29 proposes an exact-head hourly PR steward. It is not part of shipped scope until protected-main merge and operational acceptance.
 
-## 8. Risks and mitigations
+`planned`/excluded until separately reviewed: compatibility matching, payments, multi-tenant billing, consultant editing/collaboration UI, medical diagnosis, automatic high-stakes decisions, automatic provider fallback, scientific validation of traditional interpretation, and certification claims.
 
-Approximate solar longitude can be least reliable at a boundary, so the product emits a six-hour warning and records the policy. Hosted model availability can vary, so the selected client retries transient errors and never falls back silently. Symbolic text can sound deterministic, so quality checks require conditional language and real-world decision disclaimers.
+## 8. Principal risks and mitigations
 
-Personal data can persist in output, so storage uses UUIDs, retention, explicit deletion, restricted logs, redacted history items, cursors containing only UTC timestamps and random job UUIDs, safe browser rendering, and prompt-safe organizational attribution. Concurrent browser requests can complete out of order, so only the latest history request may update the visible collection.
+- **Boundary calculation risk:** use independent fixtures, calculation versions and visible warnings rather than AI correction.
+- **Hosted model variability:** bounded retries/repair, explicit backend/model identity and no silent fallback.
+- **Overconfident symbolic prose:** deterministic editorial rules, conditional language and real-world evidence disclaimer.
+- **Personal data persistence/disclosure:** purpose-bound data flow, opaque paths, authenticated redacted history, retention/deletion, restricted telemetry/attribution, operator controls.
+- **Concurrent browser responses:** sequence guards and stale-response suppression.
+- **Organization gateway recipient risk:** deployment-owned subprocessor/egress/region/retention documentation.
+- **LLM-judge manipulation/bias:** supplementary role only; deterministic/human controls remain authoritative.
+- **Architecture drift:** canonical maturity labels, ADR index, ERD/threat/test/operability documents and machine-checkable documentation contract.
 
-Contextual Orchestrator may route to multiple organization-approved providers, so deployment owners must document subprocessors, egress restrictions, retention, model availability, and incident responsibilities. LLM-as-a-judge methods can be adversarially manipulated or biased, so they remain supplementary to deterministic and human controls.
+## 9. Canonical product evidence
 
-The standards crosswalk is maintained for engineering governance and continual improvement. It is not an accredited certification or evidence that traditional Four Pillars interpretation predicts individual outcomes scientifically.
+Technical implementation requirements live in `docs/technical/TRD.md`; system viewpoints in `docs/architecture/SYSTEM_ARCHITECTURE.md`; detailed UML in `docs/uml/architecture.md`; durable data in `docs/architecture/DATA_MODEL.md`; decisions in `docs/adr/README.md`; threats in `docs/security/THREAT_MODEL.md`; tests in `docs/technical/TEST_STRATEGY.md`; operations in `docs/operations/OPERABILITY.md`; standards/research in `docs/standards/REFERENCES.md` and `docs/standards/TRACEABILITY.md`; documentation fitness in `docs/standards/DOCUMENTATION_AUDIT.md`.
