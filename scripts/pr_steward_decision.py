@@ -119,7 +119,8 @@ FAILED_CHECK_CONCLUSIONS = {
     "STALE",
 }
 SUCCESS_CHECK_CONCLUSIONS = {"SUCCESS", "NEUTRAL", "SKIPPED"}
-QUEUEABLE_MERGE_STATES = {"CLEAN", "BLOCKED", "HAS_HOOKS", "UNSTABLE"}
+REQUIRED_PASSING_CHECK_CONCLUSIONS = {"SUCCESS"}
+QUEUEABLE_MERGE_STATES = {"CLEAN", "HAS_HOOKS"}
 REQUIRED_CHECK_GROUPS = {
     "python_311": ("quality (3.11)",),
     "python_312": ("quality (3.12)",),
@@ -629,21 +630,17 @@ def _latest_review_states(
 
 
 def _required_check_gaps(checks: Sequence[Mapping[str, Any]]) -> list[str]:
-    """Return required exact-head groups without a successful Check."""
+    """Return required exact-head groups without an explicit successful Check."""
 
     successful_names = {
         check["name"].casefold()
         for check in checks
         if check["status"] not in PENDING_CHECK_STATUSES
-        and check["conclusion"] in SUCCESS_CHECK_CONCLUSIONS
+        and check["conclusion"] in REQUIRED_PASSING_CHECK_CONCLUSIONS
     }
     gaps: list[str] = []
     for group, aliases in REQUIRED_CHECK_GROUPS.items():
-        if not any(
-            alias in name
-            for alias in aliases
-            for name in successful_names
-        ):
+        if not any(name in aliases for name in successful_names):
             gaps.append(f"required_check_missing:{group}")
     return gaps
 
@@ -688,6 +685,8 @@ def decide_action(evidence: Mapping[str, Any]) -> StewardDecision:
         repair_reasons.append("unresolved_thread")
 
     wait_reasons: list[str] = []
+    if pull_request["review_decision"] == "REVIEW_REQUIRED":
+        wait_reasons.append("review_required")
     if not normalized["checks"]:
         wait_reasons.append("checks_missing")
     for check in normalized["checks"]:
