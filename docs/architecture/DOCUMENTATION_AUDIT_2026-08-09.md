@@ -17,7 +17,7 @@ Baseline inspected: protected `main` at `cd4f4e6361238a1db43c28540640a407c7bf7c6
 | PRD | Strong | Missing current calculation-evidence scope, control-plane requirements, no-blanket-masking strategy, CSAP/SOC 2 readiness and documentation-as-product requirements | Updated |
 | TRD | Strong but stale in one material area | Incorrectly implied Contextual Orchestrator provider-native JSON `response_format`; lacked ERD/data-governance/control-plane/compliance detail | Updated to `native_json_mode=False` reality and expanded |
 | Root Architecture | Strong | Current runtime/deployment view but minute-07 steward and new documentation/data-governance views not yet integrated | Follow-up after steward merge to avoid active-file conflict |
-| ADRs | Incomplete | Only 0001–0003; no index/lifecycle and missing privacy, documentation, MSA/control-plane decisions | Added index and Proposed ADRs 0004–0007 |
+| ADRs | Incomplete | Only 0001–0003; no index/lifecycle and missing privacy, docs, MSA, control-plane, external-calculation-evidence and release-provenance decisions | Added index and ADRs 0004–0009; 0008 is Accepted from protected-main evidence, others stay Proposed until their acceptance criteria are met |
 | UML/runtime | Strong | Contextual Orchestrator JSON wording could mislead; no data/automation authority view | Updated runtime UML and added control-plane UML |
 | ERD/data model | Missing | No canonical persisted-vs-conceptual data authority model | Added `docs/erd/domain-model.md` |
 | Privacy/data governance | Fragmented | Security/privacy rules existed across TRD/API/runbooks but no explicit purpose-bound alternative to blanket PII masking | Added `docs/security/DATA_GOVERNANCE.md` and ADR 0004 |
@@ -25,7 +25,8 @@ Baseline inspected: protected `main` at `cd4f4e6361238a1db43c28540640a407c7bf7c6
 | Standards catalog | Good | Missing ISO/IEC/IEEE 42010, ISO/IEC/IEEE 29148, UML, current ISO 27701, ISO 27001, CSAP and SOC 2 sources | Updated |
 | Traceability | Good but stale | Incorrect Contextual Orchestrator `response_format` statement; missing docs/privacy/assurance/control-plane mappings | Updated |
 | API contract | Strong | No blocking gap identified in this audit | Keep code-current |
-| Calculation/provenance | Strong | KASI/NAOJ + `calendar-1.1.0` already materially improved evidence | Referenced from PRD/TRD/ERD |
+| Calculation/provenance | Strong | KASI/NAOJ + `calendar-1.1.0` already materially improved evidence | Referenced from PRD/TRD/ERD and recorded in Accepted ADR 0008 |
+| Release provenance | Partial | Existing exact-main release, package/container validation, checksums and idempotency were good; SBOM/attestation/signing/operational-acceptance policy not explicit | Added Proposed ADR 0009 with current controls and remaining supply-chain gaps |
 | Operations | Strong | New PR steward runbook lives in active PR and remains Proposed | Integrate only after PR merge |
 | AGENTS/CLAUDE | Strong, actively changing | Active PR #29 modifies both; avoid competing writer changes | Follow up after active PR |
 | CHANGELOG | Strong, actively changing | Active PR #29 modifies it; docs baseline should not create a conflicting release claim | Follow up after active PR |
@@ -49,12 +50,12 @@ The minute-17 deterministic quality sentinel and minute-47 NVIDIA/OpenCode produ
 ## Remaining repository work after this baseline
 
 1. Merge/fix active PR #29 under normal exact-head review/check governance.
-2. After merge, update root `ARCHITECTURE.md`, `AGENTS.md`, `CLAUDE.md`, `CHANGELOG.md`, and `scripts/check_docs.py` from the integrated protected head rather than racing the active branch.
+2. After merge, update root `ARCHITECTURE.md`, `AGENTS.md`, `CLAUDE.md`, `CHANGELOG.md`, `SECURITY.md`, and `scripts/check_docs.py` from the integrated protected head rather than racing the active branch.
 3. Promote ADR 0007 from Proposed to Accepted only after protected-main PR-steward implementation and operational acceptance exist.
 4. Promote ADR 0005 when canonical-file/link/index consistency tests are integrated.
 5. Promote ADR 0004 only after the remaining production tenant/KMS/break-glass/backup/export evidence exists; do not falsely claim completion.
-6. Promote ADR 0006 after the current port/no-shared-DB rules and intended remote-adapter contracts are machine-checked at the authoritative documentation boundary.
-7. Add a release/provenance ADR if release/SBOM/signing policy becomes materially more detailed than current workflow documentation.
+6. Promote ADR 0006 after current port/no-shared-DB rules and intended remote-adapter contracts are machine-checked at the authoritative documentation boundary.
+7. Promote ADR 0009 only after release SBOM/provenance/signing policy and post-publication verification satisfy its acceptance criteria or an accepted alternative supersedes them.
 8. Continue adding independent calendar fixtures beyond 2026 and historical-time policy evidence as product scope expands.
 
 ## Acceptance criterion
