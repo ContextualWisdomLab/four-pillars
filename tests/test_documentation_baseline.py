@@ -54,11 +54,16 @@ def test_adr_index_tracks_current_decisions_and_statuses() -> None:
 
 
 def test_contextual_orchestrator_documentation_matches_production_native_json_mode() -> None:
-    """Prevent docs from reintroducing a provider-native JSON claim the adapter disables."""
+    """Prevent docs from reintroducing provider-native JSON where the adapter disables it."""
     production = Path("src/four_pillars/contextual_orchestrator.py").read_text(encoding="utf-8")
     assert "native_json_mode=False" in production
+
+    product = _text("docs/product/PRD.md")
+    assert "shall not force provider-native JSON response mode" in product
+    assert "Pydantic" in product
+    assert "never silently" in product.casefold()
+
     for path in (
-        "docs/product/PRD.md",
         "docs/technical/TRD.md",
         "docs/uml/architecture.md",
         "docs/standards/TRACEABILITY.md",
