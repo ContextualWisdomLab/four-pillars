@@ -15,6 +15,10 @@ convention = "google"
 [lint.per-file-ignores]
 "src/four_pillars/__init__.py" = ["I001", "RUF022"]
 "src/four_pillars/calendar.py" = ["I001"]
+# The steward decision script deliberately separates long operational docstrings
+# from executable branches for audit readability; docstring presence/coverage is
+# still enforced, while only PEP 257's blank-line style rule is scoped out here.
+"scripts/pr_steward_decision.py" = ["D202"]
 "tests/**/*.py" = ["D"]
 "tests/test_analysis.py" = ["I001"]
 "tests/test_api.py" = ["I001"]
