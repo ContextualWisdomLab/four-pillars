@@ -31,7 +31,7 @@ The calculator may receive the complete validated birth input required by the co
 
 ### Interpretation
 
-The selected interpreter receives only the calculation/luck evidence plus user context needed for the requested report. Direct NIM uses `NVIDIA_NIM_API_KEY`; Contextual Orchestrator uses its separate token. Provider credentials never become prompt values. Organizational attribution contains service/organization labels only and excludes birth input, notes, report copy, fingerprints, file paths and credentials.
+The selected interpreter receives only the calculation/luck evidence plus user context needed for the requested report. Direct NIM uses `NVIDIA_NIM_API_KEY`; Contextual Orchestrator uses only its separate `CONTEXTUAL_ORCHESTRATOR_TOKEN`. Provider credentials never become prompt values. Organizational attribution contains service/organization labels only and excludes birth input, notes, report copy, fingerprints, file paths and credentials.
 
 ### Persistence and history
 
