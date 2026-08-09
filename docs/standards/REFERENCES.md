@@ -2,7 +2,25 @@
 
 This catalog records the external standards and peer-reviewed research used to design, review, and operate Four Pillars. Entries follow APA 7th edition conventions as closely as the source type permits. ISO standards are listed by their issuing organizations and reference numbers; purchase of an ISO publication may be required to inspect its complete normative text.
 
-These references govern software engineering, AI risk, model evaluation, privacy, reliability, interoperability, calculation evidence, and operations. They do **not** establish Four Pillars interpretation as scientifically validated prediction. The product treats traditional interpretation as symbolic, conditional content and keeps deterministic calendar calculations, AI-generated prose, and ordinary practical guidance visibly separate.
+These references govern requirements/architecture description, software engineering, AI risk, information security/privacy, assurance readiness, interoperability, calculation evidence, and operations. They do **not** establish Four Pillars interpretation as scientifically validated prediction. The product treats traditional interpretation as symbolic, conditional content and keeps deterministic calendar calculations, AI-generated prose, and ordinary practical guidance visibly separate.
+
+## Architecture and requirements standards
+
+International Organization for Standardization, International Electrotechnical Commission, & Institute of Electrical and Electronics Engineers. (2022). *Software, systems and enterprise—Architecture description* (ISO/IEC/IEEE Standard No. 42010:2022). https://www.iso.org/standard/74393.html
+
+**Application.** The architecture-description standard informs Four Pillars' explicit stakeholder concerns, viewpoints and model kinds: PRD/TRD, root architecture, ADRs, runtime UML, repository-control-plane UML, conceptual/logical ERD, security/data-governance views, and the authoritative documentation map.
+
+**Claim boundary.** Repository documentation has not undergone a formal ISO/IEC/IEEE 42010 conformance assessment.
+
+International Organization for Standardization, International Electrotechnical Commission, & Institute of Electrical and Electronics Engineers. (2018). *Systems and software engineering—Life cycle processes—Requirements engineering* (ISO/IEC/IEEE Standard No. 29148:2018). https://www.iso.org/standard/72089.html
+
+**Application.** PRD, TRD, API/calculation/modularity contracts and acceptance evidence separate stakeholder/product requirements from technical requirements and verification information. ISO lists Edition 2 as the current published edition, confirmed in 2024, while Edition 3 is under development as a DIS during the 2026-08-09 review.
+
+**Version note.** The DIS is monitored as a future revision and is not treated as a published normative replacement.
+
+Object Management Group. (2017). *OMG Unified Modeling Language (OMG UML), version 2.5.1*. https://www.omg.org/spec/UML/2.5.1
+
+**Application.** UML 2.5.1 supplies the notation reference for class, component, sequence, state and deployment concepts represented as committed Mermaid/PlantUML source. Four Pillars does not claim that Mermaid itself is an OMG-conformant UML interchange tool.
 
 ## International standards
 
@@ -10,7 +28,7 @@ These references govern software engineering, AI risk, model evaluation, privacy
 
 International Organization for Standardization, & International Electrotechnical Commission. (2023). *Systems and software engineering—Systems and software Quality Requirements and Evaluation (SQuaRE)—Product quality model* (ISO/IEC Standard No. 25010:2023). https://www.iso.org/standard/78176.html
 
-**Application.** ISO/IEC 25010:2023 and its nine-characteristic product-quality model inform the PRD/TRD quality goals, deterministic correctness tests, interoperability ports, reliability controls, security boundaries, maintainability requirements, accessibility-aware browser workflow, and release acceptance criteria.
+**Application.** ISO/IEC 25010:2023 and its nine-characteristic product-quality model inform the PRD/TRD quality goals, deterministic correctness tests, interoperability ports, reliability controls, security boundaries, maintainability requirements, accessibility-aware browser workflow, documentation quality, and release acceptance criteria.
 
 **Limitation.** Repository controls are an engineering crosswalk, not an ISO conformity assessment or certification.
 
@@ -30,27 +48,69 @@ International Organization for Standardization, & International Electrotechnical
 
 **Limitation.** This project uses a practical control mapping and does not reproduce the copyrighted standard.
 
-## Public risk frameworks and profiles
+### Information-security management
+
+International Organization for Standardization, & International Electrotechnical Commission. (2022). *Information security, cybersecurity and privacy protection—Information security management systems—Requirements* (ISO/IEC Standard No. 27001:2022). https://www.iso.org/standard/27001
+
+International Organization for Standardization, & International Electrotechnical Commission. (2024). *Information security, cybersecurity and privacy protection—Information security management systems—Requirements—Amendment 1: Climate action changes* (ISO/IEC Standard No. 27001:2022/Amd 1:2024). https://www.iso.org/standard/88435.html
+
+**Application.** The ISMS requirements inform risk-based ownership, access/change/incident/supplier controls, evidence collection, continual improvement, and the need to separate repository implementation from organizational operating controls.
+
+**Limitation.** Four Pillars is not represented as ISO/IEC 27001 certified.
+
+### Privacy-information management
+
+International Organization for Standardization, & International Electrotechnical Commission. (2025). *Information security, cybersecurity and privacy protection—Privacy information management systems—Requirements and guidance* (ISO/IEC Standard No. 27701:2025). https://www.iso.org/standard/27701
+
+**Application.** ISO/IEC 27701:2025 informs accountable PII-controller/processor boundaries, purpose-bound processing, data-classification and lifecycle governance, provider/subprocessor documentation, and the proposed personal-data ADR. The 2025 edition supersedes the withdrawn 2019 edition.
+
+**Limitation.** This is engineering guidance and does not establish privacy-law compliance or ISO/IEC 27701 certification.
+
+## Public risk, privacy, and security frameworks
 
 Tabassi, E. (2023). *Artificial Intelligence Risk Management Framework (AI RMF 1.0)* (NIST AI 100-1). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.AI.100-1
 
-**Application.** Govern, Map, Measure, and Manage concepts are reflected in documented ownership, immutable evidence, model/prompt traces, deterministic and editorial tests, risk-specific failure states, and the hourly product-quality review.
+**Application.** Govern, Map, Measure, and Manage concepts are reflected in documented ownership, immutable evidence, model/prompt traces, deterministic/editorial tests, risk-specific failure states, and scheduled quality review.
 
 Autio, C., Schwartz, R., Dunietz, J., Jain, S., Stanley, M., Tabassi, E., Hall, P., & Roberts, K. (2024). *Artificial Intelligence Risk Management Framework: Generative Artificial Intelligence Profile* (NIST AI 600-1). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.AI.600-1
 
 **Application.** The Generative AI Profile informs prompt-injection separation, schema validation, grounded-generation checks, bounded repair, human-review limitations, content safety, provenance metadata, and the rule that an LLM cannot change deterministic calculation evidence.
 
-**Version note.** NIST updated the publication page in 2026, and AI RMF 1.0 itself is under revision. The project shall monitor authoritative NIST updates rather than assuming this crosswalk is permanent.
+**Version note.** NIST updated the publication page in 2026, and AI RMF 1.0 itself is under revision. The project monitors authoritative NIST updates rather than assuming this crosswalk is permanent.
+
+Rose, S., Borchert, O., Mitchell, S., & Connelly, S. (2020). *Zero trust architecture* (NIST Special Publication 800-207). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-207
+
+**Application.** Resource-centric authorization and the absence of implicit trust based on network placement inform future tenant/job/artifact authorization, service identity separation, and governed privileged/break-glass access.
+
+## CSAP and SOC 2 readiness sources
+
+Korea Internet & Security Agency. (n.d.). *클라우드 보안인증제 제도소개* [Cloud Service Security Certification program introduction]. Retrieved August 9, 2026, from https://isms.kisa.or.kr/main/csap/intro/index.jsp
+
+Korea Internet & Security Agency. (2024). *클라우드 서비스 보안인증제 안내서* [Cloud Service Security Certification program guide]. https://isms.kisa.or.kr/main/csap/notice/?boardId=bbs_0000000000000004&cntId=86&mode=view
+
+Korea Internet & Security Agency. (2024). *클라우드서비스 보안인증기준 해설서* [Cloud service security certification criteria commentary]. https://isms.kisa.or.kr/main/csap/notice/?boardId=bbs_0000000000000004&cntId=87&mode=view
+
+**Application.** KISA's materials define the Korean CSAP assurance boundary and inform the readiness inventory for cloud assets, scope, security controls, assessment evidence, provider responsibilities, and the explicit rule that repository engineering must not claim a certificate that has not been externally issued.
+
+**Version note.** KISA guidance and certification type/grade procedures can change. An actual certification project must revalidate the then-current official materials and target scope.
+
+American Institute of Certified Public Accountants. (2023). *2017 Trust Services Criteria for security, availability, processing integrity, confidentiality, and privacy (with revised points of focus—2022)*. AICPA & CIMA. https://www.aicpa-cima.com/resources/download/2017-trust-services-criteria-with-revised-points-of-focus-2022
+
+American Institute of Certified Public Accountants. (2022). *SOC 2® reporting on an examination of controls at a service organization relevant to security, availability, processing integrity, confidentiality, or privacy*. AICPA & CIMA.
+
+**Application.** Trust Services Criteria categories inform the readiness mapping for security, availability, processing integrity, confidentiality, privacy, system-description evidence, and operating-effectiveness gaps.
+
+**Limitation.** A SOC 2 report requires an independent examination over an identified service/system and cannot be inferred from passing CI, a source review, or this crosswalk.
 
 ## Internet and web standards
 
 Nottingham, M., Wilde, E., & Dalal, S. (2023). *Problem details for HTTP APIs* (RFC 9457). Internet Engineering Task Force. https://doi.org/10.17487/RFC9457
 
-**Application.** RFC 9457 is the target error-interoperability standard for future machine-readable API problem responses. Existing HTTP status semantics remain stable until a separately tested migration is released. RFC 9457 obsoletes RFC 7807.
+**Application.** RFC 9457 is the target error-interoperability standard for a future machine-readable API problem-response migration. Existing HTTP status semantics remain stable until a separately tested change is released. RFC 9457 obsoletes RFC 7807.
 
 World Wide Web Consortium. (2021). *Trace context: W3C recommendation, 23 November 2021*. https://www.w3.org/TR/trace-context/
 
-**Application.** W3C Trace Context is the target for future propagation of `traceparent` and `tracestate` across Four Pillars, Contextual Orchestrator, model gateways, and organization observability systems. Current model and prompt traces are local generation evidence and are not represented as distributed traces.
+**Application.** W3C Trace Context is the target for future `traceparent`/`tracestate` propagation across Four Pillars, Contextual Orchestrator, model gateways, and organization observability systems. Current model/prompt traces are local generation evidence and are not represented as distributed traces.
 
 ## Astronomical calculation and civil-calendar evidence
 
@@ -98,11 +158,13 @@ Pydantic. (2026). *Pydantic Settings documentation*. https://docs.pydantic.dev/l
 
 Contextual Wisdom Lab. (2026). *Contextual Orchestrator* [Computer software]. GitHub. https://github.com/ContextualWisdomLab/contextual-orchestrator
 
-**Application.** The optional adapter uses the repository's OpenAI-compatible chat-completions surface, structured-output passthrough, Bearer authentication, organizational usage attribution, and routing metadata. Four Pillars does not duplicate or reach into the orchestrator's internal state.
+**Application.** The optional adapter uses the repository's OpenAI-compatible chat-completions surface, Bearer authentication, organizational usage attribution, and routing metadata. Production Four Pillars currently sets `native_json_mode=False` for this adapter: JSON is required by the application prompt and enforced with Pydantic parsing/validation plus bounded same-backend repair rather than by sending provider-native `response_format`. Four Pillars does not duplicate or reach into orchestrator internal state.
 
 ## Review cadence
 
-- `scripts/check_docs.py` and `scripts/product_gap_audit.py` verify that this catalog and its core references remain present.
-- The hourly GitHub Actions loop executes those checks at minute 17 of every hour and on manual dispatch.
+- `scripts/check_docs.py` and `scripts/product_gap_audit.py` verify the repository's core standards/documentation contracts; the documentation-baseline work expands the canonical graph that future checks should enforce.
+- The deterministic hourly GitHub Actions quality loop executes its checks at minute 17 and on manual dispatch.
 - A standards update does not alter production behavior automatically. It creates a documented review obligation followed by tests, a PR, security review, and a release when behavior changes.
-- Consensus search capacity was unavailable during the 2026-08-07 review, so the astronomical and existing academic entries were verified directly against authoritative institute, standards-service, catalog, journal, and ACL sources. Future literature reviews should add independent peer-reviewed evidence rather than replacing deterministic software tests.
+- ISO/IEC/IEEE 29148 Edition 3 is monitored while it remains a DIS; published-project requirements continue to cite the current 2018 edition until a final superseding edition is issued and reviewed.
+- KISA CSAP guidance and AICPA assurance material are revalidated for any actual assessment scope; this catalog does not claim certification/attestation.
+- Consensus search capacity was unavailable during earlier review. The 2026-08-09 documentation baseline relied on current primary standards bodies, KISA, AICPA, NIST, institute, catalog, journal, and ACL sources; future literature review should add independent peer-reviewed evidence where it materially changes a product claim rather than replacing deterministic software tests.
