@@ -74,11 +74,15 @@ For source/behavior defects:
 
 Calculation changes require independent authoritative/golden evidence, not an LLM-generated expected value.
 
+For model-proposed code, **credential-free verification before publication is mandatory**. Candidate code must be reconstructed on an exact immutable base/head/artifact identity and executed without the model credential and without publication/merge/reviewer authority. If the selected workflow cannot enforce that boundary, publication must fail closed. An alternative is allowed only through a separate Accepted ADR that proves equivalent separation and executable regression tests; convenience is not a compensating control.
+
 ## 7. Model and credential boundary
 
 Autonomous development that actually calls a hosted model uses only GitHub Secret **`NVIDIA_NIM_API_KEY`** through the immutably reviewed OpenCode/NVIDIA path. **`COPILOT_GITHUB_TOKEN` is prohibited** for autonomous product development.
 
 Do not alter the existing independent review-agent identities, credential names, scopes, or key chain. Model execution does not receive merge/release/reviewer authority. Candidate patches cross trust zones as bounded artifacts and must be revalidated without the model credential before publication.
+
+Do not pass unrelated GitHub/OIDC/Actions runtime credentials, command-file paths, provider secrets, personal data, or operator credentials into the model process merely because they exist in the runner environment.
 
 ## 8. LLM orchestration design
 
@@ -105,7 +109,20 @@ Documentation-only completion does not justify stopping if the same bounded incr
 
 ## 10. Privacy and security
 
-Do not use blanket PII masking when it breaks deterministic calculation or requested interpretation. Apply purpose limitation, minimum necessary disclosure, authentication/authorization, encryption, restricted telemetry/attribution, secret separation, retention/deletion, and audited privileged access as documented in ADR 0004 and the Threat Model.
+Do not use blanket PII masking when it breaks deterministic calculation or a legitimate requested interpretation. That is not permission to send arbitrary personal data to a model.
+
+Personal data may cross a model boundary only when all of the following are true:
+
+1. the processing purpose is explicitly approved for the selected backend;
+2. the caller is authenticated/authorized for that purpose;
+3. the field is included in the versioned model-input allow-list/schema for that purpose;
+4. the value is necessary for the requested result or an approved purpose-preserving transformation is applied;
+5. the selected provider/region/retention/subprocessor boundary is the configured recipient;
+6. the payload excludes unrelated identity, credentials, internal paths, private traces and data from other users/jobs.
+
+Otherwise the field is omitted. Raw PII, prompts/reports, credentials and internal paths are never emitted to ordinary logs, metrics, traces, PR metadata, model attribution, or autonomous-development evidence. Any safe transformation is field- and purpose-specific; it must not be a blanket mask that silently changes the calculation or meaning.
+
+Apply purpose limitation, minimum necessary disclosure, authentication/authorization, encryption, restricted telemetry/attribution, secret separation, retention/deletion, and audited privileged access as documented in ADR 0004 and the Threat Model.
 
 Design for CSAP/SOC 2 procurement readiness without claiming certification. Preserve fail-closed evidence, least privilege, immutable pins where practical, artifact/provenance integrity, vulnerability management, incident/recovery responsibilities, and supply-chain checks.
 
