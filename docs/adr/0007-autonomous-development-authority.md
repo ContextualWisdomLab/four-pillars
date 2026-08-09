@@ -1,6 +1,7 @@
 # ADR 0007: Separate autonomous development, verification, review, and merge authority
 
-- **Status:** Accepted for shipped minute-17/minute-47 controls; PR-steward extension remains `active_pr`
+- **Status:** Accepted
+- **Architecture maturity:** minute-17/minute-47 controls are `implemented_on_protected_main`; the PR-steward extension remains `active_pr` (#29)
 - **Date:** 2026-08-09
 
 ## Context
@@ -15,7 +16,7 @@ The repository currently has a deterministic minute-17 quality sentinel and a mi
 2. **Model credential:** model-backed autonomous development uses `NVIDIA_NIM_API_KEY`; `COPILOT_GITHUB_TOKEN` is prohibited for this purpose.
 3. **Reviewer independence:** existing reviewer-agent identities, secret names, provider routing, and key chains are not repurposed as development-writer authority.
 4. **Proposal isolation:** model execution does not receive repository merge/release/reviewer credentials. It produces a bounded candidate patch or working-tree increment only.
-5. **Verification isolation:** candidate code is verified on an exact immutable base/head without the model credential or publication credential where the workflow architecture permits that separation.
+5. **Verification isolation:** candidate code MUST be verified on an exact immutable base/head without the model credential and without the publication credential before it can cross into a publishable change. If a workflow cannot enforce that credential-free verification boundary, publication is prohibited and the run fails closed. A compensating control is acceptable only after a separate reviewed ADR proves equivalent separation, bounded scope, exact artifact/head identity, no model access to the publication credential, and an executable regression test; absence of such an ADR is not permission to publish.
 6. **Publication isolation:** publication authority is late-bound, scoped, revalidates exact base/head/queue state, and does not execute model-proposed code merely to create a PR.
 7. **Exact-head governance:** reviews and Checks belong to one exact head. Stale/predecessor/synthetic-only/pending/skipped-required/cancelled/failed evidence does not become passing evidence.
 8. **Work-conserving execution:** review/Check/provider waiting blocks only the affected action. Autonomous development follows `docs/operations/AUTONOMOUS_DEVELOPMENT.md` and performs a mandatory final sweep before ending a practical run.
@@ -29,7 +30,8 @@ The repository currently has a deterministic minute-17 quality sentinel and a mi
 - no model self-approval;
 - no model-created status string substitutes for a required Check/review;
 - no silent widening of GitHub App/token permissions;
-- no model access to unrelated OIDC/Actions runtime/command-file secrets where the workflow can remove them;
+- no model access to unrelated OIDC/Actions runtime/command-file secrets;
+- no candidate publication without a credential-free verification zone or a separately accepted equivalent-separation ADR;
 - patch/artifact identity is cryptographically/boundedly checked across trust zones;
 - symlink/gitlink/path or unbounded-output mechanisms cannot smuggle an uncontrolled proposal into the publisher;
 - branch/head/base is refreshed immediately before a write/merge decision.
@@ -41,6 +43,7 @@ The control plane is slower than a single all-powerful bot, but evidence is attr
 ## Rejected alternatives
 
 - **One bot token for code, review, merge, and release:** rejected for separation-of-duties and compromise blast radius.
+- **Let the model credential remain available during verification because publication uses another token:** rejected because dependency/test commands are still an execution boundary capable of exfiltrating the model secret.
 - **Use GitHub Copilot/`COPILOT_GITHUB_TOKEN` for scheduled development:** rejected by repository-owner credential policy and because the dedicated OpenCode/NIM path is the development authority.
 - **Poll a pending review until the run ends:** rejected because waiting is local and wastes the development window.
 - **Treat automated COMMENTED/model verdicts as independent approval:** rejected because review evidence and merge authority are distinct.
@@ -48,7 +51,7 @@ The control plane is slower than a single all-powerful bot, but evidence is attr
 ## Mapping
 
 - `.github/workflows/hourly-product-loop.yml` — deterministic sentinel.
-- `.github/workflows/hourly-nim-product-development.yml` — model-backed proposal/verification/publication separation.
+- `.github/workflows/hourly-nim-product-development.yml` — model-backed proposal/credential-free verification/publication separation.
 - `docs/operations/AUTONOMOUS_DEVELOPMENT.md` — work-conserving execution contract.
 - `docs/doctoring/hourly-nim-opencode-development.md` — original control-plane research/standards evidence.
 - PR #29 — `active_pr` PR-steward extension; must be reclassified only after protected-main integration.
@@ -56,7 +59,7 @@ The control plane is slower than a single all-powerful bot, but evidence is attr
 
 ## Reversal conditions
 
-Supersede this ADR if the repository moves to another autonomous-development architecture or if organization-wide governance provides a stronger centrally enforced separation model. The successor must preserve exact-head evidence, non-self-approval, least privilege, and explicit credential/authority boundaries.
+Supersede this ADR if the repository moves to another autonomous-development architecture or if organization-wide governance provides a stronger centrally enforced separation model. The successor must preserve exact-head evidence, credential-free or equivalently isolated verification, non-self-approval, least privilege, and explicit credential/authority boundaries.
 
 ## References — APA 7th
 
