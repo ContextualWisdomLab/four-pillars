@@ -1,5 +1,7 @@
 # Architecture and UML
 
+This file describes the protected-main runtime architecture. Repository automation authority is modeled separately in `docs/uml/control-plane.md`, and persistence/data authority is modeled in `docs/erd/domain-model.md`. Those separate viewpoints prevent runtime, automation, persistence and governance concerns from being collapsed into one diagram.
+
 ## Component view
 
 ```mermaid
@@ -68,6 +70,8 @@ classDiagram
 
 `NimTrace` remains the compatible application trace model for model identity, attempts, repairs, and raw validation content. Public trace artifacts expose only privacy-safe fields assembled by `analysis.py`. The orchestrator receives organization attribution separately; personal data and generated content are prohibited from attribution.
 
+The two adapters do not use identical provider-native response semantics. Direct NVIDIA NIM may use its native JSON mode. `ContextualOrchestratorClient` currently sets `native_json_mode=False`, requires JSON through the application prompt, and keeps Pydantic parsing/validation plus bounded repair in Four Pillars. This distinction is intentional and must remain aligned with production code.
+
 ## Report sequence
 
 ```mermaid
@@ -90,16 +94,18 @@ sequenceDiagram
   W->>C: calculate chart and luck
   C-->>W: immutable models + fingerprint
   W->>I: immutable evidence + untrusted context
-  I->>M: versioned stage prompts + JSON response mode
-  M-->>I: schema-oriented JSON content
-  I-->>W: Pydantic-validated drafts and traces
+  I->>M: versioned stage prompts + JSON-only application contract
+  M-->>I: JSON content
+  I->>I: parse and validate Pydantic schema
+  I-->>W: validated drafts and privacy-safe traces
   W->>G: fingerprint + synthesized report
   alt quality passes
     G-->>W: approved
   else editorial issue
     W->>I: bounded editorial repair
-    I->>M: repair prompt + JSON Schema
-    M-->>I: repaired complete report
+    I->>M: repair prompt + schema guidance
+    M-->>I: repaired JSON content
+    I->>I: parse and validate Pydantic schema
     I-->>W: validated report
     W->>G: validate again
   end
@@ -111,7 +117,7 @@ sequenceDiagram
   A-->>U: redacted state or allow-listed file
 ```
 
-The selected interpreter never changes during one job. Missing credentials, unavailable gateways, invalid responses, and exhausted retry or repair budgets become visible failures rather than provider fallback.
+The selected interpreter never changes during one job. Missing credentials, unavailable gateways, invalid responses, and exhausted retry or repair budgets become visible failures rather than provider fallback. The sequence deliberately says “JSON-only application contract”: it does not claim that Contextual Orchestrator receives provider-native `response_format`.
 
 ## Calculation sequence
 
@@ -132,6 +138,30 @@ sequenceDiagram
   D-->>F: ten gods, hidden stems, growth, elements, interactions
   F-->>V: immutable Chart
 ```
+
+The current calculation evidence version is `calendar-1.1.0`. Boundary-critical modern roots are checked offline against committed KASI 2026 evidence independently corroborated by NAOJ minute values.
+
+## Personal-data authority view
+
+```mermaid
+flowchart LR
+  Input[Authorized birth/context input\nPII-bearing] --> Queue[(Restricted report job)]
+  Queue --> Core[Deterministic calculator]
+  Core --> Evidence[Immutable calculation evidence]
+  Queue --> Worker[Worker]
+  Evidence --> Worker
+  Worker --> Model[Selected interpretation backend\nminimum purpose payload]
+  Worker --> Artifact[Restricted report artifacts]
+  Queue --> History[Redacted public job view]
+  Evidence --> Manifest[Fingerprint/provenance]
+  Model --> Trace[Privacy-safe trace metadata]
+
+  Input -. prohibited default propagation .-> Telemetry[Routine telemetry]
+  Input -. prohibited default propagation .-> Attribution[Model usage attribution]
+  Artifact -. prohibited .-> History
+```
+
+Purpose-required personal values remain usable inside the authorized calculation/report path. Privacy is enforced by authorization, minimum boundary payloads, opaque identifiers, encryption/secret controls, retention/deletion/export and restricted privileged access rather than blanket masking.
 
 ## Standalone deployment view
 
@@ -173,6 +203,8 @@ The organization form selects `INTERPRETATION_BACKEND=contextual_orchestrator`, 
 
 Current generation traces are local evidence, not W3C distributed traces. `traceparent`/`tracestate` propagation and RFC 9457 problem responses are documented future changes that require separate compatibility PRs.
 
+No arrow in the MSA view means direct cross-service application-database access. Each product owns its persistence and integrates through versioned APIs/events/ports/artifacts.
+
 ## State machine
 
 ```mermaid
@@ -187,6 +219,12 @@ stateDiagram-v2
   quality_failed --> [*]: retention or explicit deletion
 ```
 
+The physical and conceptual data entities behind this lifecycle are defined in `docs/erd/domain-model.md`.
+
+## Repository control-plane view
+
+The implemented minute-17 deterministic quality sentinel and minute-47 NVIDIA/OpenCode product-development workflow, plus the currently Proposed minute-07 PR steward, require a separate authority-focused viewpoint. See `docs/uml/control-plane.md`. That document distinguishes model proposal, uncredentialed verification, late publication, independent review, merge and release authority rather than representing “automation” as one trusted actor.
+
 ## Standards traceability
 
-`docs/standards/REFERENCES.md` records APA 7th references for ISO/IEC 25010:2023, ISO/IEC 42001:2023, ISO/IEC 23894:2023, NIST AI RMF, NIST AI 600-1, RFC 9457, W3C Trace Context, and peer-reviewed LLM-judge research. `docs/standards/TRACEABILITY.md` maps architecture elements to controls, tests, workflows, limitations, and future work. The mapping is not an ISO certification or scientific validation of traditional interpretation.
+`docs/standards/REFERENCES.md` records APA 7th references for ISO/IEC 25010:2023, ISO/IEC 42001:2023, ISO/IEC 23894:2023, ISO/IEC/IEEE 42010:2022, ISO/IEC/IEEE 29148:2018, OMG UML 2.5.1, information-security/privacy standards, CSAP/SOC 2 readiness sources, NIST AI/security frameworks, RFC 9457, W3C Trace Context, astronomical evidence, and peer-reviewed LLM-judge research. `docs/standards/TRACEABILITY.md` maps architecture elements to controls, tests, workflows, limitations, and future work. The mapping is not an ISO/CSAP/SOC 2 certification or scientific validation of traditional interpretation.
