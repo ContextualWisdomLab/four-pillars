@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from datetime import UTC, datetime, tzinfo
 from pathlib import Path
 
@@ -87,6 +88,64 @@ def test_delete_report_rejects_a_non_terminal_job(tmp_path: Path) -> None:
 
     assert captured.value.status_code == 409
     assert service.store.get(job.id) is not None
+
+
+def test_delete_report_preserves_artifacts_when_terminal_row_delete_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Never destroy the only artifact copy before durable deletion is accepted."""
+    service = configured_service(tmp_path)
+    job = service.store.create({"subject_name": "delete-refused"})
+    service.store.claim_next()
+    artifact_dir = service.settings.artifact_dir / job.id
+    artifact_dir.mkdir(parents=True)
+    (artifact_dir / "report.json").write_text("{}", encoding="utf-8")
+    service.store.finish(job.id, artifact_dir)
+    monkeypatch.setattr(service.store, "delete", lambda _: False)
+
+    with pytest.raises(HTTPException) as captured:
+        api_module.delete_report(job.id, service)
+
+    assert captured.value.status_code == 409
+    assert service.store.get(job.id) is not None
+    assert (artifact_dir / "report.json").is_file()
+
+
+def test_delete_report_can_retry_artifact_cleanup_after_row_deletion(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Keep a failed artifact cleanup retryable after the terminal row is removed."""
+    service = configured_service(tmp_path)
+    job = service.store.create({"subject_name": "cleanup-retry"})
+    service.store.claim_next()
+    artifact_dir = service.settings.artifact_dir / job.id
+    artifact_dir.mkdir(parents=True)
+    (artifact_dir / "report.json").write_text("{}", encoding="utf-8")
+    service.store.finish(job.id, artifact_dir)
+    real_rmtree = shutil.rmtree
+    calls = 0
+
+    def fail_once(path: Path) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OSError("simulated cleanup failure")
+        real_rmtree(path)
+
+    monkeypatch.setattr(shutil, "rmtree", fail_once)
+
+    with pytest.raises(HTTPException) as captured:
+        api_module.delete_report(job.id, service)
+
+    assert captured.value.status_code == 500
+    assert service.store.get(job.id) is None
+    assert artifact_dir.is_dir()
+
+    api_module.delete_report(job.id, service)
+
+    assert not artifact_dir.exists()
 
 
 @pytest.mark.parametrize("artifact_mode", ["outside", "wrong_name", "missing"])
