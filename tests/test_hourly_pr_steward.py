@@ -285,7 +285,8 @@ def test_workflow_separates_five_trust_zones() -> None:
     publisher = text.split("publish_repair:", 1)[1].split("queue_governed_merge:", 1)[0]
     merger = text.split("queue_governed_merge:", 1)[1]
 
-    assert "NVIDIA_NIM_API_KEY" not in inspector
+    assert "NVIDIA_NIM_API_KEY:" not in inspector
+    assert "NIM_CONFIGURED: ${{ secrets.NVIDIA_NIM_API_KEY != '' }}" in inspector
     assert "create-github-app-token" not in inspector
     assert "NVIDIA_NIM_API_KEY" in proposer
     assert "create-github-app-token" not in proposer
