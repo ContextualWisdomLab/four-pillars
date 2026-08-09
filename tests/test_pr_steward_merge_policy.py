@@ -48,13 +48,40 @@ def test_each_required_check_group_is_fail_closed_when_absent() -> None:
         evidence["checks"] = [
             check
             for check in evidence["checks"]
-            if not any(alias in check["name"].casefold() for alias in aliases)
+            if check["name"].casefold() not in aliases
         ]
 
         decision = module.decide_action(evidence)
 
         assert decision.action == "wait"
         assert f"required_check_missing:{group}" in decision.reasons
+
+
+def test_required_check_alias_must_match_exactly_not_by_substring() -> None:
+    """Reject spoofed or informational Check names that merely contain a required alias."""
+
+    module = _module()
+    evidence = _green()
+    alias = module.REQUIRED_CHECK_GROUPS["python_311"][0]
+    evidence["checks"] = [
+        check
+        for check in evidence["checks"]
+        if check["name"].casefold() != alias
+    ]
+    evidence["checks"].append(
+        {
+            "kind": "check_run",
+            "name": f"optional {alias} informational",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "details_url": "https://github.com/ContextualWisdomLab/four-pillars/runs/2",
+        }
+    )
+
+    decision = module.decide_action(evidence)
+
+    assert decision.action == "wait"
+    assert "required_check_missing:python_311" in decision.reasons
 
 
 @pytest.mark.parametrize("conclusion", ["NEUTRAL", "SKIPPED"])
@@ -66,7 +93,7 @@ def test_required_check_neutral_or_skipped_never_counts_as_passing(conclusion: s
     required_alias = module.REQUIRED_CHECK_GROUPS["python_311"][0]
     matched = False
     for check in evidence["checks"]:
-        if required_alias in check["name"].casefold():
+        if check["name"].casefold() == required_alias:
             check["status"] = "COMPLETED"
             check["conclusion"] = conclusion
             matched = True
