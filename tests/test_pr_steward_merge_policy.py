@@ -7,6 +7,8 @@ import json
 from pathlib import Path
 from types import ModuleType
 
+import pytest
+
 SCRIPT = Path("scripts/pr_steward_decision.py")
 FIXTURE = Path("tests/fixtures/pr_steward_scenarios.json")
 
@@ -53,6 +55,28 @@ def test_each_required_check_group_is_fail_closed_when_absent() -> None:
 
         assert decision.action == "wait"
         assert f"required_check_missing:{group}" in decision.reasons
+
+
+@pytest.mark.parametrize("conclusion", ["NEUTRAL", "SKIPPED"])
+def test_required_check_neutral_or_skipped_never_counts_as_passing(conclusion: str) -> None:
+    """Treat non-success required conclusions as non-passing merge evidence."""
+
+    module = _module()
+    evidence = _green()
+    required_alias = module.REQUIRED_CHECK_GROUPS["python_311"][0]
+    matched = False
+    for check in evidence["checks"]:
+        if required_alias in check["name"].casefold():
+            check["status"] = "COMPLETED"
+            check["conclusion"] = conclusion
+            matched = True
+    assert matched, "realistic fixture must contain the Python 3.11 required check"
+
+    decision = module.decide_action(evidence)
+
+    assert decision.action == "wait"
+    assert "required_check_missing:python_311" in decision.reasons
+    assert "exact_head_green" not in decision.reasons
 
 
 def test_blocked_or_unstable_head_may_queue_but_never_bypass_governance() -> None:
