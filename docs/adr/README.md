@@ -20,6 +20,8 @@ When one ADR changes another, the newer record must name the prior record and th
 | [0003-explicit-contextual-orchestrator-backend.md](0003-explicit-contextual-orchestrator-backend.md) | Accepted | Contextual Orchestrator is an explicit optional organization adapter with its own token and no silent fallback. | `contextual_orchestrator.py`, adapter tests, modularity docs |
 | [0004-purpose-bound-personal-data.md](0004-purpose-bound-personal-data.md) | Accepted | Preserve necessary PII for the requested computation/interpretation while limiting purpose, access, retention, telemetry, and disclosure instead of blanket masking. | API/history redaction, artifact UUIDs, retention/deletion, threat model |
 | [0005-architecture-description-and-maturity.md](0005-architecture-description-and-maturity.md) | Accepted | Architecture claims use a canonical documentation graph and explicit maturity labels; protected-main evidence outranks plans and PR prose. | documentation audit, architecture docs, contract tests |
+| [0006-calculation-evidence-provenance.md](0006-calculation-evidence-provenance.md) | Accepted | Solar-term/calendar changes require versioned astronomical policy plus independent boundary evidence rather than AI/app oracle correction. | `solar.py`, `calendar.py`, KASI/NAOJ fixtures, calculation doctoring |
+| [0007-autonomous-development-authority.md](0007-autonomous-development-authority.md) | Accepted with `active_pr` extension | Model development, verification, review, merge and release remain separate authorities; one PR/run is a safety bound, not an early-stop rule. | minute-17/minute-47 workflows, autonomous-development contract, PR #29 as `active_pr` |
 
 ## Decisions that require a new ADR
 
