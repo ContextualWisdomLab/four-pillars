@@ -10,6 +10,8 @@ Four Pillars is designed to run as an independent product and to be imported as 
 4. **Replaceable infrastructure:** a platform integration may replace the queue, artifact store, authentication edge, deployment workflow, and interpretation adapter while retaining application and domain behavior.
 5. **Central governance compatibility:** organization `.github` workflows, `naruon`, Contextual Orchestrator, and other repositories can invoke or compose checked-in contracts rather than duplicating product rules.
 6. **No implicit fallback:** direct NIM and Contextual Orchestrator are explicit alternatives; a failed selection never changes providers silently.
+7. **No shared application database:** integrations use versioned APIs, events, structural ports, or immutable artifacts. A consuming service must not reach directly into Four Pillars application tables, and Four Pillars must not depend on another service's private tables.
+8. **Purpose-bound personal data:** birth/context/report values may cross a component boundary only when the selected contract needs them for an authorized purpose. Public history, usage attribution, metrics labels, trace correlation, and cross-service identifiers remain content-minimized.
 
 ## Bounded components
 
@@ -33,7 +35,7 @@ This boundary owns solar/lunar normalization, solar terms, pillars, Ten Gods, hi
 
 `generation.py` defines `StructuredGenerationClient`, the protocol consumed by `analysis.py`. The protocol returns a Pydantic-validated object and compatible generation trace. It does not expose provider administration or routing internals to the domain layer.
 
-`nim.py` supplies the shared OpenAI-compatible JSON transport and direct `NimClient`. `contextual_orchestrator.py` configures the same contract for the organization gateway. Both use an explicit untrusted-input envelope, JSON response mode, Pydantic validation, bounded retry, and bounded schema repair.
+`nim.py` supplies the shared OpenAI-compatible structured-generation transport and direct `NimClient`. `contextual_orchestrator.py` configures the same transport contract for the organization gateway, but the two adapters do not use identical provider-native response semantics. Direct NVIDIA NIM may use provider-native JSON mode. `ContextualOrchestratorClient` deliberately configures `native_json_mode=False`: Four Pillars requests JSON through the application prompt, parses and validates the returned content with Pydantic, and performs only the bounded configured same-backend repair after an invalid response. Both adapters preserve the explicit untrusted-input envelope, validation, bounded retry, bounded repair, and compatible application trace contract.
 
 ### Interpretation adapters
 
@@ -85,7 +87,7 @@ Injected implementations are structurally typed. They do not need to inherit pro
 
 `jobs.py` is the single-node SQLite implementation of the base, idempotency, and history repository contracts. `history.py` owns strict privacy-safe cursor encoding. `adapters.py` contains the default interpretation adapters and filesystem publisher. `reporting.py` owns atomic JSON, HTML, PDF, trace, and manifest writing. `api.py`, `web.py`, and `cli.py` are delivery adapters. None redefine chart or report schemas.
 
-A multi-node deployment should substitute PostgreSQL or a managed queue and object storage behind the same ports. It must preserve atomic claim semantics, terminal-state deletion, allow-listed artifact names, content hashes, fingerprints, database-enforced idempotency, and deterministic `(created_at DESC, id DESC)` history ordering.
+A multi-node deployment should substitute PostgreSQL or a managed queue and object storage behind the same ports. It must preserve atomic claim semantics, terminal-state deletion, allow-listed artifact names, content hashes, fingerprints, database-enforced idempotency, and deterministic `(created_at DESC, id DESC)` history ordering. The replacement adapter owns its schema and migrations; other services consume the port/API rather than its tables.
 
 ## Deployment forms
 
@@ -111,9 +113,11 @@ CONTEXTUAL_ORCHESTRATOR_COMPANY=ContextualWisdomLab
 CONTEXTUAL_ORCHESTRATOR_TEAM=fortune-products
 ```
 
-Four Pillars sends schema-constrained requests through the OpenAI-compatible surface. Usage attribution contains only approved organization labels. Subject names, birth data, user notes, fingerprints, generated text, artifact paths, and credentials never become attribution dimensions.
+Four Pillars sends schema-constrained application requests through the OpenAI-compatible surface. The adapter does not force provider-native `response_format`; it preserves orchestrator routing by requesting JSON in the prompt and validating the application response with Pydantic. Usage attribution contains only approved organization labels. Subject names, birth data, user notes, fingerprints, generated text, artifact paths, and credentials never become attribution dimensions.
 
 Calls across services preserve model, prompt versions, and calculation fingerprint through Four Pillars traces and manifests. Current traces are not W3C distributed traces; `traceparent` propagation is a separately documented target state.
+
+The organization gateway owns its routing/provider ledger and worker credentials. Four Pillars owns chart/report/job semantics and must not query the gateway's private database. Likewise the gateway or `naruon` must not treat `report_jobs` as a shared integration schema.
 
 ### Central workflow consumption
 
@@ -130,7 +134,7 @@ pytest -m 'not nim_live' --cov=four_pillars --cov-report=term-missing
 python -m build --no-isolation
 ```
 
-The repository remains the source of product-specific policy. Central workflows may add organization controls, attestations, deployment, or promotion without copying calculation and quality rules.
+The repository remains the source of product-specific policy. Central workflows may add organization controls, attestations, deployment, or promotion without copying calculation and quality rules. Central automation is governance/composition, not ownership of Four Pillars runtime data or model credentials.
 
 ## Port behavior contracts
 
@@ -152,7 +156,7 @@ The interpreter receives subject label, natal chart, daewoon, annual snapshot, m
 
 ### Structured generation client
 
-A client accepts a system prompt, untrusted payload, Pydantic response model, optional model override, temperature, and token bound. It returns a validated object and trace. The Contextual Orchestrator implementation additionally sends approved attribution and routing metadata but returns the same application-level trace contract.
+A client accepts a system prompt, untrusted payload, Pydantic response model, optional model override, temperature, and token bound. It returns a validated object and trace. The Contextual Orchestrator implementation additionally sends approved attribution and routing metadata but returns the same application-level trace contract. Provider-native structured-output mode is an adapter choice, not part of the shared application port.
 
 ### Artifact publisher
 
@@ -160,9 +164,11 @@ The publisher receives a new staging path, approved report, deterministic eviden
 
 ## Data and naming contracts
 
-Application-owned database objects use at least two words, preferably `snake_case`; camelCase and PascalCase are accepted only for external systems requiring them. The product-gap audit rejects one-word or mixed invalid identifiers. This integration adds no database object.
+Application-owned database objects use at least two words, preferably `snake_case`; camelCase and PascalCase are accepted only for external systems requiring them. The product-gap audit rejects one-word or mixed invalid identifiers. This integration adds no database object. `docs/erd/domain-model.md` is the canonical persisted-vs-conceptual information model.
 
 Public files and messages use UUID job identifiers rather than subject names. Integrations must not put names, birth dates, notes, raw idempotency keys, request fingerprints, report copy, prompts, or model credentials in queue identifiers, history cursors, object keys, usage attribution, metrics labels, or trace correlation identifiers.
+
+Purpose-required personal values may remain inside the explicitly authorized report request/calculation/interpretation flow. This is intentional: privacy does not depend on blanket masking that would destroy calculation/report semantics. Organization adapters must provide equivalent authorization, encryption/key isolation, retention/deletion/export, restricted linkage, and audit boundaries for the selected deployment profile.
 
 ## Versioning and compatibility
 
@@ -175,6 +181,7 @@ An integration is conformant when:
 - deterministic fixtures and fingerprints match the standalone package;
 - interpretation receives immutable evidence as untrusted input;
 - direct NIM uses `NVIDIA_NIM_API_KEY` and the gateway uses `CONTEXTUAL_ORCHESTRATOR_TOKEN`;
+- Contextual Orchestrator remains `native_json_mode=False` unless a separately reviewed contract changes the adapter; JSON schema enforcement remains application-owned;
 - backend selection is explicit and no fallback occurs;
 - prompt/model/attempt/repair provenance remains available;
 - report quality validation runs before publication;
@@ -184,10 +191,12 @@ An integration is conformant when:
 - raw idempotency keys are not persisted;
 - artifact paths, names, hashes, retention, and deletion remain enforced;
 - supplied adapters satisfy structural ports without application forks;
+- no service integrates through another service's private application tables;
 - attribution contains organization labels only;
+- purpose-required PII is limited to authorized contract payloads rather than public/telemetry identifiers;
 - database object names satisfy repository policy; and
 - the full gate remains at exactly 100 percent statement and branch coverage.
 
 ## Standards doctoring
 
-`docs/standards/REFERENCES.md` contains APA 7th references. `docs/standards/TRACEABILITY.md` maps ISO/IEC 25010:2023, ISO/IEC 42001:2023, ISO/IEC 23894:2023, NIST AI RMF, NIST AI 600-1, RFC 9457, W3C Trace Context, and peer-reviewed LLM-judge research to code/tests and residual gaps. Scheduled checks detect missing references or control mappings; the crosswalk is not an ISO certification or scientific validation of traditional interpretation.
+`docs/standards/REFERENCES.md` contains APA 7th references. `docs/standards/TRACEABILITY.md` maps architecture/requirements standards, ISO/IEC 25010:2023, ISO/IEC 42001:2023, ISO/IEC 23894:2023, ISO/IEC 27001:2022, ISO/IEC 27701:2025, NIST AI/security frameworks, KISA CSAP/AICPA SOC 2 readiness sources, RFC 9457, W3C Trace Context, authoritative calendar evidence, and peer-reviewed LLM-judge research to code/tests and residual gaps. Scheduled checks detect missing references or control mappings; the crosswalk is not an ISO/CSAP/SOC 2 certification or scientific validation of traditional interpretation.
