@@ -89,6 +89,15 @@ def require_api_key(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
 
 
+def _public_job_error(job: ReportJob) -> str | None:
+    """Map private stored diagnostics to one stable non-sensitive public failure message."""
+    if job.status is JobStatus.QUALITY_FAILED:
+        return "Report quality validation failed."
+    if job.status is JobStatus.FAILED:
+        return "Report generation failed."
+    return None
+
+
 def _job_view(job: ReportJob, service: ReportService) -> ReportJobView:
     artifacts = service.available_artifacts(job.id) if job.status is JobStatus.COMPLETED else []
     return ReportJobView(
@@ -96,7 +105,7 @@ def _job_view(job: ReportJob, service: ReportService) -> ReportJobView:
         status=job.status,
         created_at=job.created_at,
         updated_at=job.updated_at,
-        error=job.error,
+        error=_public_job_error(job),
         artifacts=artifacts,
     )
 
