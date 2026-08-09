@@ -79,6 +79,25 @@ def test_required_check_neutral_or_skipped_never_counts_as_passing(conclusion: s
     assert "exact_head_green" not in decision.reasons
 
 
+def test_optional_neutral_or_skipped_check_does_not_invent_a_merge_blocker() -> None:
+    """Distinguish strict required-gate policy from benign informational conclusions."""
+
+    module = _module()
+    for conclusion in ("NEUTRAL", "SKIPPED"):
+        evidence = _green()
+        evidence["checks"].append(
+            {
+                "kind": "check_run",
+                "name": "optional informational analysis",
+                "status": "COMPLETED",
+                "conclusion": conclusion,
+                "details_url": "https://github.com/ContextualWisdomLab/four-pillars/runs/1",
+            }
+        )
+
+        assert module.decide_action(evidence).action == "queue_merge"
+
+
 @pytest.mark.parametrize("state", ["BLOCKED", "UNSTABLE"])
 def test_blocked_or_unstable_head_waits_instead_of_queueing_merge(state: str) -> None:
     """Require a passing merge state rather than delegating known blockers to auto-merge."""
