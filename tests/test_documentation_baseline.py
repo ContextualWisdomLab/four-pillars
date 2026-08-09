@@ -3,9 +3,22 @@
 from pathlib import Path
 
 CANONICAL_FILES = (
+    "README.md",
+    "SECURITY.md",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "ARCHITECTURE.md",
+    "CHANGELOG.md",
     "docs/product/PRD.md",
     "docs/technical/TRD.md",
+    "docs/technical/API.md",
+    "docs/technical/CALCULATION.md",
     "docs/technical/MODULARITY.md",
+    "docs/operations/NIM.md",
+    "docs/operations/RUNBOOK.md",
+    "docs/operations/HOURLY_PRODUCT_LOOP.md",
+    "docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md",
+    "docs/design/FIGMA.md",
     "docs/architecture/DOCUMENTATION_MAP.md",
     "docs/architecture/DOCUMENTATION_AUDIT_2026-08-09.md",
     "docs/adr/README.md",
@@ -21,10 +34,12 @@ CANONICAL_FILES = (
     "docs/erd/domain-model.md",
     "docs/uml/architecture.md",
     "docs/uml/control-plane.md",
+    "docs/uml/domain.puml",
     "docs/security/DATA_GOVERNANCE.md",
     "docs/security/THREAT_MODEL.md",
     "docs/compliance/CSAP_SOC2_READINESS.md",
     "docs/doctoring/documentation-governance.md",
+    "docs/doctoring/kasi-solar-term-golden-fixtures.md",
     "docs/standards/REFERENCES.md",
     "docs/standards/TRACEABILITY.md",
 )
@@ -71,13 +86,31 @@ def test_contextual_orchestrator_documentation_matches_production_native_json_mo
     for path in (
         "docs/technical/TRD.md",
         "docs/technical/MODULARITY.md",
+        "docs/operations/NIM.md",
         "docs/uml/architecture.md",
         "docs/standards/TRACEABILITY.md",
     ):
         text = _text(path)
-        assert "native_json_mode=False" in text
+        if path == "docs/operations/NIM.md":
+            assert "The orchestrator adapter deliberately omits `response_format`" in text
+        else:
+            assert "native_json_mode=False" in text
         assert "Pydantic" in text
-        assert "no silent" in text.casefold() or "never silently" in text.casefold()
+        assert "no silent" in text.casefold() or "never silently" in text.casefold() or "do not fail over" in text.casefold()
+
+
+def test_calculation_policy_names_external_evidence_version_and_accepted_adr() -> None:
+    """Bind the buyer-visible calculation policy to external evidence and versioning."""
+    calculation = _text("docs/technical/CALCULATION.md")
+    for token in (
+        "calendar-1.1.0",
+        "KASI",
+        "NAOJ",
+        "120 seconds",
+        "ADR 0008",
+        "A fixture is never regenerated from Four Pillars output",
+    ):
+        assert token in calculation
 
 
 def test_modularity_forbids_shared_application_database_coupling() -> None:
