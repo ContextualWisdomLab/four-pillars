@@ -19,7 +19,9 @@ CANONICAL_FILES = (
     "docs/uml/architecture.md",
     "docs/uml/control-plane.md",
     "docs/security/DATA_GOVERNANCE.md",
+    "docs/security/THREAT_MODEL.md",
     "docs/compliance/CSAP_SOC2_READINESS.md",
+    "docs/doctoring/documentation-governance.md",
     "docs/standards/REFERENCES.md",
     "docs/standards/TRACEABILITY.md",
 )
@@ -106,6 +108,24 @@ def test_personal_data_governance_preserves_necessary_pii_without_ambient_propag
         assert token.casefold() in governance.casefold()
 
 
+def test_threat_model_covers_runtime_and_repository_invariants() -> None:
+    """Keep the repository threat model scoped to assets, inputs, boundaries, and invariants."""
+    threat_model = _text("docs/security/THREAT_MODEL.md")
+    for token in (
+        "Assets",
+        "Trust boundaries",
+        "Attacker-controlled or untrusted inputs",
+        "Core security invariants",
+        "Calculation integrity",
+        "Authorization and privacy",
+        "Repository governance",
+        "NVIDIA_NIM_API_KEY",
+        "Repository: ContextualWisdomLab/four-pillars",
+        "Version: cd4f4e6361238a1db43c28540640a407c7bf7c6e",
+    ):
+        assert token in threat_model
+
+
 def test_assurance_document_does_not_claim_external_certification() -> None:
     """Keep CSAP and SOC 2 as evidence-readiness targets rather than repository badges."""
     readiness = _text("docs/compliance/CSAP_SOC2_READINESS.md")
@@ -139,6 +159,23 @@ def test_standards_catalog_contains_current_architecture_privacy_and_assurance_s
         "National Astronomical Observatory of Japan",
     ):
         assert token in references
+
+
+def test_doctoring_records_version_sensitive_claim_boundaries() -> None:
+    """Require APA-backed doctoring for standards, assurance, and current code semantics."""
+    doctoring = _text("docs/doctoring/documentation-governance.md")
+    for token in (
+        "APA 7th references",
+        "native_json_mode=False",
+        "ISO/IEC/IEEE 42010:2022",
+        "ISO/IEC/IEEE 29148:2018",
+        "ISO/IEC 27701:2025",
+        "CSAP",
+        "SOC 2",
+        "NVIDIA_NIM_API_KEY",
+        "Proposed",
+    ):
+        assert token in doctoring
 
 
 def test_traceability_preserves_release_quality_and_credential_contracts() -> None:
