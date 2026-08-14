@@ -81,7 +81,7 @@ def test_contextual_orchestrator_documentation_matches_production_native_json_mo
     product = _text("docs/product/PRD.md")
     assert "shall not force provider-native JSON response mode" in product
     assert "Pydantic" in product
-    assert "never silently" in product.casefold()
+    assert "no backend may silently fail over" in product.casefold()
 
     for path in (
         "docs/technical/TRD.md",
