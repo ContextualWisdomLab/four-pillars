@@ -96,7 +96,14 @@ def test_contextual_orchestrator_documentation_matches_production_native_json_mo
         else:
             assert "native_json_mode=False" in text
         assert "Pydantic" in text
-        assert "no silent" in text.casefold() or "never silently" in text.casefold() or "do not fail over" in text.casefold()
+        fallback_contract = {
+            "docs/technical/TRD.md": "never silently fails over to another backend",
+            "docs/technical/MODULARITY.md": "a failed selection never changes providers silently",
+            "docs/operations/NIM.md": "never silently routes to another provider or adapter",
+            "docs/uml/architecture.md": "visible failures rather than provider fallback",
+            "docs/standards/TRACEABILITY.md": "no silent provider fallback",
+        }
+        assert fallback_contract[path] in text.casefold()
 
 
 def test_calculation_policy_names_external_evidence_version_and_accepted_adr() -> None:
