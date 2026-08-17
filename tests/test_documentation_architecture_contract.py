@@ -52,8 +52,11 @@ def test_documentation_maturity_has_canonical_labels_and_semantic_exclusivity() 
 
     pr_steward_lines = [line for line in combined.splitlines() if "PR #29" in line]
     assert pr_steward_lines
-    assert any("active_pr" in line for line in pr_steward_lines)
-    assert all("implemented_on_protected_main" not in line for line in pr_steward_lines)
+    assert all("superseded" in line.casefold() for line in pr_steward_lines)
+    assert all(
+        "active_pr" not in line and "implemented_on_protected_main" not in line
+        for line in pr_steward_lines
+    )
 
     planned_multi_node_lines = [
         line
