@@ -24,7 +24,7 @@ The system of interest is the Four Pillars application and reusable package: det
 
 - Deterministic calculation, direct NIM, optional Contextual Orchestrator, queue/history/idempotency, report rendering, browser recovery, minute-17 sentinel, and minute-47 product-development loop are `implemented_on_protected_main`.
 - Purpose-bound personal-data processing and canonical documentation authority are `accepted_architecture` and become protected-main documentation when this PR merges.
-- PR #29's minute-07 PR steward is `active_pr`; it is not a shipped product capability in this architecture until protected-main integration and required operational proof.
+- PR #29's minute-07 PR steward is `superseded` historical evidence because that PR closed without merge; it is neither active nor shipped.
 - Multi-node PostgreSQL/managed-queue adapters, distributed tracing, enterprise identity/billing, and certification are `planned` unless a separate protected-main implementation says otherwise.
 - Superseded plans/PRs remain `superseded` evidence, not current architecture.
 
@@ -60,7 +60,7 @@ flowchart LR
     subgraph Governance[Repository governance]
       Sentinel[Minute-17 deterministic sentinel]
       ProductDev[Minute-47 OpenCode product proposal]
-      PRSteward[Minute-07 PR steward\nactive_pr]
+      PRSteward[Minute-07 PR steward proposal\nsuperseded]
       Review[Independent reviews + exact-head Checks]
     end
 
@@ -80,7 +80,7 @@ flowchart LR
     Renderer --> Artifact
     Sentinel --> Review
     ProductDev --> Review
-    PRSteward -. active_pr .-> Review
+    PRSteward -. superseded history .-> Review
 ```
 
 ### Authority rules
@@ -184,9 +184,9 @@ Four Pillars remains deployable without central `.github`, `naruon`, or Contextu
 - minute-47 NVIDIA NIM/OpenCode product-development proposal loop;
 - exact-head CI/security/release governance already present in repository workflows.
 
-### `active_pr`
+### `superseded`
 
-- PR #29 adds a minute-07 exact-head PR steward. It must remain `active_pr` here until it reaches protected main and its runtime behavior is observed through the required governance path.
+- PR #29 is `superseded` history: its minute-07 exact-head PR steward proposal closed without merge and has no current execution authority.
 
 The canonical operations contract is `docs/operations/AUTONOMOUS_DEVELOPMENT.md`. One bounded PR per product-development run is a writer-safety constraint, not permission to stop after a single RCA, test, documentation edit, or reviewer wait.
 
