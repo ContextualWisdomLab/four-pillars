@@ -42,7 +42,7 @@ Architecture descriptions SHALL use exactly these labels where lifecycle ambigui
 
 These labels are mutually exclusive for one claim at one point in time. A capability can move from `planned` → `active_pr` → `implemented_on_protected_main`; an implementation may later become `deprecated` and eventually `superseded`. `accepted_architecture` describes governing design authority and must be paired with separate implementation evidence when a document needs to assert that the design is shipped.
 
-An `active_pr` or `planned` capability may not also be labeled `implemented_on_protected_main`. PR #29 is the current contract example: it remains `active_pr` until its implementation reaches protected main and any required protected-main operational acceptance succeeds.
+An `active_pr` or `planned` capability may not also be labeled `implemented_on_protected_main`. PR #29 is now a `superseded` historical proposal because it closed without merge; it is neither an active capability nor protected-main behavior.
 
 ### Canonical documentation graph
 
@@ -69,9 +69,9 @@ The minimum current graph is:
 
 Every material change to a public API, deterministic calculation policy, prompt/interpretation schema, durable data model, lifecycle state, trust boundary, provider/secret, MSA port, user workflow, autonomous-development authority, recovery behavior, or release contract must either update the affected canonical documents in the same/prerequisite PR or explicitly state and verify why no documentation impact exists.
 
-## Current active-PR example
+## Superseded steward proposal example
 
-PR #29 proposes a minute-07 exact-head PR steward. Until that PR reaches protected main, the steward is `active_pr`. The existing minute-17 deterministic sentinel and minute-47 NVIDIA/OpenCode product-development workflow are `implemented_on_protected_main`. Documentation must preserve this distinction even if PR #29's description says its implementation is complete.
+PR #29 is `superseded` evidence: it proposed a minute-07 exact-head PR steward but closed without merge. The existing minute-17 deterministic sentinel and minute-47 NVIDIA/OpenCode product-development workflow remain `implemented_on_protected_main`. Documentation must not promote the closed proposal to `active_pr` or shipped status unless a new independently reviewed implementation is opened or reaches protected main.
 
 ## Machine-checkable fitness
 
