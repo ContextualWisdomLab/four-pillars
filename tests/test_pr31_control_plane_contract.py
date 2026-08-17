@@ -32,4 +32,39 @@ def test_closed_pr_steward_is_documented_only_as_superseded_history() -> None:
     ]
     assert lines
     assert all("superseded" in line.casefold() for line in lines)
-    assert all("active_pr" not in line and "implemented_on_protected_main" not in line for line in lines)
+    assert all(
+        "active_pr" not in line and "implemented_on_protected_main" not in line
+        for line in lines
+    )
+
+
+def test_autonomous_maturity_requires_protected_main_and_full_evidence() -> None:
+    """A merge alone must never upgrade an automation contract to shipped truth."""
+    contract = _text("docs/operations/AUTONOMOUS_DEVELOPMENT.md").casefold()
+    assert "only after integration into protected main at an exact commit" in contract
+    for evidence in ("ci", "security", "coverage", "review", "provenance", "operational"):
+        assert evidence in contract
+
+
+def test_final_sweep_has_versioned_fail_closed_machine_record() -> None:
+    """Termination evidence must be machine-auditable rather than internal prose only."""
+    contract = _text("docs/operations/AUTONOMOUS_DEVELOPMENT.md")
+    for field in (
+        "final_sweep_record_v1",
+        "scope",
+        "protected_main_sha",
+        "live_base_sha",
+        "source_head_sha",
+        "required_documents",
+        "gate_results",
+        "remaining_executable_work",
+        "remaining_budget",
+        "final_decision",
+        "recorded_at",
+        "provenance",
+    ):
+        assert field in contract
+    normalized = contract.casefold()
+    for state in ("missing", "stale", "unknown"):
+        assert state in normalized
+    assert "fail closed" in normalized
