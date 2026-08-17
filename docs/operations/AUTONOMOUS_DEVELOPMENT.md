@@ -2,7 +2,7 @@
 
 **Purpose:** durable control context for repository-local autonomous development and review automation.  
 **Applies to:** the existing minute-47 NVIDIA NIM/OpenCode product-development workflow and any successor that reads operations documentation.  
-**Maturity:** this contract becomes `implemented_on_protected_main` when merged; PR #29's PR steward is `superseded` historical evidence because it closed without merge.
+**Maturity:** this contract becomes `implemented_on_protected_main` only after integration into protected main at an exact commit and completion of all required CI, security, coverage, review, provenance, and operational evidence; PR #29's PR steward is `superseded` historical evidence because it closed without merge.
 
 ## 1. No-early-stop rule
 
@@ -146,6 +146,24 @@ Before a run ends, perform a **MANDATORY FINAL SWEEP** of the bounded scope and 
 - if PR/issues are empty, can one bounded buyer-visible Gap be implemented?
 
 If any answer is yes and practical execution budget remains, ending is prohibited. Act and sweep again. The hourly recurrence is continuation after genuine budget exhaustion, not an excuse for voluntary early termination.
+
+### Machine-readable termination evidence
+
+Every voluntary termination decision must produce a versioned `final_sweep_record_v1` evidence object in the owning automation/run evidence channel. It is operational evidence, not a substitute for GitHub checks or review. At minimum it contains:
+
+- `scope`: the bounded repository/product surfaces examined;
+- `protected_main_sha`: exact protected-main identity observed for the sweep;
+- `live_base_sha`: exact independently resolved base-ref identity used for branch-sensitive decisions;
+- `source_head_sha`: exact contributor/source head identity evaluated;
+- `required_documents`: canonical-document inventory with current/stale/missing classification;
+- `gate_results`: exact required check/review/security/coverage/provenance results and their bound revisions;
+- `remaining_executable_work`: concrete safe actions still executable now, if any;
+- `remaining_budget`: bounded run/tool budget state used only to avoid starting work that cannot reach a safe stopping point;
+- `final_decision`: continue, budget_continuation, or no_executable_lane;
+- `recorded_at`: timestamp of the final fresh sweep; and
+- `provenance`: workflow/run identity and evidence-source references sufficient to reconstruct the decision.
+
+A missing, stale, or unknown identity, document state, gate result, remaining-work assessment, or provenance field must **fail closed**: it cannot justify `no_executable_lane` or product completion. A queued/pending gate remains non-passing, and a waiting lane cannot hide another executable lane. This record must be regenerated after any material ref/head/base/review/check change.
 
 ## 13. Scheduler roles
 
