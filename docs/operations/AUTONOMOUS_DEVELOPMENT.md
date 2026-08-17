@@ -2,7 +2,7 @@
 
 **Purpose:** durable control context for repository-local autonomous development and review automation.  
 **Applies to:** the existing minute-47 NVIDIA NIM/OpenCode product-development workflow and any successor that reads operations documentation.  
-**Maturity:** this contract becomes `implemented_on_protected_main` when merged; PR #29's PR steward remains `active_pr` until separately integrated.
+**Maturity:** this contract becomes `implemented_on_protected_main` when merged; PR #29's PR steward is `superseded` historical evidence because it closed without merge.
 
 ## 1. No-early-stop rule
 
@@ -128,7 +128,7 @@ Design for CSAP/SOC 2 procurement readiness without claiming certification. Pres
 
 ## 11. Merge and release authority
 
-The product-development model does not approve, merge, tag, release, deploy, or weaken protection. Existing GitHub review/Check/branch governance remains authoritative. PR #29 proposes a separate steward for exact-head review/repair/merge queueing; until protected-main integration it is `active_pr` and must not be assumed available.
+The product-development model does not approve, merge, tag, release, deploy, or weaken protection. Existing GitHub review/Check/branch governance remains authoritative. PR #29 is `superseded` historical evidence; its former steward proposal has no current review, repair, merge-queue, or branch ownership authority.
 
 A release is allowed only from an exact integrated protected-main commit with the repository's required CI/security/100% coverage/package/container/review/provenance/operational gates satisfied. Version and CHANGELOG move only actually shipped changes.
 
@@ -153,6 +153,6 @@ If any answer is yes and practical execution budget remains, ending is prohibite
 |---|---|---|
 | minute 17 | deterministic product-quality sentinel | `implemented_on_protected_main` |
 | minute 47 | NVIDIA NIM/OpenCode bounded product proposal | `implemented_on_protected_main` |
-| minute 07 PR steward | oldest-PR review/repair/exact-head merge governance | `active_pr` (#29) |
+| minute 07 PR steward | PR #29 is `superseded`; no current execution authority | `superseded` |
 
 Keep these roles non-overlapping. Consolidate/remove a loop if protected-main evidence shows it duplicates another writer or creates unsafe races.
