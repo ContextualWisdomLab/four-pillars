@@ -24,7 +24,7 @@ For one claim at one point in time these labels are mutually exclusive. In parti
 
 The repository already has a substantially better documentation baseline than a typical early-stage service: PRD, TRD, root architecture, UML views, calculation/API/modularity documents, accepted ADRs, security policy, runbook, NIM operations, standards references, and research traceability are all present. The baseline is therefore **substantive but incomplete**, not missing.
 
-The acquisition-grade gaps were architectural discoverability and evidence separation: there was no ADR index, logical ERD/data model, explicit threat model, independent test strategy, independent operability/SLO contract, canonical public status schema, or maturity model that prevents active-PR plans from being mistaken for protected-main reality. This increment fills those gaps without modifying files currently owned by active PR #29.
+The acquisition-grade gaps were architectural discoverability and evidence separation: there was no ADR index, logical ERD/data model, explicit threat model, independent test strategy, independent operability/SLO contract, canonical public status schema, or maturity model that prevents active-PR plans from being mistaken for protected-main reality. This increment fills those gaps without reviving the `superseded` PR #29 steward proposal or claiming its former branch ownership remains active.
 
 ## Completeness matrix
 
@@ -32,7 +32,7 @@ The acquisition-grade gaps were architectural discoverability and evidence separ
 |---|---|---|---|
 | Product PRD | Strong; covers product users, calculations, LLM/report quality, outputs, browser history, modularity and NFRs. | Add documentation-completeness and purpose-bound privacy requirements. | `implemented_on_protected_main` after merge |
 | Technical TRD | Strong; covers trust boundaries, components, data flow, calculation, AI adapters, reliability, security, tests and deployment. | Link canonical ERD, threat model, test strategy, operability, public status schema and maturity rules. | `implemented_on_protected_main` after merge |
-| Root `ARCHITECTURE.md` | Strong protected-main system/control-plane summary. | Do not edit while PR #29 owns the path. Synchronize after PR #29 merges if necessary. | `implemented_on_protected_main` |
+| Root `ARCHITECTURE.md` | Strong protected-main system/control-plane summary. | PR #29 is `superseded`; no open steward PR owns this path, so reconcile it only through a separate current-base change when necessary. | `implemented_on_protected_main` |
 | Canonical system architecture | Missing as a viewpoint/concern-indexed architecture description. | Add `docs/architecture/SYSTEM_ARCHITECTURE.md`. | `implemented_on_protected_main` after merge |
 | UML | Strong component, class, sequence, deployment and state diagrams. | Preserve; supplement with data-model/trust-boundary diagrams rather than duplicate. | `implemented_on_protected_main` |
 | ERD / logical data model | Missing. | Add `docs/architecture/DATA_MODEL.md` from actual `report_jobs` schema and artifact/port contracts. | `implemented_on_protected_main` after merge |
@@ -43,7 +43,7 @@ The acquisition-grade gaps were architectural discoverability and evidence separ
 | Operability | Runbook exists; SLI/SLO, recovery ownership, backup/restore and multi-node obligations are scattered. | Add `docs/operations/OPERABILITY.md`. | `implemented_on_protected_main` after merge |
 | Standards references | Present with APA-style references and a general traceability map. | Add this audit, architecture traceability matrix, and explicit 42010 documentation mapping. | `implemented_on_protected_main` after merge |
 | Autonomous product development | Minute-17 deterministic sentinel and minute-47 NVIDIA/OpenCode proposal workflow are shipped. | Add durable no-early-stop/work-conserving operations context. | `implemented_on_protected_main` after merge |
-| PR steward | PR #29 is implementing a minute-07 exact-head steward. | Treat as `active_pr`; do not describe it as shipped until protected-main merge and operational proof. | `active_pr` |
+| PR steward | PR #29 is `superseded` historical evidence because it closed without merge. | Do not claim the proposed minute-07 steward is active or shipped; any successor needs a fresh reviewed PR and protected-main proof. | `superseded` |
 | Figma/browser design | Existing report-history studio has an authoritative editable Figma reference in prior implementation docs. | No visual redesign is needed for this documentation-focused increment. | `implemented_on_protected_main` for existing browser flow |
 | CSAP/SOC 2 readiness | Security/privacy practices exist but no certification claim is justified. | Map readiness controls through threat/operability/privacy docs; never state certification. | `accepted_architecture` |
 
@@ -117,14 +117,9 @@ flowchart TB
 - Every user-facing visual workflow change must point to the authoritative Figma design when one exists.
 - Documentation-only completion is not a valid autonomous-development stopping condition when an implementation/test/merge action remains safely executable.
 
-## Known follow-up after PR #29
+## Superseded PR #29 follow-up state
 
-PR #29 modifies root `ARCHITECTURE.md`, `AGENTS.md`, `CLAUDE.md`, `CHANGELOG.md`, `SECURITY.md`, and the PR-steward code/docs. This branch deliberately does not race those paths. After #29 reaches protected main, a follow-up documentation synchronization must:
-
-1. label the steward `implemented_on_protected_main` only after merge and protected-main operational evidence;
-2. add its control-plane edge to the canonical/root architecture if absent;
-3. reconcile the no-early-stop contract with the final steward semantics;
-4. rerun the documentation architecture contract test.
+PR #29 is `superseded` historical evidence: it proposed changes to root `ARCHITECTURE.md`, `AGENTS.md`, `CLAUDE.md`, `CHANGELOG.md`, `SECURITY.md`, and PR-steward code/docs but closed without merge. Its former ownership claim no longer blocks those paths, and its proposal must not be promoted into the canonical architecture. A future steward implementation, if opened, must start from the then-current protected main and independently establish exact-head review, checks, authority, and protected-main operational evidence.
 
 ## References — APA 7th
 
