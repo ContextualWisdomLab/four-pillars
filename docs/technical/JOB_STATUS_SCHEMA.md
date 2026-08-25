@@ -1,6 +1,6 @@
 # Public Report Job Status Schema
 
-**Maturity:** `implemented_on_protected_main` for the API model and standalone lifecycle.  
+**Maturity:** `active_pr`; promote only after exact protected-main integration and required operational evidence.  
 **Canonical implementation model:** `four_pillars.api.ReportJobView`.
 
 This document is the single documentation contract for fields exposed by `GET /v1/reports`, `GET /v1/reports/{job_id}`, and the corresponding browser history/status UI. It intentionally differs from the internal `ReportJob`, which contains confidential request/provenance fields.
