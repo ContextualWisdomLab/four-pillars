@@ -106,3 +106,21 @@ def test_artifact_identity_and_remote_branch_inventory_fail_closed() -> None:
         assert token in publisher
     assert "git ls-remote --exit-code --heads origin" in publisher
     assert "&& exit 1 || true" not in publisher
+
+
+def test_publication_revalidates_base_and_source_ref_after_branch_creation() -> None:
+    """Never create a PR if the exact base or newly-created source ref moved."""
+
+    _, _, publisher = workflow_sections()
+    package = publisher.split("Package exactly one pull request in a trusted step", 1)[1]
+    pushed = package.index('git push origin "HEAD:refs/heads/${branch}"')
+    created = package.index("gh pr create")
+    post_push = package[pushed:created]
+
+    assert 'live_base="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${DEFAULT_BRANCH}" --jq ".object.sha")"' in post_push
+    assert '[ "$live_base" = "$expected_base" ]' in post_push
+    assert 'expected_source="$(git rev-parse HEAD)"' in post_push
+    assert 'remote_source="$(git ls-remote --heads origin "refs/heads/${branch}" | cut -f1)"' in post_push
+    assert '[ "$remote_source" = "$expected_source" ]' in post_push
+    assert "base_branch_advanced_after_push" in post_push
+    assert "proposal_branch_identity_mismatch" in post_push
