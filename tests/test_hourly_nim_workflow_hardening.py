@@ -31,28 +31,62 @@ def test_cleanup_never_exposes_the_nim_key_to_dependency_installation() -> None:
     )
 
 
-def test_every_verification_gate_runs_after_runtime_channels_are_unset() -> None:
-    """Keep proposed tests away from Actions tokens and command files."""
+def test_model_process_uses_an_explicit_environment_allowlist() -> None:
+    """Give OpenCode only NIM plus non-secret runtime configuration."""
+
+    proposer, _, _ = workflow_sections()
+    fallback = proposer.split("Run bounded NVIDIA NIM fallback", 1)[1]
+    clean_exec = fallback.split("opencode run", 1)[0]
+
+    assert "env -i" in clean_exec
+    for allowed in (
+        'PATH="$PATH"',
+        'HOME="$HOME"',
+        'NVIDIA_NIM_API_KEY="$NVIDIA_NIM_API_KEY"',
+        'OPENCODE_CONFIG="$OPENCODE_CONFIG"',
+        'OPENCODE_DISABLE_AUTOUPDATE="$OPENCODE_DISABLE_AUTOUPDATE"',
+        'XDG_CONFIG_HOME="$XDG_CONFIG_HOME"',
+        'XDG_CACHE_HOME="$XDG_CACHE_HOME"',
+    ):
+        assert allowed in clean_exec
+    for forbidden in (
+        "GH_TOKEN=",
+        "GITHUB_TOKEN=",
+        "REPOSITORY_TOKEN=",
+        "ACTIONS_ID_TOKEN_REQUEST_TOKEN=",
+        "ACTIONS_RUNTIME_TOKEN=",
+        "GITHUB_ENV=",
+        "GITHUB_OUTPUT=",
+    ):
+        assert forbidden not in clean_exec
+
+
+def test_every_verification_gate_runs_inside_an_explicit_safe_environment() -> None:
+    """Keep proposed tests away from model, GitHub, OIDC, and Actions credentials."""
 
     _, verifier, _ = workflow_sections()
-    unset_command = "unset GH_TOKEN GITHUB_TOKEN REPOSITORY_TOKEN"
+    gate = verifier.split("Run every release-quality gate", 1)[1]
+    clean_exec = gate.split("python -m pip check", 1)[0]
 
-    assert unset_command in verifier
-    assert verifier.index(unset_command) < verifier.index("python -m pip check")
-    for token in (
-        "ACTIONS_ID_TOKEN_REQUEST_TOKEN",
-        "ACTIONS_ID_TOKEN_REQUEST_URL",
-        "ACTIONS_RUNTIME_TOKEN",
-        "ACTIONS_RUNTIME_URL",
-        "ACTIONS_RESULTS_URL",
-        "ACTIONS_CACHE_URL",
-        "GITHUB_ENV",
-        "GITHUB_OUTPUT",
-        "GITHUB_PATH",
-        "GITHUB_STATE",
-        "GITHUB_STEP_SUMMARY",
+    assert "env -i" in clean_exec
+    for allowed in (
+        'PATH="$PATH"',
+        'HOME="$HOME"',
+        'PYTHONPATH="$PYTHONPATH"',
+        'RUNNER_TEMP="$RUNNER_TEMP"',
     ):
-        assert token in verifier[verifier.index(unset_command) : verifier.index("python -m pip check")]
+        assert allowed in clean_exec
+    for forbidden in (
+        "NVIDIA_NIM_API_KEY=",
+        "GH_TOKEN=",
+        "GITHUB_TOKEN=",
+        "REPOSITORY_TOKEN=",
+        "ACTIONS_ID_TOKEN_REQUEST_TOKEN=",
+        "ACTIONS_RUNTIME_TOKEN=",
+        "GITHUB_ENV=",
+        "GITHUB_OUTPUT=",
+    ):
+        assert forbidden not in clean_exec
 
 
 def test_artifact_identity_and_remote_branch_inventory_fail_closed() -> None:
