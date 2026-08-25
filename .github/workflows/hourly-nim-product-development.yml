@@ -382,6 +382,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          PYTHONPATH="${PYTHONPATH:-src}"
+          PIP_DISABLE_PIP_VERSION_CHECK="${PIP_DISABLE_PIP_VERSION_CHECK:-1}"
           EXPECTED_PATCH_SHA256="${{ needs.propose_product_increment.outputs.patch_sha256 }}"
           env -i \
             PATH="$PATH" \
