@@ -8,6 +8,7 @@ import shutil
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
+from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, status
 from fastapi.responses import FileResponse, HTMLResponse
@@ -115,7 +116,14 @@ def _trusted_artifact_root(
     job_id: str,
     stored_artifact_dir: str | None,
 ) -> Path | None:
-    """Return only an exact direct child of the configured artifact root."""
+    """Return only an exact canonical-UUID direct child of the artifact root."""
+    try:
+        parsed_job_id = UUID(job_id)
+    except ValueError:
+        return None
+    if str(parsed_job_id) != job_id:
+        return None
+
     configured_root = service.settings.artifact_dir.resolve()
     candidate = (
         Path(stored_artifact_dir).resolve()
