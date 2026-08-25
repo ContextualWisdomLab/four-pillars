@@ -553,6 +553,20 @@ jobs:
           cleanup() { git push origin --delete "$branch" >/dev/null 2>&1 || true; }
           trap cleanup ERR
           git push origin "HEAD:refs/heads/${branch}"
+          expected_base="${{ needs.propose_product_increment.outputs.base_sha }}"
+          expected_source="$(git rev-parse HEAD)"
+          live_base="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${DEFAULT_BRANCH}" --jq ".object.sha")"
+          [ "$live_base" = "$expected_base" ] || {
+            echo '::error::base_branch_advanced_after_push'
+            cleanup
+            exit 1
+          }
+          remote_source="$(git ls-remote --heads origin "refs/heads/${branch}" | cut -f1)"
+          [ "$remote_source" = "$expected_source" ] || {
+            echo '::error::proposal_branch_identity_mismatch'
+            cleanup
+            exit 1
+          }
           gh pr create --repo "$GITHUB_REPOSITORY" --base "$DEFAULT_BRANCH" \
             --head "$branch" --title "$title" --body-file "$body_file"
           trap - ERR
