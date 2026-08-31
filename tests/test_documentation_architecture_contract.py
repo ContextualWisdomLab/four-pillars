@@ -56,10 +56,9 @@ def test_product_technical_gap_baseline_is_evidence_bound() -> None:
     ):
         assert phrase in baseline
 
-    pr_31_lines = [line for line in baseline.splitlines() if "#31" in line]
-    assert pr_31_lines
-    assert all("active_pr" in line for line in pr_31_lines)
-    assert all("implemented_on_protected_main" not in line for line in pr_31_lines)
+    assert "PR #31 at `9a0ac33` (`active_pr`)" in baseline
+    assert baseline.count("`active_pr` (#31)") == 2
+    assert "`implemented_on_protected_main` (#31)" not in baseline
 
 
 def test_documentation_maturity_has_canonical_labels_and_semantic_exclusivity() -> None:
