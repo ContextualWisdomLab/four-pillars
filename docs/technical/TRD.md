@@ -256,7 +256,7 @@ Queued, pending, skipped-required, cancelled, stale/predecessor/synthetic-only o
 
 ## 16. Architecture/documentation fitness
 
-ADR 0005 establishes the authority/maturity model. The canonical graph must make product intent, technical ownership, system viewpoints, data/ERD, decisions, threats, testing, operability, standards/research, visual contracts and release history discoverable without chat reconstruction.
+ADR 0005 establishes the authority/maturity model. The canonical graph must make product intent, technical ownership, system viewpoints, data/ERD, decisions, threats, testing, operability, standards/research, visual contracts and release history discoverable without chat reconstruction. `docs/product-technical-gap-baseline.md` is the prioritized evidence and action register.
 
 A material code/API/model/workflow/persistence/lifecycle/trust-boundary change must update affected canonical documents or prove no impact. Documentation completeness is an engineering quality criterion, not a substitute for executable product work.
 

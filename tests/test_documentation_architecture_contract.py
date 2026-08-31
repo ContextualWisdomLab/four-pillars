@@ -29,9 +29,32 @@ def test_canonical_documentation_families_exist() -> None:
         "docs/technical/TEST_STRATEGY.md",
         "docs/operations/OPERABILITY.md",
         "docs/operations/AUTONOMOUS_DEVELOPMENT.md",
+        "docs/product-technical-gap-baseline.md",
     )
     for relative_path in required:
         assert (ROOT / relative_path).is_file(), relative_path
+
+
+def test_product_technical_gap_baseline_is_evidence_bound() -> None:
+    """Keep product priorities tied to maturity, proof, and acceptance evidence."""
+    baseline = _text("docs/product-technical-gap-baseline.md")
+    for phrase in (
+        "implemented_on_protected_main",
+        "active_pr",
+        "planned",
+        "superseded",
+        "Acceptance evidence",
+        "Contextual Orchestrator",
+        "docs/product/PRD.md",
+        "docs/technical/TRD.md",
+        "docs/architecture/DATA_MODEL.md",
+        "docs/security/THREAT_MODEL.md",
+        "docs/technical/TEST_STRATEGY.md",
+        "docs/operations/OPERABILITY.md",
+        "scientific-prediction",
+        "certification",
+    ):
+        assert phrase in baseline
 
 
 def test_documentation_maturity_has_canonical_labels_and_semantic_exclusivity() -> None:

@@ -64,6 +64,7 @@ The canonical documentation graph must answer the following stakeholder concerns
 ```mermaid
 flowchart TB
     PRD[docs/product/PRD.md]
+    GAP[docs/product-technical-gap-baseline.md]
     TRD[docs/technical/TRD.md]
     ARCH[docs/architecture/SYSTEM_ARCHITECTURE.md]
     UML[docs/uml/architecture.md]
@@ -78,6 +79,8 @@ flowchart TB
     AUDIT[docs/standards/DOCUMENTATION_AUDIT.md]
 
     PRD --> TRD
+    PRD --> GAP
+    GAP --> TRD
     TRD --> ARCH
     ARCH --> UML
     ARCH --> DATA
