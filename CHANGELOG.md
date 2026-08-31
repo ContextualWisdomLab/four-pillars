@@ -13,6 +13,8 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ### Changed
 
+- The development toolchain now requires `pytest-asyncio` 1.4 or newer for
+  supported Python 3.14 event-loop APIs instead of deprecated policy calls.
 - Apparent solar longitude now uses a bounded VSOP87 Earth series in Terrestrial Time with FK5, nutation, and aberration corrections; deterministic calculation evidence advances to `calendar-1.1.0`.
 - Calculation and standards doctoring now trace the official Korean calendar basis, independent NAOJ cross-check, IERS time-scale policy, JPL DE440 claim boundary, signed before/after model errors, and residual historical-time risks.
 
