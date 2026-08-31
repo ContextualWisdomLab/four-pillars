@@ -17,6 +17,8 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 - The product-gap baseline now records durable execution leases, orphaned
   Actions identity remediation, and the independent publication-App boundary
   with their live dependency and evidence status.
+- PR steward maturity contracts now reject direct active or protected-main
+  classifications of the closed, unmerged PR #29 across common wording variants.
 - Apparent solar longitude now uses a bounded VSOP87 Earth series in Terrestrial Time with FK5, nutation, and aberration corrections; deterministic calculation evidence advances to `calendar-1.1.0`.
 - Calculation and standards doctoring now trace the official Korean calendar basis, independent NAOJ cross-check, IERS time-scale policy, JPL DE440 claim boundary, signed before/after model errors, and residual historical-time risks.
 
