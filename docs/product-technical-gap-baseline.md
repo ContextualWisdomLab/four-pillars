@@ -69,6 +69,9 @@ or automatic high-stakes decisions.
 |---|---|---|---|---|
 | GAP-01 | Canonical architecture evidence is not yet on protected `main`. | `active_pr` (#31) | Resolve exact-head review and Checks, then merge without changing the green head. | required Checks successful, unresolved actionable threads zero, qualifying review, protected-main commit |
 | GAP-02 | CLI users cannot rely on protected-main longitude/time-basis exposure yet. | `active_pr` (#35) | Complete review/Checks and merge the unchanged green head. | CLI edge tests including non-finite longitude, docs, exact-head gates, protected-main commit |
+| GAP-11 | A worker crash can leave a report job `running` indefinitely without a durable execution lease or race-safe reclaim. | `planned` (#32), dependency-gated | After #31 and #37 merge, implement versioned attempt ownership, heartbeat/expiry, atomic reclaim, stale-writer rejection, and attempt-scoped artifact publication without changing public job identity. | deterministic crash/reclaim and two-worker race tests, stale finish/fail rejection, restart persistence, idempotency preservation, redacted recovery state, 100% coverage |
+| GAP-12 | Deleted one-shot and release-helper workflow identities remained active in the Actions registry. | operational remediation complete; recurrence detection `planned` (#33) | Keep the 18 exact path/ID records disabled and complete the linked organization/AppGuardrail read-only detector before closing the incident. | protected-main-bound before/after inventory, supported five workflows and dynamic CodeQL still active, pagination/error/rename/reuse detector tests |
+| GAP-13 | Hourly proposal publication has no configured, independent repository-scoped maintainer App boundary. | externally blocked configuration (#34) | Provision the documented least-privilege App or review a separately owned OIDC publication exchange; do not reuse review identities or add a PAT. | real protected-main zero-PR run creates at most one Draft PR and starts normal exact-head gates without exposing publisher authority to model/verifier jobs |
 | GAP-03 | The standalone SQLite/filesystem queue is not a supported horizontal multi-node deployment. | `planned` | Add a separately reviewed remote repository/queue and object-store adapter only when a deployment needs horizontal workers. | atomic distributed claim/idempotency tests, 3NF schema/migration, backup/restore, RPO/RTO, load evidence |
 | GAP-04 | SLOs are defined but no repository evidence proves a deployed environment meets them. | `planned`, deployment-owned | Add reproducible reference-environment measurement and k6/browser load evidence before making performance claims. | environment manifest, raw results, p95 values, bottleneck analysis, repeatable command |
 | GAP-05 | Backup/restore requirements exist without a current automated deployment drill artifact. | `planned`, deployment-owned | Implement a safe sampled restore drill for the selected database/artifact adapters. | timestamped restore result, manifest checks, queue-state handling, owner and follow-up |
@@ -83,9 +86,14 @@ or automatic high-stakes decisions.
 1. Merge GAP-01 and GAP-02 only from unchanged, exact green heads.
 2. Rebase this baseline onto protected `main`, replace `active_pr` labels with
    protected-main evidence only after the merges are confirmed, and merge it.
-3. Select the next implementation gap from measured buyer or operator evidence.
+3. Implement GAP-11 only after #31 and #37 settle so its lease schema and
+   attempt-scoped artifact contract build on the canonical data model and
+   connection-lifecycle fix rather than racing them.
+4. Complete GAP-12 recurrence detection and GAP-13 external publication
+   authority without restoring one-shot workflows or reusing reviewer identity.
+5. Select later implementation gaps from measured buyer or operator evidence.
    GAP-03 through GAP-07 are not permission to build speculative infrastructure.
-4. Re-run the gap audit after every material API, persistence, trust-boundary,
+6. Re-run the gap audit after every material API, persistence, trust-boundary,
    calculation-policy, UI, or release change.
 
 ## Update contract
