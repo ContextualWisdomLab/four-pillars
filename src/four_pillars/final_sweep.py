@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from datetime import datetime
 from typing import Any
 
@@ -26,11 +26,18 @@ _SHA_RE = re.compile(r"[0-9a-f]{40}", re.IGNORECASE)
 
 
 def _validate_revisioned_evidence(
-    value: Any, *, field: str, status: str, revision: str
+    value: Any,
+    *,
+    field: str,
+    expected_names: Collection[str],
+    status: str,
+    revision: str,
 ) -> None:
-    """Require a non-empty evidence map in one state at one exact revision."""
+    """Require the independently resolved inventory at one exact revision."""
     if not isinstance(value, Mapping) or not value:
         raise ValueError(f"{field} must be a non-empty evidence map")
+    if set(value) != set(expected_names):
+        raise ValueError(f"{field} inventory does not match independently required names")
     for name, evidence in value.items():
         if (
             not isinstance(name, str)
@@ -42,7 +49,12 @@ def _validate_revisioned_evidence(
             raise ValueError(f"{field} contains stale, unknown, or mismatched evidence")
 
 
-def validate_final_sweep_record(record: Mapping[str, Any]) -> None:
+def validate_final_sweep_record(
+    record: Mapping[str, Any],
+    *,
+    expected_documents: Collection[str],
+    expected_gates: Collection[str],
+) -> None:
     """Reject incomplete or contradictory ``final_sweep_record_v1`` evidence."""
     missing = _REQUIRED_FIELDS.difference(record)
     if missing:
@@ -64,12 +76,14 @@ def validate_final_sweep_record(record: Mapping[str, Any]) -> None:
     _validate_revisioned_evidence(
         record["required_documents"],
         field="required_documents",
+        expected_names=expected_documents,
         status="current",
         revision=source_head_sha,
     )
     _validate_revisioned_evidence(
         record["gate_results"],
         field="gate_results",
+        expected_names=expected_gates,
         status="success",
         revision=source_head_sha,
     )
@@ -77,9 +91,11 @@ def validate_final_sweep_record(record: Mapping[str, Any]) -> None:
     if not isinstance(recorded_at, str):
         raise ValueError("recorded_at must be a canonical UTC timestamp")
     try:
-        datetime.strptime(recorded_at, "%Y-%m-%dT%H:%M:%SZ")
+        parsed_recorded_at = datetime.strptime(recorded_at, "%Y-%m-%dT%H:%M:%SZ")
     except ValueError as exc:
         raise ValueError("recorded_at must be a canonical UTC timestamp") from exc
+    if parsed_recorded_at.strftime("%Y-%m-%dT%H:%M:%SZ") != recorded_at:
+        raise ValueError("recorded_at must be a canonical UTC timestamp")
 
     provenance = record["provenance"]
     if not isinstance(provenance, Mapping):

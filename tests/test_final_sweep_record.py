@@ -6,6 +6,9 @@ import pytest
 
 from four_pillars.final_sweep import validate_final_sweep_record
 
+EXPECTED_DOCUMENTS = frozenset({"README.md", "ARCHITECTURE.md"})
+EXPECTED_GATES = frozenset({"quality", "security"})
+
 
 def record(**overrides: object) -> dict[str, object]:
     """Return one structurally complete termination record."""
@@ -15,10 +18,12 @@ def record(**overrides: object) -> dict[str, object]:
         "live_base_sha": "a" * 40,
         "source_head_sha": "b" * 40,
         "required_documents": {
-            "README.md": {"status": "current", "revision": "b" * 40}
+            name: {"status": "current", "revision": "b" * 40}
+            for name in EXPECTED_DOCUMENTS
         },
         "gate_results": {
-            "quality": {"status": "success", "revision": "b" * 40}
+            name: {"status": "success", "revision": "b" * 40}
+            for name in EXPECTED_GATES
         },
         "remaining_executable_work": [],
         "remaining_budget": {"can_reach_safe_stopping_point": True},
@@ -35,10 +40,39 @@ def record(**overrides: object) -> dict[str, object]:
     return value
 
 
+def validate(value: dict[str, object]) -> None:
+    """Validate one record against independently resolved required evidence."""
+    validate_final_sweep_record(
+        value,
+        expected_documents=EXPECTED_DOCUMENTS,
+        expected_gates=EXPECTED_GATES,
+    )
+
+
+def documents(**readme_updates: str) -> dict[str, dict[str, str]]:
+    """Return complete document evidence with optional README corruption."""
+    value = {
+        name: {"status": "current", "revision": "b" * 40}
+        for name in EXPECTED_DOCUMENTS
+    }
+    value["README.md"].update(readme_updates)
+    return value
+
+
+def gates(**quality_updates: str) -> dict[str, dict[str, str]]:
+    """Return complete gate evidence with optional quality corruption."""
+    value = {
+        name: {"status": "success", "revision": "b" * 40}
+        for name in EXPECTED_GATES
+    }
+    value["quality"].update(quality_updates)
+    return value
+
+
 def test_valid_termination_decisions_are_accepted() -> None:
     """Accept only internally consistent terminal decisions."""
-    validate_final_sweep_record(record())
-    validate_final_sweep_record(
+    validate(record())
+    validate(
         record(
             remaining_executable_work=["rerun exact-head checks"],
             remaining_budget={"can_reach_safe_stopping_point": False},
@@ -65,7 +99,7 @@ def test_contradictory_termination_decisions_fail_closed(
 ) -> None:
     """Reject work, budget, and decision combinations that cannot justify stopping."""
     with pytest.raises(ValueError):
-        validate_final_sweep_record(invalid_record)
+        validate(invalid_record)
 
 
 def test_missing_or_malformed_fields_fail_closed() -> None:
@@ -73,11 +107,30 @@ def test_missing_or_malformed_fields_fail_closed() -> None:
     missing = record()
     del missing["provenance"]
     with pytest.raises(ValueError, match="missing fields"):
-        validate_final_sweep_record(missing)
+        validate(missing)
     with pytest.raises(ValueError, match="remaining_executable_work"):
-        validate_final_sweep_record(record(remaining_executable_work="none"))
+        validate(record(remaining_executable_work="none"))
     with pytest.raises(ValueError, match="remaining_budget"):
-        validate_final_sweep_record(record(remaining_budget={}))
+        validate(record(remaining_budget={}))
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"required_documents": {"README.md": {"status": "current", "revision": "b" * 40}}},
+        {"gate_results": {"quality": {"status": "success", "revision": "b" * 40}}},
+    ],
+)
+def test_omitted_required_evidence_fails_closed(overrides: dict[str, object]) -> None:
+    """Reject records that omit independently required documents or gates."""
+    with pytest.raises(ValueError, match="inventory"):
+        validate(record(**overrides))
+
+
+def test_noncanonical_timestamp_fails_closed() -> None:
+    """Reject parseable UTC timestamps without canonical zero padding."""
+    with pytest.raises(ValueError, match="recorded_at"):
+        validate(record(recorded_at="2026-8-1T00:00:00Z"))
 
 
 @pytest.mark.parametrize(
@@ -90,17 +143,17 @@ def test_missing_or_malformed_fields_fail_closed() -> None:
         ({"source_head_sha": "bad"}, "source_head_sha"),
         ({"required_documents": {}}, "required_documents"),
         (
-            {"required_documents": {"README.md": {"status": "stale", "revision": "b" * 40}}},
+            {"required_documents": documents(status="stale")},
             "required_documents",
         ),
         (
-            {"required_documents": {"README.md": {"status": "current", "revision": "a" * 40}}},
+            {"required_documents": documents(revision="a" * 40)},
             "required_documents",
         ),
         ({"gate_results": {}}, "gate_results"),
         *[
             (
-                {"gate_results": {"quality": {"status": status, "revision": "b" * 40}}},
+                {"gate_results": gates(status=status)},
                 "gate_results",
             )
             for status in (
@@ -113,7 +166,7 @@ def test_missing_or_malformed_fields_fail_closed() -> None:
             )
         ],
         (
-            {"gate_results": {"quality": {"status": "success", "revision": "a" * 40}}},
+            {"gate_results": gates(revision="a" * 40)},
             "gate_results",
         ),
         ({"recorded_at": "yesterday"}, "recorded_at"),
@@ -135,4 +188,4 @@ def test_identity_and_evidence_states_fail_closed(
 ) -> None:
     """Reject empty, stale, non-passing, or revision-mismatched evidence."""
     with pytest.raises(ValueError, match=message):
-        validate_final_sweep_record(record(**overrides))
+        validate(record(**overrides))
