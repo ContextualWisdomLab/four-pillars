@@ -6,6 +6,7 @@
 - Protected-main SHA: `cd4f4e6361238a1db43c28540640a407c7bf7c6e`
 - Remediation observation: `2026-08-31T10:25:03Z`
 - Configuration recheck: `2026-08-31T11:18:45Z`
+- Organization-scope recheck: `2026-08-31T11:44:55Z`
 - Owner incident: [#33](https://github.com/ContextualWisdomLab/four-pillars/issues/33)
 - Contemporaneous operator receipt: [issue comment 5477004993](https://github.com/ContextualWisdomLab/four-pillars/issues/33#issuecomment-5477004993)
 
@@ -48,10 +49,14 @@ also remained `active`; they were not misclassified as missing repository files.
 ## Publication boundary observation
 
 At the configuration recheck time, the repository Actions API returned zero
-repository variables and zero repository secrets. Therefore the documented
-`FOUR_PILLARS_MAINTAINER_APP_CLIENT_ID` variable and
-`FOUR_PILLARS_MAINTAINER_APP_PRIVATE_KEY` secret were not configured. This is
-presence-only evidence; no secret value was requested or exposed. Issue
+repository variables and zero repository secrets. Because Actions can inherit
+organization configuration, the owner loop also paginated the organization
+Actions variable and secret inventories. Neither inventory contained the exact
+`FOUR_PILLARS_MAINTAINER_APP_CLIENT_ID` variable or
+`FOUR_PILLARS_MAINTAINER_APP_PRIVATE_KEY` secret. The documented maintainer App
+credentials were therefore absent from both applicable scopes. This is
+presence-and-visibility-only evidence; no variable or secret value was requested
+or exposed. Issue
 [#34](https://github.com/ContextualWisdomLab/four-pillars/issues/34) remains the
 owner record for provisioning or replacing that independent publication
 boundary.
