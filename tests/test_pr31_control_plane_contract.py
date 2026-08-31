@@ -1,5 +1,6 @@
 """Fail closed when canonical architecture evidence preserves obsolete repair authority."""
 
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -39,8 +40,12 @@ def test_closed_pr_steward_is_documented_only_as_superseded_history() -> None:
     assert lines
     assert all("superseded" in line.casefold() for line in lines)
     combined = "\n".join(lines)
-    assert "PR #29 is `active_pr`" not in combined
-    assert "PR #29 is `implemented_on_protected_main`" not in combined
+    direct_classification = re.compile(
+        r"PR #29\s+(?:is|remains|becomes)\s+(?:now\s+)?(?:an?\s+)?"
+        r"`?(?:active_pr|implemented_on_protected_main)`?",
+        re.IGNORECASE,
+    )
+    assert direct_classification.search(combined) is None
 
 
 def test_autonomous_maturity_requires_protected_main_and_full_evidence() -> None:
