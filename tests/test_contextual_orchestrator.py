@@ -344,8 +344,8 @@ def test_settings_bound_orchestrator_operational_values() -> None:
         settings(contextual_orchestrator_mode="unbounded")
 
 
-def test_orchestrator_default_allows_two_hour_generation() -> None:
-    """Do not terminate accuracy-first orchestration at the old 120-second limit."""
+def test_orchestrator_default_allows_two_hour_request() -> None:
+    """Do not terminate an accuracy-first model request at the old 120-second limit."""
     configured = Settings(_env_file=None)
 
     assert configured.contextual_orchestrator_timeout_seconds == 2 * 60 * 60

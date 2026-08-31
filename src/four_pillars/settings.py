@@ -70,6 +70,7 @@ class Settings(BaseSettings):
         default=2 * 60 * 60,
         gt=0,
         le=4 * 60 * 60,
+        description="Timeout for each Contextual Orchestrator HTTP request",
     )
     contextual_orchestrator_max_retries: int = Field(
         default=3,

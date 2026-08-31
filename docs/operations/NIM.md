@@ -43,6 +43,10 @@ CONTEXTUAL_ORCHESTRATOR_GROUP=interpretation
 CONTEXTUAL_ORCHESTRATOR_COMPANY=ContextualWisdomLab
 ```
 
+`CONTEXTUAL_ORCHESTRATOR_TIMEOUT_SECONDS` applies to each gateway HTTP request,
+not to the complete multi-stage report job. The default allows two hours per
+request; validation permits an explicit value up to four hours.
+
 `CONTEXTUAL_ORCHESTRATOR_MODE` accepts only `auto`, `route`, or `conduct`. `auto` delegates test-time compute allocation to the organization gateway; `route` requests one bounded routed worker; `conduct` requests deeper bounded multi-agent conduct. Four Pillars keeps synchronous delivery because its worker must receive and validate the complete response before it commits a report job. Batch orchestration requires a separately versioned asynchronous job contract.
 
 The example `.env.example` uses loopback HTTP for local development. Production traffic should use TLS, an approved hostname, restricted egress, and a gateway token scoped to inference rather than administration.
