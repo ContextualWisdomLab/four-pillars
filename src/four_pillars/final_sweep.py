@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
+from datetime import datetime
 from typing import Any
 
 _REQUIRED_FIELDS = frozenset(
@@ -20,6 +22,24 @@ _REQUIRED_FIELDS = frozenset(
         "provenance",
     }
 )
+_SHA_RE = re.compile(r"[0-9a-f]{40}", re.IGNORECASE)
+
+
+def _validate_revisioned_evidence(
+    value: Any, *, field: str, status: str, revision: str
+) -> None:
+    """Require a non-empty evidence map in one state at one exact revision."""
+    if not isinstance(value, Mapping) or not value:
+        raise ValueError(f"{field} must be a non-empty evidence map")
+    for name, evidence in value.items():
+        if (
+            not isinstance(name, str)
+            or not name
+            or not isinstance(evidence, Mapping)
+            or evidence.get("status") != status
+            or evidence.get("revision") != revision
+        ):
+            raise ValueError(f"{field} contains stale, unknown, or mismatched evidence")
 
 
 def validate_final_sweep_record(record: Mapping[str, Any]) -> None:
@@ -27,6 +47,57 @@ def validate_final_sweep_record(record: Mapping[str, Any]) -> None:
     missing = _REQUIRED_FIELDS.difference(record)
     if missing:
         raise ValueError(f"missing fields: {', '.join(sorted(missing))}")
+
+    scope = record["scope"]
+    if (
+        not isinstance(scope, list)
+        or not scope
+        or any(not isinstance(item, str) or not item.strip() for item in scope)
+    ):
+        raise ValueError("scope must be a non-empty list of names")
+    for field in ("protected_main_sha", "live_base_sha", "source_head_sha"):
+        identity = record[field]
+        if not isinstance(identity, str) or _SHA_RE.fullmatch(identity) is None:
+            raise ValueError(f"{field} must be one exact Git SHA")
+    source_head_sha = record["source_head_sha"]
+
+    _validate_revisioned_evidence(
+        record["required_documents"],
+        field="required_documents",
+        status="current",
+        revision=source_head_sha,
+    )
+    _validate_revisioned_evidence(
+        record["gate_results"],
+        field="gate_results",
+        status="success",
+        revision=source_head_sha,
+    )
+    recorded_at = record["recorded_at"]
+    if not isinstance(recorded_at, str):
+        raise ValueError("recorded_at must be a canonical UTC timestamp")
+    try:
+        datetime.strptime(recorded_at, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError as exc:
+        raise ValueError("recorded_at must be a canonical UTC timestamp") from exc
+
+    provenance = record["provenance"]
+    if not isinstance(provenance, Mapping):
+        raise ValueError("provenance must be a current evidence map")
+    evidence_sources = provenance.get("evidence_sources")
+    if (
+        provenance.get("status") != "current"
+        or provenance.get("source_head_sha") != source_head_sha
+        or not isinstance(provenance.get("workflow"), str)
+        or not provenance["workflow"].strip()
+        or not isinstance(evidence_sources, list)
+        or not evidence_sources
+        or any(
+            not isinstance(source, str) or not source.strip()
+            for source in evidence_sources
+        )
+    ):
+        raise ValueError("provenance contains stale, unknown, or incomplete evidence")
 
     work = record["remaining_executable_work"]
     if not isinstance(work, list):

@@ -14,13 +14,22 @@ def record(**overrides: object) -> dict[str, object]:
         "protected_main_sha": "a" * 40,
         "live_base_sha": "a" * 40,
         "source_head_sha": "b" * 40,
-        "required_documents": {"README.md": "current"},
-        "gate_results": {"quality": "success"},
+        "required_documents": {
+            "README.md": {"status": "current", "revision": "b" * 40}
+        },
+        "gate_results": {
+            "quality": {"status": "success", "revision": "b" * 40}
+        },
         "remaining_executable_work": [],
         "remaining_budget": {"can_reach_safe_stopping_point": True},
         "final_decision": "no_executable_lane",
         "recorded_at": "2026-08-31T00:00:00Z",
-        "provenance": {"workflow": "manual-audit"},
+        "provenance": {
+            "status": "current",
+            "source_head_sha": "b" * 40,
+            "workflow": "manual-audit",
+            "evidence_sources": ["local://final-sweep"],
+        },
     }
     value.update(overrides)
     return value
@@ -69,3 +78,61 @@ def test_missing_or_malformed_fields_fail_closed() -> None:
         validate_final_sweep_record(record(remaining_executable_work="none"))
     with pytest.raises(ValueError, match="remaining_budget"):
         validate_final_sweep_record(record(remaining_budget={}))
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"scope": []}, "scope"),
+        ({"scope": "four-pillars"}, "scope"),
+        ({"protected_main_sha": "bad"}, "protected_main_sha"),
+        ({"live_base_sha": "bad"}, "live_base_sha"),
+        ({"source_head_sha": "bad"}, "source_head_sha"),
+        ({"required_documents": {}}, "required_documents"),
+        (
+            {"required_documents": {"README.md": {"status": "stale", "revision": "b" * 40}}},
+            "required_documents",
+        ),
+        (
+            {"required_documents": {"README.md": {"status": "current", "revision": "a" * 40}}},
+            "required_documents",
+        ),
+        ({"gate_results": {}}, "gate_results"),
+        *[
+            (
+                {"gate_results": {"quality": {"status": status, "revision": "b" * 40}}},
+                "gate_results",
+            )
+            for status in (
+                "pending",
+                "queued",
+                "skipped_required",
+                "cancelled",
+                "failed",
+                "unknown",
+            )
+        ],
+        (
+            {"gate_results": {"quality": {"status": "success", "revision": "a" * 40}}},
+            "gate_results",
+        ),
+        ({"recorded_at": "yesterday"}, "recorded_at"),
+        ({"recorded_at": None}, "recorded_at"),
+        ({"provenance": "unknown"}, "provenance"),
+        ({"provenance": {}}, "provenance"),
+        (
+            {"provenance": {"status": "unknown", "source_head_sha": "b" * 40, "workflow": "audit", "evidence_sources": ["local://audit"]}},
+            "provenance",
+        ),
+        (
+            {"provenance": {"status": "current", "source_head_sha": "a" * 40, "workflow": "audit", "evidence_sources": ["local://audit"]}},
+            "provenance",
+        ),
+    ],
+)
+def test_identity_and_evidence_states_fail_closed(
+    overrides: dict[str, object], message: str
+) -> None:
+    """Reject empty, stale, non-passing, or revision-mismatched evidence."""
+    with pytest.raises(ValueError, match=message):
+        validate_final_sweep_record(record(**overrides))
