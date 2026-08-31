@@ -105,7 +105,10 @@ def test_delete_report_rejects_a_non_terminal_job(tmp_path: Path) -> None:
     assert service.store.get(job.id) is not None
 
 
-@pytest.mark.parametrize("missing_job_id", ["missing-job", "../escape"])
+@pytest.mark.parametrize(
+    "missing_job_id",
+    ["missing-job", "../escape", "00000000-0000-0000-0000-00000000000A"],
+)
 def test_delete_report_rejects_missing_jobs_without_a_trusted_orphan(
     missing_job_id: str,
     tmp_path: Path,

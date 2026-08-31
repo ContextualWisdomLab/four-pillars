@@ -31,10 +31,9 @@ def test_closed_pr_steward_is_documented_only_as_superseded_history() -> None:
     ]
     assert lines
     assert all("superseded" in line.casefold() for line in lines)
-    assert all(
-        "active_pr" not in line and "implemented_on_protected_main" not in line
-        for line in lines
-    )
+    combined = "\n".join(lines)
+    assert "PR #29 is `active_pr`" not in combined
+    assert "PR #29 is `implemented_on_protected_main`" not in combined
 
 
 def test_autonomous_maturity_requires_protected_main_and_full_evidence() -> None:

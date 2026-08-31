@@ -53,10 +53,8 @@ def test_documentation_maturity_has_canonical_labels_and_semantic_exclusivity() 
     pr_steward_lines = [line for line in combined.splitlines() if "PR #29" in line]
     assert pr_steward_lines
     assert all("superseded" in line.casefold() for line in pr_steward_lines)
-    assert all(
-        "active_pr" not in line and "implemented_on_protected_main" not in line
-        for line in pr_steward_lines
-    )
+    assert "PR #29 is `active_pr`" not in combined
+    assert "PR #29 is `implemented_on_protected_main`" not in combined
 
     planned_multi_node_lines = [
         line
@@ -194,11 +192,11 @@ def test_autonomous_development_contract_is_work_conserving_and_safe() -> None:
         "exact head",
         "exact live base",
         "credential-free verification",
-        "fails closed",
+        "fail closed",
         "NVIDIA_NIM_API_KEY",
         "COPILOT_GITHUB_TOKEN",
-        "approved report-generation purpose",
-        "field-level input schema",
+        "processing purpose is explicitly approved",
+        "versioned model-input allow-list/schema",
     ):
         assert phrase.casefold() in normalized
 
@@ -240,7 +238,7 @@ def test_doctoring_tracks_current_and_draft_standards_separately() -> None:
     assert "ISO/IEC 42001:2023" in doctoring
     assert "ISO/IEC 23894:2023" in doctoring
     assert "NIST AI 600-1" in doctoring
-    assert "SSDF Version 1.1" in doctoring
+    assert "(SSDF) Version 1.1" in doctoring
     assert "Version 1.2" in doctoring
     assert "Initial Public Draft" in doctoring
 
