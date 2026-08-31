@@ -24,7 +24,7 @@ and are not inferred here.
 Four Pillars owns deterministic Korean Four Pillars calculation, immutable
 calculation evidence, schema-validated interpretation, durable report jobs,
 privacy-safe recovery, and HTML/PDF/JSON artifacts. It supports a standalone
-deployment and replaceable MSA ports. Hosted interpretation uses Contextual
+deployment and replaceable MSA ports. Organization integration uses Contextual
 Orchestrator.
 
 The product does not claim that traditional interpretation is a scientifically
