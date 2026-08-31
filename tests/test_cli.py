@@ -82,6 +82,29 @@ def test_calculate_command_requires_longitude_for_solar_time() -> None:
     assert "Traceback" not in result.output
 
 
+def test_calculation_commands_reject_non_finite_longitude() -> None:
+    shared = ["--birth", "1990-06-15T08:30:00", "--longitude", "nan"]
+    commands = (
+        ["calculate", *shared],
+        [
+            "luck",
+            *shared,
+            "--annual-year",
+            "2026",
+            "--monthly-year",
+            "2026",
+            "--monthly-month",
+            "8",
+        ],
+    )
+
+    for command in commands:
+        result = runner.invoke(app, command)
+        assert result.exit_code == 2
+        assert "longitude must be a finite number" in result.output
+        assert "Traceback" not in result.output
+
+
 def test_luck_command_prints_daewoon_annual_and_monthly() -> None:
     result = runner.invoke(
         app,

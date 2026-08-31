@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from datetime import datetime
 
 import typer
@@ -28,6 +29,11 @@ def _birth_input(
     longitude: float | None = None,
     time_basis: TimeBasis = TimeBasis.CIVIL,
 ) -> BirthInput:
+    if longitude is not None and not math.isfinite(longitude):
+        raise typer.BadParameter(
+            "longitude must be a finite number",
+            param_hint="--longitude",
+        )
     if time_basis is not TimeBasis.CIVIL and longitude is None:
         raise typer.BadParameter(
             "longitude is required for mean or apparent solar time",
