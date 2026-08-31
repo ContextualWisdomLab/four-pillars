@@ -24,10 +24,8 @@ and are not inferred here.
 Four Pillars owns deterministic Korean Four Pillars calculation, immutable
 calculation evidence, schema-validated interpretation, durable report jobs,
 privacy-safe recovery, and HTML/PDF/JSON artifacts. It supports a standalone
-deployment and replaceable MSA ports. Direct NVIDIA NIM is the standalone model
-adapter; an organization deployment may instead use Contextual Orchestrator.
-Four Pillars does not define Contextual Orchestrator's internal provider
-inventory.
+deployment and replaceable MSA ports. Hosted interpretation uses Contextual
+Orchestrator.
 
 The product does not claim that traditional interpretation is a scientifically
 validated prediction of a person's future. It does not provide medical diagnosis
