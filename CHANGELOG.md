@@ -19,8 +19,8 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
   with their live dependency and evidence status.
 - Each Contextual Orchestrator request now defaults to a two-hour timeout
   instead of 120 seconds, with a bounded four-hour per-request ceiling.
-- Customer-facing hosted-interpretation copy now names Contextual Orchestrator
-  without exposing its internal provider inventory.
+- Customer-facing organization-integration copy now names Contextual
+  Orchestrator without exposing its internal provider inventory.
 - PR steward maturity contracts now reject direct active or protected-main
   classifications of the closed, unmerged PR #29 across common wording variants,
   link its replacement authority, and fail closed on contradictory termination
