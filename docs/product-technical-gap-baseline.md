@@ -2,7 +2,7 @@
 
 **Audit date:** 2026-09-01  
 **Protected-main baseline:** `cd4f4e6361238a1db43c28540640a407c7bf7c6e`  
-**Documentation source:** PR #31 at `fa9d999` (`active_pr`)  
+**Documentation source:** PR #31 at `5e66159` (`active_pr`)
 **Maturity vocabulary:** ADR 0005
 
 ## Purpose and evidence rules

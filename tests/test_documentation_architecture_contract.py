@@ -61,6 +61,29 @@ def test_product_technical_gap_baseline_is_evidence_bound() -> None:
     assert baseline.count("`active_pr` (#31)") >= 2
     assert "`implemented_on_protected_main` (#31)" not in baseline
 
+    gap_rows = {}
+    for line in baseline.splitlines():
+        if line.startswith("| GAP-"):
+            columns = tuple(cell.strip() for cell in line.split("|")[1:-1])
+            assert len(columns) == 5
+            assert all(columns)
+            gap_rows[columns[0]] = columns
+
+    assert set(gap_rows) == {f"GAP-{number:02d}" for number in range(1, 14)}
+    allowed_maturities = (
+        "`active_pr`",
+        "`planned`",
+        "`superseded`",
+        "accepted claim limit",
+    )
+    for gap_id, _, status, next_action, acceptance_evidence in gap_rows.values():
+        assert any(maturity in status for maturity in allowed_maturities), gap_id
+        assert next_action != acceptance_evidence
+
+    assert "`active_pr` (#31)" in gap_rows["GAP-01"][2]
+    assert "`superseded`" in gap_rows["GAP-08"][2]
+    assert "accepted claim limit" in gap_rows["GAP-09"][2]
+
 
 def test_documentation_maturity_has_canonical_labels_and_semantic_exclusivity() -> None:
     """Prevent active/planned claims from being classified as protected-main behavior."""
