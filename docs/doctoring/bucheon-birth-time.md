@@ -6,7 +6,7 @@ The image is partly true. Longitude changes local mean solar time, and the equat
 
 The image overstates the chart impact. Civil 08:30 and apparent-solar 07:57 are both within the traditional 07:00–08:59 `辰` interval, so this case remains `庚午 壬午 辛亥 壬辰`. A correction can change a pillar near a two-hour or day boundary, but it does not do so merely because the displayed minute changes.
 
-The lunar claim is false for this input. Solar 1990-06-15 corresponds to regular lunar 1990-05-23. Leap lunar 1990-05-23 is solar 1990-07-15. The API already requires an explicit `calendar` and `lunar_leap_month`; it does not infer a leap month from a solar date.
+The lunar claim is false for this input. Solar 1990-06-15 corresponds to regular lunar 1990-05-23. Leap lunar 1990-05-23 is solar 1990-07-15. The API requires an explicit `calendar`; `lunar_leap_month` defaults to `false` and must be `true` for an intercalary month. It does not infer a leap month from a solar date.
 
 ## Product decision and checks
 

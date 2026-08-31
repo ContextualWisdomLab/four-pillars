@@ -60,11 +60,13 @@ Internet Assigned Numbers Authority. (2026, July 8). *Time zone database 2026c* 
 
 Korea Ministry of Government Legislation. (1986). *Standard time act* (Act No. 3919). https://www.law.go.kr/LSW/lsRvsRsnListP.do?chrClsCd=010202&lsId=000744&lsRvsGubun=all
 
+Hong Kong Observatory. (2001). *Gregorian-lunar calendar conversion table of 1990 (Geng-wu—year of the Horse)*. https://www.hko.gov.hk/en/gts/time/calendar/pdf/files/1990e.pdf
+
 **Application.** NOAA's longitude, UTC-offset, and equation-of-time relationship; IANA's historical Seoul offsets; and Korea's 135° E standard meridian support the explicit birthplace solar-time policy and its DST handling. The Bucheon case and claim limits are recorded in `docs/doctoring/bucheon-birth-time.md`.
 
 Lee, J. (2026). *korean-lunar-calendar* (Version 0.4.0) [Computer software]. GitHub. https://github.com/usingsky/korean_lunar_calendar_py
 
-**Application.** The declared conversion dependency follows the Korea Astronomy and Space Science Institute calendar basis. Its regular/leap-month result is independently cross-checked against the Hong Kong Observatory's published 1990 Gregorian-lunar table in the Bucheon evidence doctoring.
+**Application.** The declared conversion dependency follows the Korea Astronomy and Space Science Institute calendar basis. The Bucheon evidence doctoring independently cross-checks only solar 1990-06-15 to regular lunar 1990-05-23 and leap lunar 1990-05-23 to solar 1990-07-15 against the Hong Kong Observatory's published 1990 Gregorian-lunar table.
 
 Bretagnon, P., & Francou, G. (1988). Planetary theories in rectangular and spherical variables: VSOP87 solutions. *Astronomy and Astrophysics, 202*, 309–315.
 
