@@ -67,9 +67,9 @@ class Settings(BaseSettings):
     )
     contextual_orchestrator_mode: ContextualOrchestrationMode = "auto"
     contextual_orchestrator_timeout_seconds: float = Field(
-        default=120,
+        default=2 * 60 * 60,
         gt=0,
-        le=600,
+        le=4 * 60 * 60,
     )
     contextual_orchestrator_max_retries: int = Field(
         default=3,

@@ -13,6 +13,8 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ### Changed
 
+- Contextual Orchestrator generation now defaults to a two-hour timeout instead
+  of 120 seconds, with a bounded four-hour operator ceiling.
 - PR steward maturity contracts now reject direct active or protected-main
   classifications of the closed, unmerged PR #29 across common wording variants,
   link its replacement authority, and fail closed on contradictory termination

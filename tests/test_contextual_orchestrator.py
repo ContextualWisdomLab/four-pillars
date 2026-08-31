@@ -335,8 +335,17 @@ def test_settings_bound_orchestrator_operational_values() -> None:
     with pytest.raises(ValidationError):
         settings(contextual_orchestrator_timeout_seconds=0)
     with pytest.raises(ValidationError):
+        settings(contextual_orchestrator_timeout_seconds=4 * 60 * 60 + 1)
+    with pytest.raises(ValidationError):
         settings(contextual_orchestrator_max_retries=11)
     with pytest.raises(ValidationError):
         settings(contextual_orchestrator_max_schema_repairs=4)
     with pytest.raises(ValidationError):
         settings(contextual_orchestrator_mode="unbounded")
+
+
+def test_orchestrator_default_allows_two_hour_generation() -> None:
+    """Do not terminate accuracy-first orchestration at the old 120-second limit."""
+    configured = Settings(_env_file=None)
+
+    assert configured.contextual_orchestrator_timeout_seconds == 2 * 60 * 60
