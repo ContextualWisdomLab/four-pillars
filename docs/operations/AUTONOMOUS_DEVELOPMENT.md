@@ -167,6 +167,8 @@ A missing, stale, or unknown identity, document state, gate result, remaining-wo
 
 The decision fields have cross-field invariants: `no_executable_lane` requires `remaining_executable_work` to be empty. `budget_continuation` requires non-empty `remaining_executable_work` and a `remaining_budget` value showing that the next safe stopping point cannot be reached. `continue` is valid only for a non-termination sweep; a voluntary termination record must use `budget_continuation` or `no_executable_lane`. Any contradictory record fails closed.
 
+Before accepting voluntary termination evidence, producers and consumers call `four_pillars.final_sweep.validate_final_sweep_record`. The `remaining_budget` object must include the boolean `can_reach_safe_stopping_point`; `budget_continuation` requires it to be `false`. The validator rejects missing fields, malformed work/budget containers, `continue`, unknown decisions, and both contradictory terminal combinations.
+
 ## 13. Scheduler roles
 
 | Schedule/control | Current role | Maturity |
