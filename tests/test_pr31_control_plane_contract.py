@@ -19,8 +19,15 @@ def test_closed_pr_steward_is_documented_only_as_superseded_history() -> None:
     """Closed, unmerged PR #29 cannot remain active or shipped authority."""
     documents = (
         "docs/standards/DOCUMENTATION_AUDIT.md",
+        "docs/standards/ARCHITECTURE_TRACEABILITY.md",
+        "docs/product/PRD.md",
+        "docs/technical/TRD.md",
+        "docs/adr/README.md",
         "docs/adr/0005-architecture-description-and-maturity.md",
+        "docs/adr/0007-autonomous-development-authority.md",
         "docs/architecture/SYSTEM_ARCHITECTURE.md",
+        "docs/uml/governance-and-data.md",
+        "docs/security/THREAT_MODEL.md",
         "docs/operations/AUTONOMOUS_DEVELOPMENT.md",
     )
     lines = [

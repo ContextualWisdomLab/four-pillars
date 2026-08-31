@@ -231,7 +231,7 @@ The existing minute-17 deterministic sentinel and minute-47 NVIDIA NIM/OpenCode 
 
 The work-conserving/no-early-stop contract is documented in `docs/operations/AUTONOMOUS_DEVELOPMENT.md`. One generated PR per product-development run is a writer-safety boundary, not permission to stop after one inventory/RCA/test/document change.
 
-PR #29's minute-07 exact-head PR steward is `active_pr`. It must not be called shipped until protected-main merge and required operational acceptance.
+PR #29's minute-07 exact-head PR steward is `superseded` because it closed without merge. It has no current execution authority; any successor requires a fresh reviewed change and operational acceptance.
 
 Model-based development uses `NVIDIA_NIM_API_KEY`, not `COPILOT_GITHUB_TOKEN`, and must not receive reviewer/merge/release identity. Independent review/Checks/branch governance remain separate authority.
 

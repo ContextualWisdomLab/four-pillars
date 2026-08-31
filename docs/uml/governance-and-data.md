@@ -157,7 +157,7 @@ stateDiagram-v2
     OperationalProof --> Inventory: continue queue
 ```
 
-The minute-47 product-development workflow may reach `ReviewReady` by proposing one bounded PR but does not own the `IndependentGovernance -> ProtectedMain` transition. Credential-free verification is mandatory before publication under ADR 0007. PR #29 proposes a steward for governed PR triage/merge queueing and remains `active_pr` until protected-main integration.
+The minute-47 product-development workflow may reach `ReviewReady` by proposing one bounded PR but does not own the `IndependentGovernance -> ProtectedMain` transition. Credential-free verification is mandatory before publication under ADR 0007. PR #29's steward proposal is `superseded` because it closed without merge and has no current triage or merge authority.
 
 ## Documentation maturity class view
 

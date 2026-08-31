@@ -1,14 +1,14 @@
 # ADR 0007: Separate autonomous development, verification, review, and merge authority
 
 - **Status:** Accepted
-- **Architecture maturity:** minute-17/minute-47 controls are `implemented_on_protected_main`; the PR-steward extension remains `active_pr` (#29)
+- **Architecture maturity:** minute-17/minute-47 controls are `implemented_on_protected_main`; the closed PR #29 steward proposal is `superseded`
 - **Date:** 2026-08-09
 
 ## Context
 
 Four Pillars uses scheduled automation to keep product quality and development moving. A model-backed development agent is useful only if it cannot convert its own proposal into trusted verification, approval, merge, release, or deployment evidence. GitHub review/check latency must not freeze product development, but “automation keeps working” must not mean “one credential can write and approve everything.”
 
-The repository currently has a deterministic minute-17 quality sentinel and a minute-47 NVIDIA NIM/OpenCode product-development proposal workflow. PR #29 proposes a separate minute-07 exact-head PR steward.
+The repository currently has a deterministic minute-17 quality sentinel and a minute-47 NVIDIA NIM/OpenCode product-development proposal workflow. PR #29 proposed a separate minute-07 exact-head PR steward but closed without merge and is `superseded`.
 
 ## Decision
 
@@ -21,7 +21,7 @@ The repository currently has a deterministic minute-17 quality sentinel and a mi
 7. **Exact-head governance:** reviews and Checks belong to one exact head. Stale/predecessor/synthetic-only/pending/skipped-required/cancelled/failed evidence does not become passing evidence.
 8. **Work-conserving execution:** review/Check/provider waiting blocks only the affected action. Autonomous development follows `docs/operations/AUTONOMOUS_DEVELOPMENT.md` and performs a mandatory final sweep before ending a practical run.
 9. **One PR is a safety bound:** minute-47 development may create at most one coherent PR per run; this does not permit stopping after one inventory, RCA, documentation edit, or test result while the same bounded increment still has safe executable work.
-10. **PR steward:** PR #29 is `active_pr`. If merged, the steward may triage/repair/queue governed merge only within the authority proven by its exact protected-main implementation. This ADR does not pre-authorize unmerged PR behavior.
+10. **PR steward:** PR #29 is `superseded` and has no current authority. Any successor may triage, repair, or queue governed merge only within authority proven by its own exact protected-main implementation; this ADR does not pre-authorize proposed behavior.
 11. **Release authority:** autonomous development/review automation does not independently mint a release unless a separately reviewed release workflow, exact protected-main gates, provenance, and repository governance permit it.
 
 ## Security invariants
@@ -54,7 +54,7 @@ The control plane is slower than a single all-powerful bot, but evidence is attr
 - `.github/workflows/hourly-nim-product-development.yml` — model-backed proposal/credential-free verification/publication separation.
 - `docs/operations/AUTONOMOUS_DEVELOPMENT.md` — work-conserving execution contract.
 - `docs/doctoring/hourly-nim-opencode-development.md` — original control-plane research/standards evidence.
-- PR #29 — `active_pr` PR-steward extension; must be reclassified only after protected-main integration.
+- PR #29 — `superseded` PR-steward proposal; any successor requires fresh review and evidence.
 - `docs/security/THREAT_MODEL.md` — autonomous-development credential/supply-chain threats.
 
 ## Reversal conditions

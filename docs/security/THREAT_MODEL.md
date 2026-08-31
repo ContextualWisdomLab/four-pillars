@@ -1,7 +1,7 @@
 # Four Pillars Threat Model
 
 **Scope:** standalone product and modular MSA integration.  
-**Maturity:** current protected-main controls plus accepted architecture; PR #29 automation is `active_pr`, not shipped.
+**Maturity:** current protected-main controls plus accepted architecture; PR #29 automation is `superseded`, not shipped.
 
 ## 1. Security objectives
 
@@ -154,7 +154,7 @@ flowchart LR
 
 **Controls:** checksum/immutable action pinning where practical; model runner separated from verifier/publisher; late-bound scoped GitHub App publication; model has no merge/release/reviewer identity; exact-head/base checks; bounded patches; symlink/gitlink rejection; no `COPILOT_GITHUB_TOKEN`; independent security/review gates.
 
-PR #29's PR steward is `active_pr`; its final authority must be re-evaluated when merged rather than assumed here.
+PR #29's PR steward is `superseded` and has no current authority; any successor must be evaluated from its own reviewed implementation and evidence.
 
 ### T12 — false authority in generated interpretation
 

@@ -168,7 +168,7 @@ Open-PR or planned behavior must not be described as shipped protected-main beha
 
 Current protected-main product scope includes single-person natal/luck reporting, Korean output, deterministic calculation with independently checked modern solar-term evidence, direct NIM, optional Contextual Orchestrator, API/CLI/queue, recent-work recovery, idempotency, PDF/HTML/JSON, quality/security gates, Docker, CI, standards traceability, and product documentation.
 
-`active_pr`: PR #29 proposes an exact-head hourly PR steward. It is not part of shipped scope until protected-main merge and operational acceptance.
+`superseded`: PR #29 proposed an exact-head hourly PR steward but closed without merge. It is not part of shipped scope or current execution authority.
 
 `planned`/excluded until separately reviewed: compatibility matching, payments, multi-tenant billing, consultant editing/collaboration UI, medical diagnosis, automatic high-stakes decisions, automatic provider fallback, scientific validation of traditional interpretation, and certification claims.
 
