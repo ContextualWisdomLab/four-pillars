@@ -159,11 +159,13 @@ Every voluntary termination decision must produce a versioned `final_sweep_recor
 - `gate_results`: exact required check/review/security/coverage/provenance results and their bound revisions;
 - `remaining_executable_work`: concrete safe actions still executable now, if any;
 - `remaining_budget`: bounded run/tool budget state used only to avoid starting work that cannot reach a safe stopping point;
-- `final_decision`: continue, budget_continuation, or no_executable_lane;
+- `final_decision`: `continue`, `budget_continuation`, or `no_executable_lane`;
 - `recorded_at`: timestamp of the final fresh sweep; and
 - `provenance`: workflow/run identity and evidence-source references sufficient to reconstruct the decision.
 
 A missing, stale, or unknown identity, document state, gate result, remaining-work assessment, or provenance field must **fail closed**: it cannot justify `no_executable_lane` or product completion. A queued/pending gate remains non-passing, and a waiting lane cannot hide another executable lane. This record must be regenerated after any material ref/head/base/review/check change.
+
+The decision fields have cross-field invariants: `no_executable_lane` requires `remaining_executable_work` to be empty. `budget_continuation` requires non-empty `remaining_executable_work` and a `remaining_budget` value showing that the next safe stopping point cannot be reached. `continue` is valid only for a non-termination sweep; a voluntary termination record must use `budget_continuation` or `no_executable_lane`. Any contradictory record fails closed.
 
 ## 13. Scheduler roles
 
