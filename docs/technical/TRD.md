@@ -8,7 +8,7 @@ The selected interpretation adapter never changes deterministic evidence and nev
 
 ## 2. Technology stack
 
-- Python 3.11 and 3.12
+- Python 3.11 through 3.14
 - Pydantic 2 and Pydantic Settings 2 for data, LLM, and configuration contracts
 - FastAPI and Uvicorn for HTTP
 - Typer for CLI
