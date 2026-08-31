@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 
+from click import unstyle
 from typer.testing import CliRunner
 
 from four_pillars.cli import app
@@ -62,7 +63,7 @@ def test_calculate_command_rejects_invalid_time_basis_without_traceback() -> Non
         ["calculate", "--birth", "1990-06-15T08:30:00", "--time-basis", "invalid"],
     )
     assert result.exit_code == 2
-    assert "Invalid value for '--time-basis'" in result.output
+    assert "Invalid value for '--time-basis'" in unstyle(result.output)
     assert "Traceback" not in result.output
 
 
