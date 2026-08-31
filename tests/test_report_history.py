@@ -6,6 +6,7 @@ import base64
 import json
 import sqlite3
 import uuid
+from contextlib import closing
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -34,7 +35,7 @@ def _set_job_metadata(
     created_at: datetime,
     status: JobStatus,
 ) -> None:
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection, connection:
         connection.execute(
             "UPDATE report_jobs SET created_at=?, updated_at=?, status=? WHERE id=?",
             (created_at.isoformat(), created_at.isoformat(), status.value, job_id),
@@ -238,7 +239,7 @@ def test_job_history_filters_status_across_pages_and_creates_indexes(
     assert first_cursor is not None
     assert [job.id for job in second] == [completed_old.id]
     assert second_cursor is None
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection, connection:
         names = {
             row[0]
             for row in connection.execute(

@@ -1,11 +1,23 @@
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from four_pillars.jobs import JobStore
+
+
+def test_store_connection_context_closes_the_database(tmp_path: Path) -> None:
+    """Release SQLite handles when one repository operation leaves its context."""
+    store = JobStore(tmp_path / "jobs.sqlite3")
+
+    with store._connect() as connection:
+        connection.execute("SELECT 1")
+
+    with pytest.raises(sqlite3.ProgrammingError, match="closed"):
+        connection.execute("SELECT 1")
 
 
 class LostClaimConnection:

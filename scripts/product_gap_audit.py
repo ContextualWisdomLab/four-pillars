@@ -7,6 +7,7 @@ import re
 import sqlite3
 import tempfile
 import tomllib
+from contextlib import closing
 from pathlib import Path
 from typing import NamedTuple
 
@@ -157,7 +158,7 @@ def _database_names() -> list[str]:
     with tempfile.TemporaryDirectory(prefix="four-pillars-audit-") as temporary:
         database = Path(temporary) / "audit.sqlite3"
         JobStore(database)
-        with sqlite3.connect(database) as connection:
+        with closing(sqlite3.connect(database)) as connection:
             return [
                 row[0]
                 for row in connection.execute(

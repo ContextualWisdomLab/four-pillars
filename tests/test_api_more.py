@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import closing
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -78,7 +79,7 @@ def _set_job(
     status: JobStatus,
     error: str | None = None,
 ) -> None:
-    with sqlite3.connect(service.settings.sqlite_path) as connection:
+    with closing(sqlite3.connect(service.settings.sqlite_path)) as connection, connection:
         connection.execute(
             """
             UPDATE report_jobs

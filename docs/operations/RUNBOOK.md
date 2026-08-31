@@ -23,7 +23,7 @@ Direct standalone generation uses `INTERPRETATION_BACKEND=nvidia_nim` and `NVIDI
 
 ### Jobs remain queued
 
-Check that the worker container is running, points to the same `DATABASE_URL` and artifact volume, and can acquire the SQLite file. Restart one worker at a time. Do not mark jobs completed manually.
+Check that the worker container is running, points to the same `DATABASE_URL` and artifact volume, and can acquire the SQLite file. Each repository operation owns and closes one bounded connection; sustained handle growth is an incident signal rather than expected pooling. Restart one worker at a time. Do not mark jobs completed manually.
 
 ### Jobs remain running after a crash
 
