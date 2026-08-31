@@ -1,8 +1,8 @@
 # Four Pillars Product and Technical Gap Baseline
 
-**Audit date:** 2026-08-31  
+**Audit date:** 2026-09-01  
 **Protected-main baseline:** `cd4f4e6361238a1db43c28540640a407c7bf7c6e`  
-**Documentation source:** PR #31 at `9a0ac33` (`active_pr`)  
+**Documentation source:** PR #31 at `fa9d999` (`active_pr`)  
 **Maturity vocabulary:** ADR 0005
 
 ## Purpose and evidence rules
@@ -58,7 +58,7 @@ or automatic high-stakes decisions.
 | Korean lunar regular/leap input | `implemented_on_protected_main` | explicit calendar/leap flag and conversion tests | no inference of leap month from a solar date |
 | Civil, mean-solar, apparent-solar policies | `active_pr` (#35 for CLI exposure) | existing core/API plus reviewed CLI and Bucheon evidence | unchanged green HEAD, required review, protected-main merge |
 | Schema-validated report generation | `implemented_on_protected_main` | structural client port, bounded retry/repair, quality gate | selected backend failure remains visible; no silent backend switch |
-| Contextual Orchestrator adapter | `implemented_on_protected_main` | explicit adapter/token/routing contract tests | Four Pillars treats it as one external gateway |
+| Contextual Orchestrator adapter | `implemented_on_protected_main`; long-request update `active_pr` (#31) | explicit adapter/token/routing contract tests; two-hour per-request timeout contract | Four Pillars treats it as one external gateway; the timeout is per HTTP request, not a whole-report deadline |
 | Durable async jobs and stable history | `implemented_on_protected_main` | SQLite WAL repository, atomic claim/idempotency, cursor tests | single-node guarantees only |
 | Searchable HTML/PDF/JSON artifacts | `implemented_on_protected_main` | renderer and manifest-integrity tests | visual changes require browser/visual review |
 | Canonical acquisition-grade documentation | `active_pr` (#31) | architecture graph, ADR index, ERD, threat/test/operations contracts | unchanged green HEAD and protected-main merge |

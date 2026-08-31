@@ -159,11 +159,15 @@ Every voluntary termination decision must produce a versioned `final_sweep_recor
 - `gate_results`: exact required check/review/security/coverage/provenance results and their bound revisions;
 - `remaining_executable_work`: concrete safe actions still executable now, if any;
 - `remaining_budget`: bounded run/tool budget state used only to avoid starting work that cannot reach a safe stopping point;
-- `final_decision`: continue, budget_continuation, or no_executable_lane;
+- `final_decision`: `continue`, `budget_continuation`, or `no_executable_lane`;
 - `recorded_at`: timestamp of the final fresh sweep; and
 - `provenance`: workflow/run identity and evidence-source references sufficient to reconstruct the decision.
 
 A missing, stale, or unknown identity, document state, gate result, remaining-work assessment, or provenance field must **fail closed**: it cannot justify `no_executable_lane` or product completion. A queued/pending gate remains non-passing, and a waiting lane cannot hide another executable lane. This record must be regenerated after any material ref/head/base/review/check change.
+
+The decision fields have cross-field invariants: `no_executable_lane` requires `remaining_executable_work` to be empty. `budget_continuation` requires non-empty `remaining_executable_work` and a `remaining_budget` value showing that the next safe stopping point cannot be reached. `continue` is valid only for a non-termination sweep; a voluntary termination record must use `budget_continuation` or `no_executable_lane`. Any contradictory record fails closed.
+
+Before accepting voluntary termination evidence, producers and consumers call `four_pillars.final_sweep.validate_final_sweep_record` with the required document and gate names independently resolved for the exact source head. `scope` is a non-empty name list and all three identity fields are exact Git SHAs. The submitted inventories must exactly match those independent sets. Each `required_documents` item has `status: current` and each `gate_results` item has `status: success`; both carry a `revision` equal to `source_head_sha`. `provenance` likewise has `status: current`, the same source head, a non-empty workflow identity, and evidence-source references. The `remaining_budget` object includes the boolean `can_reach_safe_stopping_point`; `budget_continuation` requires it to be `false`. The validator rejects missing fields, malformed containers or noncanonical timestamps, omitted or unexpected evidence, stale or unknown evidence, pending/queued/skipped-required/cancelled/failed gates, revision mismatch, `continue`, unknown decisions, and both contradictory terminal combinations.
 
 ## 13. Scheduler roles
 

@@ -46,6 +46,9 @@ def test_closed_pr_steward_is_documented_only_as_superseded_history() -> None:
         re.IGNORECASE,
     )
     assert direct_classification.search(combined) is None
+    maturity = _text("docs/adr/0005-architecture-description-and-maturity.md")
+    assert "[ADR 0007](0007-autonomous-development-authority.md)" in maturity
+    assert "replacement authority" in maturity
 
 
 def test_autonomous_maturity_requires_protected_main_and_full_evidence() -> None:
@@ -78,3 +81,12 @@ def test_final_sweep_has_versioned_fail_closed_machine_record() -> None:
     for state in ("missing", "stale", "unknown"):
         assert state in normalized
     assert "fail closed" in normalized
+    assert (
+        "`no_executable_lane` requires `remaining_executable_work` to be empty"
+        in contract
+    )
+    assert (
+        "`budget_continuation` requires non-empty `remaining_executable_work`"
+        in contract
+    )
+    assert "`continue` is valid only for a non-termination sweep" in contract
