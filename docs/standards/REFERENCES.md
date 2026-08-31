@@ -54,6 +54,18 @@ World Wide Web Consortium. (2021). *Trace context: W3C recommendation, 23 Novemb
 
 ## Astronomical calculation and civil-calendar evidence
 
+National Oceanic and Atmospheric Administration, Global Monitoring Laboratory. (n.d.). *General solar position calculations*. https://gml.noaa.gov/grad/solcalc/solareqns.PDF
+
+Internet Assigned Numbers Authority. (2026, July 8). *Time zone database 2026c* [Data set]. https://data.iana.org/time-zones/releases/tzdata2026c.tar.gz
+
+Korea Ministry of Government Legislation. (1986). *Standard time act* (Act No. 3919). https://www.law.go.kr/LSW/lsRvsRsnListP.do?chrClsCd=010202&lsId=000744&lsRvsGubun=all
+
+**Application.** NOAA's longitude, UTC-offset, and equation-of-time relationship; IANA's historical Seoul offsets; and Korea's 135° E standard meridian support the explicit birthplace solar-time policy and its DST handling. The Bucheon case and claim limits are recorded in `docs/doctoring/bucheon-birth-time.md`.
+
+Lee, J. (2026). *korean-lunar-calendar* (Version 0.4.0) [Computer software]. GitHub. https://github.com/usingsky/korean_lunar_calendar_py
+
+**Application.** The declared conversion dependency follows the Korea Astronomy and Space Science Institute calendar basis. Its regular/leap-month result is independently cross-checked against the Hong Kong Observatory's published 1990 Gregorian-lunar table in the Bucheon evidence doctoring.
+
 Bretagnon, P., & Francou, G. (1988). Planetary theories in rectangular and spherical variables: VSOP87 solutions. *Astronomy and Astrophysics, 202*, 309–315.
 
 **Application.** A bounded VSOP87 Earth longitude/radius series replaces the former compact solar approximation for modern month-changing solar-term roots. The coefficients remain local, deterministic, dependency-free, and reviewable.

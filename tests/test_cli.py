@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 
 from typer.testing import CliRunner
 
@@ -30,6 +31,55 @@ def test_calculate_command_prints_golden_chart() -> None:
         "辛亥",
         "壬辰",
     ]
+
+
+def test_calculate_command_applies_bucheon_apparent_solar_time() -> None:
+    result = runner.invoke(
+        app,
+        [
+            "calculate",
+            "--birth",
+            "1990-06-15T08:30:00",
+            "--timezone",
+            "Asia/Seoul",
+            "--longitude",
+            "126.766",
+            "--time-basis",
+            "apparent_solar",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    normalized = datetime.fromisoformat(payload["normalized_birth"])
+    expected = datetime.fromisoformat("1990-06-15T07:57:00+09:00")
+    assert abs((normalized - expected).total_seconds()) < 30
+    assert payload["hour"]["hanja"] == "壬辰"
+
+
+def test_calculate_command_rejects_invalid_time_basis_without_traceback() -> None:
+    result = runner.invoke(
+        app,
+        ["calculate", "--birth", "1990-06-15T08:30:00", "--time-basis", "invalid"],
+    )
+    assert result.exit_code == 2
+    assert "Invalid value for '--time-basis'" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_calculate_command_requires_longitude_for_solar_time() -> None:
+    result = runner.invoke(
+        app,
+        [
+            "calculate",
+            "--birth",
+            "1990-06-15T08:30:00",
+            "--time-basis",
+            "apparent_solar",
+        ],
+    )
+    assert result.exit_code == 2
+    assert "longitude is required" in result.output
+    assert "Traceback" not in result.output
 
 
 def test_luck_command_prints_daewoon_annual_and_monthly() -> None:

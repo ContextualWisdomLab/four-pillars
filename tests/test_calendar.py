@@ -79,6 +79,24 @@ def test_lunar_new_year_2024_converts_to_solar_february_10() -> None:
     assert normalized.date().isoformat() == "2024-02-10"
 
 
+def test_1990_regular_and_leap_fifth_lunar_months_are_distinct() -> None:
+    regular = normalize_birth(
+        BirthInput(
+            birth=datetime(1990, 5, 23, 8, 30),
+            calendar=CalendarKind.LUNAR,
+        )
+    )
+    leap = normalize_birth(
+        BirthInput(
+            birth=datetime(1990, 5, 23, 8, 30),
+            calendar=CalendarKind.LUNAR,
+            lunar_leap_month=True,
+        )
+    )
+    assert regular.date().isoformat() == "1990-06-15"
+    assert leap.date().isoformat() == "1990-07-15"
+
+
 def test_solar_time_requires_longitude() -> None:
     with pytest.raises(ValueError, match="longitude"):
         normalize_birth(

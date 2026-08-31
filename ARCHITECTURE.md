@@ -50,7 +50,9 @@ flowchart LR
 
 ## Data plane
 
-The API accepts validated birth and report inputs. `calculate_chart` and the luck
+The API and CLI accept validated birth and report inputs. Optional numeric
+birthplace longitude selects an explicit mean- or apparent-solar-time policy;
+place names are not retained or geocoded. `calculate_chart` and the luck
 calculators create immutable Pydantic evidence. `ReportService` stores a durable
 job through a repository port. A worker invokes exactly one selected
 interpretation backend, applies strict schemas and quality checks, and publishes

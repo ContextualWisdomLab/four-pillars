@@ -29,7 +29,7 @@ The product shall work independently with direct hosted NVIDIA NIM and as an org
 
 ### 4.1 Deterministic calculation
 
-The service shall calculate solar and Korean lunar input, IANA timezone conversion, optional local mean/apparent solar correction, Li Chun year boundaries, twelve month-changing `jie` boundaries, configurable midnight or late-Zi day rollover, hour pillar, ten gods, hidden stems, twelve growth stages, element balance, and core stem/branch interactions. Unknown birth time shall leave the hour pillar unresolved. A boundary within six hours shall create a visible warning.
+The service shall calculate solar and Korean lunar input, IANA timezone conversion, optional longitude-based local mean/apparent solar correction, Li Chun year boundaries, twelve month-changing `jie` boundaries, configurable midnight or late-Zi day rollover, hour pillar, ten gods, hidden stems, twelve growth stages, element balance, and core stem/branch interactions. API and CLI callers shall select the time basis explicitly; civil time remains the default. Solar input shall never be inferred as a leap lunar month. Unknown birth time shall leave the hour pillar unresolved. A boundary within six hours shall create a visible warning.
 
 ### 4.2 Luck calculations
 

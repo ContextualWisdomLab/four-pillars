@@ -28,6 +28,10 @@ The fixture and timing budget are product correctness evidence, not research-gra
 
 The Gregorian integer Julian day number is converted to the sexagenary day by `(JDN + 49) mod 60`. The default day rollover is local midnight. The optional `late_zi` policy advances the day at 23:00. Hour branches are two-hour periods with Zi covering 23:00–00:59. The Zi-hour stem is derived from the day stem and advances one stem for each branch.
 
+Mean solar time adds four minutes for each degree east of the timezone's effective meridian and subtracts four minutes for each degree west. Apparent solar time also adds the equation of time. The effective IANA offset is evaluated at the birth moment, so historical daylight saving is applied once rather than hardcoded. For Bucheon longitude 126.766° E, 1990-06-15 08:30 KST normalizes to 07:56:49, which rounds to 07:57. Both values remain in the 07:00–08:59 `辰` interval, so the hour pillar remains `壬辰`.
+
+Calendar kind is an input policy, not an inferred property. Solar 1990-06-15 is not silently reinterpreted as a leap-month input. It corresponds to regular lunar 1990-05-23; leap lunar 1990-05-23 converts to solar 1990-07-15.
+
 ## Derived relationships
 
 The day stem is the day master. Ten Gods are calculated from five-element production/control relationships and yin-yang polarity. Hidden stems follow the standard branch table. Twelve growth stages use each day stem's Chang Sheng branch and progress forward for yang stems and reverse for yin stems. Element balance is a transparent heuristic: visible stems, primary branch elements, and hidden stems receive fixed weights; the result is not a biological or psychological measurement.
@@ -45,6 +49,7 @@ Annual luck begins at Li Chun and ends at the next Li Chun. Monthly luck begins 
 ## Golden examples
 
 - 1990-06-15 08:30, Asia/Seoul, civil time, midnight rollover → `庚午 壬午 辛亥 壬辰`.
+- 1990-06-15 08:30, Asia/Seoul, apparent solar time at 126.766° E → approximately 07:57 and still `庚午 壬午 辛亥 壬辰`.
 - 1989-07-24 06:27, Asia/Seoul, civil time, midnight rollover → `己巳 辛未 乙酉 己卯`.
 - 2026 annual luck → `丙午` beginning at the 2026 Li Chun instant.
 - 2027 annual luck → `丁未` beginning at the 2027 Li Chun instant.

@@ -33,6 +33,8 @@ pip install -e '.[dev]'
 cp .env.example .env
 pytest
 four-pillars calculate --birth '1990-06-15T08:30:00' --timezone Asia/Seoul
+four-pillars calculate --birth '1990-06-15T08:30:00' --timezone Asia/Seoul \
+  --longitude 126.766 --time-basis apparent_solar
 uvicorn four_pillars.api:app --host 0.0.0.0 --port 8000
 ```
 
