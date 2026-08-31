@@ -8,11 +8,15 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ### Added
 
+- An evidence-bound product and technical gap baseline mapping PRD, TRD, architecture, data, security, tests, operations, live PR maturity, next actions, and acceptance evidence without claiming certification or scientific prediction.
 - Independent KASI/NAOJ 2026 golden fixtures for all twelve month-changing solar terms, enforcing a two-minute timing budget and five-minute year/month pillar transition checks without network or test-only ephemeris dependencies.
 - Offline authority-fixture governance that detects missing evidence, provenance, tolerance, traceability, and calculation-version contracts in the hourly product-gap audit.
 
 ### Changed
 
+- The product-gap baseline now records durable execution leases, orphaned
+  Actions identity remediation, and the independent publication-App boundary
+  with their live dependency and evidence status.
 - Each Contextual Orchestrator request now defaults to a two-hour timeout
   instead of 120 seconds, with a bounded four-hour per-request ceiling.
 - Customer-facing organization-integration copy now names Contextual

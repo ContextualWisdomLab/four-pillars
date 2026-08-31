@@ -26,6 +26,7 @@ class ProductGap(NamedTuple):
 REQUIRED_DOCUMENTS = (
     "README.md",
     "CHANGELOG.md",
+    "docs/product-technical-gap-baseline.md",
     "docs/product/PRD.md",
     "docs/technical/TRD.md",
     "docs/technical/CALCULATION.md",

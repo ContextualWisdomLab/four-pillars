@@ -1,5 +1,6 @@
 """Keep the canonical architecture documentation complete and internally coherent."""
 
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,9 +30,59 @@ def test_canonical_documentation_families_exist() -> None:
         "docs/technical/TEST_STRATEGY.md",
         "docs/operations/OPERABILITY.md",
         "docs/operations/AUTONOMOUS_DEVELOPMENT.md",
+        "docs/product-technical-gap-baseline.md",
     )
     for relative_path in required:
         assert (ROOT / relative_path).is_file(), relative_path
+
+
+def test_product_technical_gap_baseline_is_evidence_bound() -> None:
+    """Keep product priorities tied to maturity, proof, and acceptance evidence."""
+    baseline = _text("docs/product-technical-gap-baseline.md")
+    for phrase in (
+        "implemented_on_protected_main",
+        "active_pr",
+        "planned",
+        "superseded",
+        "Acceptance evidence",
+        "Contextual Orchestrator",
+        "docs/product/PRD.md",
+        "docs/technical/TRD.md",
+        "docs/architecture/DATA_MODEL.md",
+        "docs/security/THREAT_MODEL.md",
+        "docs/technical/TEST_STRATEGY.md",
+        "docs/operations/OPERABILITY.md",
+        "scientific-prediction",
+        "certification",
+    ):
+        assert phrase in baseline
+
+    assert re.search(r"PR #31 at `[0-9a-f]{7}` \(`active_pr`\)", baseline)
+    assert baseline.count("`active_pr` (#31)") >= 2
+    assert "`implemented_on_protected_main` (#31)" not in baseline
+
+    gap_rows = {}
+    for line in baseline.splitlines():
+        if line.startswith("| GAP-"):
+            columns = tuple(cell.strip() for cell in line.split("|")[1:-1])
+            assert len(columns) == 5
+            assert all(columns)
+            gap_rows[columns[0]] = columns
+
+    assert set(gap_rows) == {f"GAP-{number:02d}" for number in range(1, 14)}
+    allowed_maturities = (
+        "`active_pr`",
+        "`planned`",
+        "`superseded`",
+        "accepted claim limit",
+    )
+    for gap_id, _, status, next_action, acceptance_evidence in gap_rows.values():
+        assert any(maturity in status for maturity in allowed_maturities), gap_id
+        assert next_action != acceptance_evidence
+
+    assert "`active_pr` (#31)" in gap_rows["GAP-01"][2]
+    assert "`superseded`" in gap_rows["GAP-08"][2]
+    assert "accepted claim limit" in gap_rows["GAP-09"][2]
 
 
 def test_documentation_maturity_has_canonical_labels_and_semantic_exclusivity() -> None:
