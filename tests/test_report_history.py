@@ -29,15 +29,24 @@ def _cursor_payload(payload: object) -> str:
 
 def _set_job_metadata(
     database_path: Path,
-    job_id: str,
+    report_job_id: str,
     *,
     created_at: datetime,
-    status: JobStatus,
+    job_status: JobStatus,
 ) -> None:
     with sqlite3.connect(database_path) as connection:
         connection.execute(
-            "UPDATE report_jobs SET created_at=?, updated_at=?, status=? WHERE id=?",
-            (created_at.isoformat(), created_at.isoformat(), status.value, job_id),
+            """
+            UPDATE report_jobs
+            SET created_at=?, updated_at=?, job_status=?
+            WHERE report_job_id=?
+            """,
+            (
+                created_at.isoformat(),
+                created_at.isoformat(),
+                job_status.value,
+                report_job_id,
+            ),
         )
 
 
@@ -156,53 +165,79 @@ def test_history_cursor_rejects_noncanonical_encoding_values(
 
 def test_job_history_is_stable_newest_first_without_duplicate_rows(tmp_path: Path) -> None:
     database_path = tmp_path / "report_jobs.sqlite3"
-    store = JobStore(database_path)
-    base = datetime(2026, 8, 4, 5, 0, tzinfo=UTC)
-    jobs = [store.create({"sequence": sequence}) for sequence in range(5)]
-    timestamps = [
-        base,
-        base + timedelta(minutes=1),
-        base + timedelta(minutes=1),
-        base + timedelta(minutes=2),
-        base + timedelta(minutes=3),
+    report_job_store = JobStore(database_path)
+    base_timestamp = datetime(2026, 8, 4, 5, 0, tzinfo=UTC)
+    report_jobs = [
+        report_job_store.create({"sequence": sequence_number})
+        for sequence_number in range(5)
     ]
-    statuses = [
+    created_timestamps = [
+        base_timestamp,
+        base_timestamp + timedelta(minutes=1),
+        base_timestamp + timedelta(minutes=1),
+        base_timestamp + timedelta(minutes=2),
+        base_timestamp + timedelta(minutes=3),
+    ]
+    job_statuses = [
         JobStatus.QUEUED,
         JobStatus.COMPLETED,
         JobStatus.FAILED,
         JobStatus.COMPLETED,
         JobStatus.RUNNING,
     ]
-    for job, created_at, status in zip(jobs, timestamps, statuses, strict=True):
+    for report_job, created_at, job_status in zip(
+        report_jobs,
+        created_timestamps,
+        job_statuses,
+        strict=True,
+    ):
         _set_job_metadata(
             database_path,
-            job.id,
+            report_job.report_job_id,
             created_at=created_at,
-            status=status,
+            job_status=job_status,
         )
 
-    expected = [
-        job.id
-        for job, _created_at in sorted(
-            zip(jobs, timestamps, strict=True),
-            key=lambda pair: (pair[1], pair[0].id),
+    expected_job_ids = [
+        report_job.report_job_id
+        for report_job, _created_at in sorted(
+            zip(report_jobs, created_timestamps, strict=True),
+            key=lambda report_pair: (
+                report_pair[1],
+                report_pair[0].report_job_id,
+            ),
             reverse=True,
         )
     ]
-    first, first_cursor = store.list_jobs(limit=2)
-    second, second_cursor = store.list_jobs(limit=2, cursor=first_cursor)
-    third, third_cursor = store.list_jobs(limit=2, cursor=second_cursor)
+    first_page, first_cursor = report_job_store.list_jobs(limit=2)
+    second_page, second_cursor = report_job_store.list_jobs(
+        limit=2,
+        cursor=first_cursor,
+    )
+    third_page, third_cursor = report_job_store.list_jobs(
+        limit=2,
+        cursor=second_cursor,
+    )
 
-    actual = [job.id for job in [*first, *second, *third]]
-    assert actual == expected
-    assert len(actual) == len(set(actual)) == 5
+    actual_job_ids = [
+        report_job.report_job_id
+        for report_job in [*first_page, *second_page, *third_page]
+    ]
+    assert actual_job_ids == expected_job_ids
+    assert len(actual_job_ids) == len(set(actual_job_ids)) == 5
     assert first_cursor is not None
     assert second_cursor is not None
     assert third_cursor is None
 
-    after_last = encode_history_cursor(third[-1].created_at, third[-1].id)
-    empty, empty_cursor = store.list_jobs(limit=2, cursor=after_last)
-    assert empty == []
+    after_last_cursor = encode_history_cursor(
+        third_page[-1].created_at,
+        third_page[-1].report_job_id,
+    )
+    empty_page, empty_cursor = report_job_store.list_jobs(
+        limit=2,
+        cursor=after_last_cursor,
+    )
+    assert empty_page == []
     assert empty_cursor is None
 
 
@@ -210,43 +245,50 @@ def test_job_history_filters_status_across_pages_and_creates_indexes(
     tmp_path: Path,
 ) -> None:
     database_path = tmp_path / "report_jobs.sqlite3"
-    store = JobStore(database_path)
-    base = datetime(2026, 8, 4, 5, 0, tzinfo=UTC)
-    completed_old = store.create({"kind": "completed-old"})
-    queued = store.create({"kind": "queued"})
-    completed_new = store.create({"kind": "completed-new"})
-    for job, minutes, status in (
-        (completed_old, 0, JobStatus.COMPLETED),
-        (queued, 1, JobStatus.QUEUED),
-        (completed_new, 2, JobStatus.COMPLETED),
+    report_job_store = JobStore(database_path)
+    base_timestamp = datetime(2026, 8, 4, 5, 0, tzinfo=UTC)
+    completed_old_job = report_job_store.create({"kind": "completed-old"})
+    queued_job = report_job_store.create({"kind": "queued"})
+    completed_new_job = report_job_store.create({"kind": "completed-new"})
+    for report_job, minute_offset, job_status in (
+        (completed_old_job, 0, JobStatus.COMPLETED),
+        (queued_job, 1, JobStatus.QUEUED),
+        (completed_new_job, 2, JobStatus.COMPLETED),
     ):
         _set_job_metadata(
             database_path,
-            job.id,
-            created_at=base + timedelta(minutes=minutes),
-            status=status,
+            report_job.report_job_id,
+            created_at=base_timestamp + timedelta(minutes=minute_offset),
+            job_status=job_status,
         )
 
-    first, first_cursor = store.list_jobs(limit=1, status=JobStatus.COMPLETED)
-    second, second_cursor = store.list_jobs(
+    first_page, first_cursor = report_job_store.list_jobs(
+        limit=1,
+        status=JobStatus.COMPLETED,
+    )
+    second_page, second_cursor = report_job_store.list_jobs(
         limit=1,
         cursor=first_cursor,
         status=JobStatus.COMPLETED,
     )
 
-    assert [job.id for job in first] == [completed_new.id]
+    assert [report_job.report_job_id for report_job in first_page] == [
+        completed_new_job.report_job_id
+    ]
     assert first_cursor is not None
-    assert [job.id for job in second] == [completed_old.id]
+    assert [report_job.report_job_id for report_job in second_page] == [
+        completed_old_job.report_job_id
+    ]
     assert second_cursor is None
     with sqlite3.connect(database_path) as connection:
-        names = {
-            row[0]
-            for row in connection.execute(
+        index_names = {
+            database_row[0]
+            for database_row in connection.execute(
                 "SELECT name FROM sqlite_master WHERE type='index'"
             )
         }
-    assert "idx_report_jobs_created_id" in names
-    assert "idx_report_jobs_status_created_id" in names
+    assert "idx_report_jobs_created_at_job_id" in index_names
+    assert "idx_report_jobs_job_status_created_at_job_id" in index_names
 
 
 @pytest.mark.parametrize("limit", [0, 101])
@@ -254,7 +296,7 @@ def test_job_history_rejects_invalid_direct_repository_limits(
     tmp_path: Path,
     limit: int,
 ) -> None:
-    store = JobStore(tmp_path / "report_jobs.sqlite3")
+    report_job_store = JobStore(tmp_path / "report_jobs.sqlite3")
 
     with pytest.raises(ValueError, match="between 1 and 100"):
-        store.list_jobs(limit=limit)
+        report_job_store.list_jobs(limit=limit)
