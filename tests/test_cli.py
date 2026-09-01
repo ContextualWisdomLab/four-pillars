@@ -149,6 +149,27 @@ def test_calculation_commands_reject_unsupported_lunar_date_without_traceback() 
         assert "Traceback" not in result.output
 
 
+def test_lunar_input_attributes_invalid_timezone_to_timezone_option() -> None:
+    result = runner.invoke(
+        app,
+        [
+            "calculate",
+            "--birth",
+            "1990-05-23T08:30:00",
+            "--calendar",
+            "lunar",
+            "--timezone",
+            ".",
+        ],
+    )
+
+    plain_output = unstyle(result.output)
+    assert result.exit_code == 2
+    assert "Invalid value for --timezone" in plain_output
+    assert "Invalid value for --birth" not in plain_output
+    assert "Traceback" not in plain_output
+
+
 def test_luck_command_prints_daewoon_annual_and_monthly() -> None:
     result = runner.invoke(
         app,

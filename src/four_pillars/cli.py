@@ -5,10 +5,11 @@ from __future__ import annotations
 import json
 import math
 from datetime import datetime
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import typer
 
-from .calendar import calculate_chart, normalize_birth
+from .calendar import _convert_lunar_to_solar, calculate_chart
 from .fortune import calculate_annual_luck, calculate_daewoon, calculate_monthly_luck
 from .models import BirthInput, CalendarKind, Gender, TimeBasis
 from .prompts import prompt_manifest
@@ -41,6 +42,10 @@ def _birth_input(
             "longitude is required for mean or apparent solar time",
             param_hint="--longitude",
         )
+    try:
+        ZoneInfo(timezone)
+    except (ValueError, ZoneInfoNotFoundError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="--timezone") from exc
     value = BirthInput(
         birth=datetime.fromisoformat(birth),
         timezone=timezone,
@@ -52,7 +57,7 @@ def _birth_input(
     )
     if value.calendar is CalendarKind.LUNAR:
         try:
-            normalize_birth(value)
+            _convert_lunar_to_solar(value)
         except ValueError as exc:
             raise typer.BadParameter(str(exc), param_hint="--birth") from exc
     return value
