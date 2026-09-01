@@ -34,9 +34,9 @@ This boundary owns solar/lunar normalization, solar terms, pillars, Ten Gods, hi
 
 `generation.py` defines `StructuredGenerationClient`, the protocol consumed by `analysis.py`. The protocol returns a Pydantic-validated object and compatible generation trace. It does not expose provider administration or routing internals to the domain layer.
 
-`contextual_orchestrator.py` implements the Model Orchestration anti-corruption layer. It speaks the gateway's OpenAI-compatible transport, labels user/calculation payloads as untrusted input, validates Pydantic output, and applies bounded retry and schema repair. The active product contract fixes the virtual model to `orchestrator/free`.
+`infrastructure/orchestration/openai_compatible.py` owns provider-neutral OpenAI-compatible HTTP/JSON transport mechanics. `infrastructure/orchestration/contextual_orchestrator.py` implements the Model Orchestration anti-corruption layer: it labels user/calculation payloads as untrusted input, validates Pydantic output, applies bounded retry and schema repair, and attaches prompt-safe organizational attribution. The active product contract fixes the virtual model to `orchestrator/free`.
 
-`nim.py` is transitional provider-specific compatibility infrastructure retained while low-level offline transport tests are migrated. It is not used by the repository composition root. ADR 0004 requires a later bounded namespace refactor to move shared transport under `infrastructure/orchestration` while updating imports, tests, UML, and compatibility exports together.
+The historical provider-specific `nim.py` module and direct provider interpreter have been removed. `four_pillars.contextual_orchestrator` remains only as a compatibility re-export so existing imports can converge without creating a second implementation boundary.
 
 ### Interpretation adapters
 
@@ -83,7 +83,7 @@ Injected implementations are structurally typed. They do not need to inherit pro
 
 ### Infrastructure adapters
 
-`jobs.py` is the single-node SQLite implementation of the base, idempotency, and history repository contracts. `history.py` owns strict privacy-safe cursor encoding. `adapters.py` contains the orchestration ACL adapter and filesystem publisher. `reporting.py` owns atomic JSON, HTML, PDF, trace, and manifest writing. `api.py`, `web.py`, and `cli.py` are delivery adapters. None redefine chart or report schemas.
+`jobs.py` is the single-node SQLite implementation of the base, idempotency, and history repository contracts. `history.py` owns strict privacy-safe cursor encoding. `adapters.py` contains the application-facing orchestration adapter and filesystem publisher. `infrastructure/orchestration` owns the external model-gateway ACL and transport. `reporting.py` owns atomic JSON, HTML, PDF, trace, and manifest writing. `api.py`, `web.py`, and `cli.py` are delivery adapters. None redefine chart or report schemas.
 
 A multi-node deployment should substitute PostgreSQL or a managed queue and object storage behind the same ports. It must preserve atomic claim semantics, terminal-state deletion, allow-listed artifact names, content hashes, fingerprints, database-enforced idempotency, and deterministic `(created_at DESC, id DESC)` history ordering.
 
