@@ -7,6 +7,7 @@ import pytest
 from four_pillars.analysis import PracticalSkillsDraft, SynthesisDraft, generate_report
 from four_pillars.calendar import calculate_chart
 from four_pillars.fortune import calculate_annual_luck, calculate_daewoon, calculate_monthly_luck
+from four_pillars.generation import GenerationTrace
 from four_pillars.models import (
     BirthInput,
     Gender,
@@ -14,7 +15,6 @@ from four_pillars.models import (
     ReportDocument,
     ReportSection,
 )
-from four_pillars.nim import NimTrace
 
 
 REQUIRED = ("natal", "daewoon", "annual", "monthly", "work", "money", "relationships", "daily_rhythm")
@@ -49,7 +49,7 @@ class FakeClient:
 
     async def generate(self, *, system_prompt, user_payload, response_model, **kwargs):
         self.calls.append(response_model.__name__)
-        trace = NimTrace(model="fake-nim", attempts=1, repairs=0, raw_content="{}")
+        trace = GenerationTrace(model="fixture-route", attempts=1, repairs=0, raw_content="{}")
         if response_model is ReportSection:
             return section("단계 분석"), trace
         if response_model is PracticalSkillsDraft:
@@ -88,7 +88,7 @@ class FakeClient:
                 ],
                 disclaimer="이 보고서는 전통 명리학의 상징 자료입니다. 의학·법률·재정 판단은 실제 정보와 전문가 의견을 우선합니다.",
                 generated_at=datetime.now(UTC),
-                model="fake-nim",
+                model="fixture-route",
                 prompt_versions={"editorial_repair": "1.0.0"},
             ), trace
         raise AssertionError(response_model)
