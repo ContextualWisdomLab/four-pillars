@@ -1,89 +1,92 @@
 # ADR 0003: Explicit Contextual Orchestrator interpretation backend
 
-- **Status:** Accepted
+- **Status:** Superseded for product runtime by ADR 0004
 - **Date:** 2026-08-04
 - **Decision owners:** Four Pillars maintainers
+- **Superseded:** 2026-09-01
 
-## Context
+## Current status note
 
-Four Pillars was originally complete as a standalone service with deterministic calculation, direct hosted NVIDIA NIM interpretation, quality validation, durable jobs, and file delivery. ContextualWisdomLab also operates `contextual-orchestrator`, an OpenAI-compatible gateway that can centralize routing, usage attribution, provider policy, and shared model governance for multiple products.
+This ADR records the intermediate architecture in which Four Pillars supported both a direct NVIDIA NIM backend and an optional Contextual Orchestrator backend. ADR 0004 supersedes that runtime-selection decision: the repository-owned product composition now uses Contextual Orchestrator only and fixes the virtual model to `orchestrator/free`.
 
-Without a checked-in adapter, organization deployments must write custom composition code and duplicate provider controls. Making the gateway mandatory would create the opposite problem: the product would no longer be independently deployable and deterministic calculation users would inherit an unrelated service dependency.
+The structural lessons in this ADR remain valid: deterministic evidence cannot be replaced by an LLM, the gateway is an HTTP service boundary rather than an imported implementation, prompt-safe attribution is required, provider passthrough fields can defeat route/conduct orchestration, and failures must not trigger an implicit provider change.
 
-The integration must also preserve the existing rule that an LLM may interpret but may not replace calculated pillars, luck periods, interactions, or evidence fingerprints. Direct hosted NIM credentials use `NVIDIA_NIM_API_KEY`; they must not be repurposed as gateway credentials.
+## Historical context
 
-The gateway has an additional protocol constraint: `response_format`, tools, and function-calling fields select its one-agent provider-passthrough path because those provider features cannot be merged across agents. Four Pillars must not accidentally request that path while claiming organization routing or conduct.
+Four Pillars was originally complete as a standalone service with deterministic calculation, direct hosted NVIDIA NIM interpretation, quality validation, durable jobs, and file delivery. ContextualWisdomLab also operated `contextual-orchestrator`, an OpenAI-compatible gateway able to centralize routing, usage attribution, provider policy, and shared model governance for multiple products.
 
-## Decision
+The integration had to preserve the rule that an LLM may interpret but may not replace calculated pillars, luck periods, interactions, or evidence fingerprints. It also had to keep provider credentials distinct from gateway credentials.
 
-Four Pillars will support two explicit built-in interpretation backends:
+A further protocol constraint was identified: `response_format`, tools, and function-calling fields could select a one-agent provider-passthrough path, defeating the route/conduct behavior expected from the gateway.
 
-- `nvidia_nim`, the standalone default; and
-- `contextual_orchestrator`, an optional organization gateway.
+## Historical decision
 
-`Settings.interpretation_backend` is a validated literal. `ReportService` uses `build_report_interpreter(settings)` only when the caller did not inject a `ReportInterpreter`. Therefore settings improve standalone composition without weakening the structural MSA port.
+The repository supported two explicit built-in interpretation backends:
 
-`analysis.py` depends on a runtime-checkable `StructuredGenerationClient` protocol. Both built-in clients share Bearer authentication, an untrusted-input envelope, bounded retries, Pydantic validation, and bounded repair. Their wire contracts intentionally differ where the providers differ:
+- `nvidia_nim`, then the standalone default; and
+- `contextual_orchestrator`, then an optional organization gateway.
 
-- direct NVIDIA NIM receives `response_format={"type":"json_object"}`; and
-- Contextual Orchestrator omits `response_format`, sends a validated `auto`, `route`, or `conduct` mode, requests synchronous delivery, and relies on explicit JSON prompting plus Four Pillars Pydantic validation.
+`analysis.py` depended on the runtime-checkable `StructuredGenerationClient` protocol. The orchestrator client omitted provider passthrough fields, sent a validated `auto`, `route`, or `conduct` mode, requested synchronous delivery, and relied on explicit JSON prompting plus Four Pillars Pydantic validation.
 
-This separation prevents the organization adapter from silently collapsing into single-agent passthrough. The default `auto` mode lets the gateway allocate work between one-agent routing and deeper conduct; operators may force either bounded mode through configuration. Asynchronous batch execution remains outside this version because report jobs require an immediate schema-validated stage result.
+The orchestrator adapter added prompt-safe organizational attribution. Attribution always included `service=four-pillars`; optional account, team, group, and company values came from deployment settings. Personal data, prompt/report content, fingerprints, paths, and credentials were prohibited.
 
-The orchestrator adapter adds prompt-safe organizational attribution. Attribution always includes `service=four-pillars`; optional account, team, group, and company values come from deployment settings. Personal data, prompt/report content, fingerprints, paths, and credentials are prohibited from attribution.
+No implicit fallback was permitted. A missing token, unavailable gateway, invalid response, or exhausted retry/repair budget failed the selected report job visibly.
 
-No implicit fallback is permitted. A missing token, unavailable gateway, invalid response, or exhausted retry/repair budget fails the selected report job visibly. An operator may change backend configuration only as an explicit deployment change.
+## What ADR 0004 changes
 
-## Consequences
+ADR 0004 removes the repository-owned provider choice. The product now treats Model Orchestration as a separate bounded context and integrates through an anti-corruption layer:
 
-### Positive
+```text
+Fortune Interpretation
+  -> ReportInterpreter port
+  -> Contextual Orchestrator ACL
+  -> orchestrator/free
+```
 
-- The repository remains independently runnable.
-- Organization deployments gain actual shared routing and conduct rather than a mislabeled passthrough call.
+As a result:
+
+- `Settings.interpretation_backend` accepts only `contextual_orchestrator`;
+- the repository-owned virtual model is `orchestrator/free`;
+- direct-provider credentials are not operator-facing product configuration;
+- an empty free pool fails closed instead of crossing to a paid or local provider route;
+- a caller may still inject a different `ReportInterpreter` when that caller owns the integration boundary;
+- provider-specific transport code remaining in `nim.py` is transitional compatibility infrastructure, not an active product route.
+
+## Preserved consequences
+
+- Deterministic calculation remains available during gateway/model outages.
 - Existing custom `ReportInterpreter` adapters remain compatible.
-- Backend credentials, compute mode, traces, and failure behavior are explicit.
-- The same deterministic and editorial controls run regardless of provider route.
+- Structured output is enforced after generation rather than with provider-native passthrough fields.
+- Gateway availability, retention, residency, and downstream provider governance remain deployment concerns of the orchestration boundary.
+- Prompt versions, virtual model, attempts, repairs, and calculation fingerprints remain traceable in Four Pillars evidence.
 
-### Negative
-
-- Two built-in adapters increase the configuration and test surface.
-- Structured output from Contextual Orchestrator is enforced after generation rather than through the provider-native `response_format` field.
-- The shared transport currently preserves the historical `NimTrace` and error names for backward compatibility, even though their behavior is provider-neutral.
-- Gateway availability and downstream provider governance become additional organization operational dependencies.
-- A gateway may route to providers with different retention or residency terms; deployment owners must document those obligations.
-
-## Rejected alternatives
-
-### Make Contextual Orchestrator mandatory
-
-Rejected because it would break standalone completeness and add a network dependency for deployments that need only direct NIM or deterministic calculation.
-
-### Keep custom integration outside the repository
-
-Rejected because every organization deployment would repeat selection, attribution, retry, schema, privacy, and no-fallback logic.
+## Rejected alternatives that remain rejected
 
 ### Send `response_format` through Contextual Orchestrator
 
-Rejected because the gateway defines that field as a single-agent passthrough trigger. Although it can improve provider-native JSON compliance, it bypasses the route/conduct decision that justifies the organization adapter.
+Rejected because it can select a single-agent passthrough path. Four Pillars keeps explicit prompting, Pydantic validation, and bounded same-route repair.
 
-### Automatically fail over from one backend to another
+### Automatically fail over around the gateway
 
-Rejected because it changes processor, policy, cost, latency, retention, and sometimes model behavior without explicit operator consent. It also makes reproducibility and incident analysis weaker.
+Rejected because it changes processor, policy, cost, retention, and model behavior without an explicit orchestration decision. Under ADR 0004, this also violates bounded-context ownership.
 
 ### Import Contextual Orchestrator internals as a Python dependency
 
-Rejected because the OpenAI-compatible HTTP contract is the stable service boundary. Reaching into gateway internals would couple release cycles and violate the MSA boundary.
+Rejected because the OpenAI-compatible HTTP contract is the service boundary. Reaching into gateway internals would couple release cycles and violate the MSA boundary.
 
-## Verification
+## Verification transition
 
-- Settings tests prove direct NIM is the default, orchestrator selection and compute mode are explicit, and unknown values fail validation.
-- HTTP mock tests verify endpoint, Bearer token, native JSON-mode separation, compute mode, attribution, routing, retries, repair, and terminal failures.
-- Direct NIM tests prove `response_format` remains present for the provider that supports it without bypassing an orchestrator.
-- Adapter tests verify immutable calculation objects are forwarded unchanged.
-- Modular-service tests verify explicit interpreter injection remains authoritative.
-- The complete release gate enforces public docstrings and exactly 100 percent statement and branch coverage.
-- `check_docs.py` and `product_gap_audit.py` require the backend and standards contracts every hour.
+Historical verification included direct NIM default-selection and live-provider tests. The active ADR 0004 verification instead requires:
+
+- product settings reject `nvidia_nim` and unknown backend values;
+- product settings reject any virtual model other than `orchestrator/free`;
+- outbound gateway requests prove `model=orchestrator/free`;
+- transient retry and schema repair remain on the same virtual route;
+- provider passthrough fields are absent;
+- default `ReportService` composition resolves to the Contextual Orchestrator adapter;
+- the live workflow receives only `CONTEXTUAL_ORCHESTRATOR_TOKEN` and the gateway URL;
+- the architecture-fitness audit fails if direct-provider runtime configuration reappears.
 
 ## Standards relationship
 
-The decision is mapped to ISO/IEC 25010:2023 compatibility, reliability, security, maintainability, and flexibility concerns; ISO/IEC 42001:2023 management controls; ISO/IEC 23894:2023 and NIST AI RMF risk controls; and NIST AI 600-1 Generative AI controls. Full APA 7th references and limitations appear in `docs/standards/REFERENCES.md` and `docs/standards/TRACEABILITY.md`. This ADR is not a certification or scientific validation of traditional interpretation.
+The decision history and its superseding control remain mapped to ISO/IEC 25010:2023 compatibility, reliability, security, maintainability, and flexibility concerns; ISO/IEC 42001:2023 management controls; ISO/IEC 23894:2023 and NIST AI RMF risk controls; and NIST AI 600-1 Generative AI controls. Full APA 7th references and limitations appear in `docs/standards/REFERENCES.md` and `docs/standards/TRACEABILITY.md`.
