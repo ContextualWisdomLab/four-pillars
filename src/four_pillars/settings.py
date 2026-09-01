@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-InterpretationBackend = Literal["nvidia_nim", "contextual_orchestrator"]
+InterpretationBackend = Literal["contextual_orchestrator"]
 ContextualOrchestrationMode = Literal["auto", "route", "conduct"]
 _LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 
@@ -32,8 +32,10 @@ class Settings(BaseSettings):
     report_retention_days: int = Field(default=30, ge=1, le=3650)
     api_key_sha256: str | None = None
 
-    interpretation_backend: InterpretationBackend = "nvidia_nim"
+    interpretation_backend: InterpretationBackend = "contextual_orchestrator"
 
+    # Legacy direct-provider transport configuration is retained temporarily for
+    # offline compatibility tests only. Product composition never selects it.
     nvidia_nim_api_key: str | None = None
     nim_base_url: str = Field(
         default="https://integrate.api.nvidia.com/v1",
@@ -60,11 +62,7 @@ class Settings(BaseSettings):
         max_length=2048,
     )
     contextual_orchestrator_token: str | None = None
-    contextual_orchestrator_model: str = Field(
-        default="contextual-orchestrator",
-        min_length=1,
-        max_length=256,
-    )
+    contextual_orchestrator_model: Literal["orchestrator/free"] = "orchestrator/free"
     contextual_orchestrator_mode: ContextualOrchestrationMode = "auto"
     contextual_orchestrator_timeout_seconds: float = Field(
         default=120,
