@@ -16,9 +16,9 @@ class LostClaimConnection:
         return None
 
     def execute(self, statement: str, *_: object) -> SimpleNamespace:
-        if statement.startswith("SELECT id"):
-            return SimpleNamespace(fetchone=lambda: {"id": "lost-race"})
-        if statement.startswith("UPDATE report_jobs"):
+        if statement.strip().startswith("SELECT report_job_id"):
+            return SimpleNamespace(fetchone=lambda: {"report_job_id": "lost-race"})
+        if statement.strip().startswith("UPDATE report_jobs"):
             return SimpleNamespace(rowcount=0)
         return SimpleNamespace()
 
@@ -27,26 +27,26 @@ def test_claim_next_returns_none_when_the_atomic_update_loses_a_race(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    store = JobStore(tmp_path / "jobs.sqlite3")
-    monkeypatch.setattr(store, "_connect", LostClaimConnection)
+    report_job_store = JobStore(tmp_path / "jobs.sqlite3")
+    monkeypatch.setattr(report_job_store, "_connect", LostClaimConnection)
 
-    assert store.claim_next() is None
+    assert report_job_store.claim_next() is None
 
 
 def test_transition_rejects_an_unknown_job(tmp_path: Path) -> None:
-    store = JobStore(tmp_path / "jobs.sqlite3")
+    report_job_store = JobStore(tmp_path / "jobs.sqlite3")
 
     with pytest.raises(KeyError, match="Unknown report job"):
-        store.finish("missing", tmp_path / "missing")
+        report_job_store.finish("missing", tmp_path / "missing")
 
 
 def test_transition_rejects_a_row_that_disappears_after_update(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    store = JobStore(tmp_path / "jobs.sqlite3")
-    job = store.create({"subject_name": "disappearing"})
-    monkeypatch.setattr(store, "get", lambda _: None)
+    report_job_store = JobStore(tmp_path / "jobs.sqlite3")
+    report_job = report_job_store.create({"subject_name": "disappearing"})
+    monkeypatch.setattr(report_job_store, "get", lambda _: None)
 
     with pytest.raises(KeyError, match="after transition"):
-        store.fail(job.id, "failure")
+        report_job_store.fail(report_job.report_job_id, "failure")
