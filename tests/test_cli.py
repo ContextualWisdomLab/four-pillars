@@ -143,7 +143,9 @@ def test_calculation_commands_reject_unsupported_lunar_date_without_traceback() 
     for command in commands:
         result = runner.invoke(app, command)
         assert result.exit_code == 2
-        assert "outside the supported Korean calendar range" in result.output
+        plain_output = unstyle(result.output)
+        assert "outside the supported Korean" in plain_output
+        assert "calendar range" in plain_output
         assert "Traceback" not in result.output
 
 
