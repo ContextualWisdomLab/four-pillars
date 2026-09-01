@@ -44,7 +44,7 @@ def test_release_workflow_runs_the_complete_gate_before_publication() -> None:
         "python -m compileall -q src tests scripts",
         "python scripts/check_docs.py",
         "python scripts/check_prompts.py",
-        "pytest -m 'not nim_live'",
+        "pytest -m 'not orchestrator_live'",
         "python -m build --no-isolation",
         "docker build --tag four-pillars:release .",
     ):
@@ -63,6 +63,8 @@ def test_release_workflow_builds_versioned_notes_checksums_and_idempotent_releas
     assert 'tag="v$version"' in text
     assert "--target \"$GITHUB_SHA\"" in text
     assert "NVIDIA_NIM_API_KEY" not in text
+    assert "OPENAI_API_KEY" not in text
+    assert "CONTEXTUAL_ORCHESTRATOR_TOKEN" not in text
 
 
 def test_release_notes_extract_exact_changelog_section() -> None:
