@@ -221,14 +221,16 @@ class JobStatus(StrEnum):
 
 
 class ReportJob(BaseModel):
-    """Internal durable job record including request, status, and retry provenance."""
+    """Internal durable report-job record with semantic owned field names."""
 
-    id: str
-    status: JobStatus
-    request: dict[str, Any]
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    report_job_id: str = Field(alias="id")
+    job_status: JobStatus = Field(alias="status")
+    report_request: dict[str, Any] = Field(alias="request")
     created_at: datetime
     updated_at: datetime
     request_fingerprint: str | None = None
     idempotency_key_digest: str | None = None
-    error: str | None = None
+    job_error_message: str | None = Field(default=None, alias="error")
     artifact_dir: str | None = None
