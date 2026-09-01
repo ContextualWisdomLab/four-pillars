@@ -124,6 +124,29 @@ def test_calculation_commands_reject_non_finite_longitude() -> None:
         assert "Traceback" not in result.output
 
 
+def test_calculation_commands_reject_unsupported_lunar_date_without_traceback() -> None:
+    shared = ["--birth", "0999-01-01T08:30:00", "--calendar", "lunar"]
+    commands = (
+        ["calculate", *shared],
+        [
+            "luck",
+            *shared,
+            "--annual-year",
+            "2026",
+            "--monthly-year",
+            "2026",
+            "--monthly-month",
+            "8",
+        ],
+    )
+
+    for command in commands:
+        result = runner.invoke(app, command)
+        assert result.exit_code == 2
+        assert "outside the supported Korean calendar range" in result.output
+        assert "Traceback" not in result.output
+
+
 def test_luck_command_prints_daewoon_annual_and_monthly() -> None:
     result = runner.invoke(
         app,
