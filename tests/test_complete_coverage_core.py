@@ -70,23 +70,23 @@ def test_default_service_and_settings_are_loaded_from_environment(
 
 def test_delete_report_handles_terminal_jobs_without_artifacts(tmp_path: Path) -> None:
     service = configured_service(tmp_path)
-    job = service.store.create({"subject_name": "failed"})
-    service.store.fail(job.id, "failed before artifacts")
+    report_job = service.store.create({"subject_name": "failed"})
+    service.store.fail(report_job.report_job_id, "failed before artifacts")
 
-    api_module.delete_report(job.id, service)
+    api_module.delete_report(report_job.report_job_id, service)
 
-    assert service.store.get(job.id) is None
+    assert service.store.get(report_job.report_job_id) is None
 
 
 def test_delete_report_rejects_a_non_terminal_job(tmp_path: Path) -> None:
     service = configured_service(tmp_path)
-    job = service.store.create({"subject_name": "queued"})
+    report_job = service.store.create({"subject_name": "queued"})
 
     with pytest.raises(HTTPException) as captured:
-        api_module.delete_report(job.id, service)
+        api_module.delete_report(report_job.report_job_id, service)
 
     assert captured.value.status_code == 409
-    assert service.store.get(job.id) is not None
+    assert service.store.get(report_job.report_job_id) is not None
 
 
 @pytest.mark.parametrize("artifact_mode", ["outside", "wrong_name", "missing"])
@@ -95,21 +95,21 @@ def test_delete_report_never_removes_an_untrusted_artifact_directory(
     tmp_path: Path,
 ) -> None:
     service = configured_service(tmp_path)
-    job = service.store.create({"subject_name": artifact_mode})
+    report_job = service.store.create({"subject_name": artifact_mode})
     service.store.claim_next()
     if artifact_mode == "outside":
         artifact_dir = tmp_path / "outside"
     elif artifact_mode == "wrong_name":
         artifact_dir = service.settings.artifact_dir / "different-job"
     else:
-        artifact_dir = service.settings.artifact_dir / job.id
+        artifact_dir = service.settings.artifact_dir / report_job.report_job_id
     if artifact_mode != "missing":
         artifact_dir.mkdir(parents=True)
-    service.store.finish(job.id, artifact_dir)
+    service.store.finish(report_job.report_job_id, artifact_dir)
 
-    api_module.delete_report(job.id, service)
+    api_module.delete_report(report_job.report_job_id, service)
 
-    assert service.store.get(job.id) is None
+    assert service.store.get(report_job.report_job_id) is None
     if artifact_mode != "missing":
         assert artifact_dir.exists()
 
