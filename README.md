@@ -1,5 +1,7 @@
 # Four Pillars
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ContextualWisdomLab/four-pillars)
+
 Deterministic Korean Four Pillars (사주·만세력) calculation and schema-validated AI-assisted report generation.
 
 The product keeps **calendar calculation** and **AI interpretation** on separate trust boundaries. The calculation engine produces immutable pillars, solar-term boundaries, ten-god relationships, hidden stems, twelve growth stages, luck periods, warnings, and a SHA-256 fingerprint. The interpretation application context receives those facts as read-only evidence and crosses a `ReportInterpreter` port into [Contextual Orchestrator](https://github.com/ContextualWisdomLab/contextual-orchestrator). A quality gate rejects deterministic contradictions, unbalanced relationship guidance, vague copy, medical claims, and event certainty before HTML or PDF is emitted.
