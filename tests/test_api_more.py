@@ -72,25 +72,25 @@ def configured(tmp_path: Path) -> tuple[TestClient, ReportService]:
 
 def _set_job(
     service: ReportService,
-    job_id: str,
+    report_job_id: str,
     *,
     created_at: datetime,
-    status: JobStatus,
-    error: str | None = None,
+    job_status: JobStatus,
+    job_error_message: str | None = None,
 ) -> None:
     with sqlite3.connect(service.settings.sqlite_path) as connection:
         connection.execute(
             """
             UPDATE report_jobs
-            SET created_at=?, updated_at=?, status=?, error=?
-            WHERE id=?
+            SET created_at=?, updated_at=?, job_status=?, job_error_message=?
+            WHERE report_job_id=?
             """,
             (
                 created_at.isoformat(),
                 created_at.isoformat(),
-                status.value,
-                error,
-                job_id,
+                job_status.value,
+                job_error_message,
+                report_job_id,
             ),
         )
 
@@ -115,17 +115,19 @@ def test_root_readiness_and_luck_endpoints(tmp_path: Path) -> None:
 
 def test_completed_artifact_can_be_downloaded_and_deleted(tmp_path: Path) -> None:
     http, service = configured(tmp_path)
-    queued = service.store.create({"subject_name": "테스트"})
+    queued_job = service.store.create({"subject_name": "테스트"})
     service.store.claim_next()
-    artifact_dir = service.settings.artifact_dir / queued.id
+    artifact_dir = service.settings.artifact_dir / queued_job.report_job_id
     artifact_dir.mkdir(parents=True)
     (artifact_dir / "report.json").write_text('{"ok":true}', encoding="utf-8")
-    service.store.finish(queued.id, artifact_dir)
+    service.store.finish(queued_job.report_job_id, artifact_dir)
 
     with http:
-        downloaded = http.get(f"/v1/reports/{queued.id}/artifacts/report.json")
-        deleted = http.delete(f"/v1/reports/{queued.id}")
-        missing = http.get(f"/v1/reports/{queued.id}")
+        downloaded = http.get(
+            f"/v1/reports/{queued_job.report_job_id}/artifacts/report.json"
+        )
+        deleted = http.delete(f"/v1/reports/{queued_job.report_job_id}")
+        missing = http.get(f"/v1/reports/{queued_job.report_job_id}")
     assert downloaded.status_code == 200
     assert downloaded.json() == {"ok": True}
     assert deleted.status_code == 204
@@ -142,27 +144,27 @@ def test_unknown_job_and_artifact_return_not_found(tmp_path: Path) -> None:
 
 def test_report_history_is_paginated_filtered_and_privacy_safe(tmp_path: Path) -> None:
     http, service = configured(tmp_path)
-    base = datetime(2026, 8, 4, 5, 0, tzinfo=UTC)
-    older = service.store.create(
+    base_timestamp = datetime(2026, 8, 4, 5, 0, tzinfo=UTC)
+    older_job = service.store.create(
         {
             "subject_name": "비공개 이름",
             "birth": BIRTH,
             "user_context": "비공개 메모",
         }
     )
-    newer = service.store.create({"subject_name": "두 번째 비공개 이름"})
+    newer_job = service.store.create({"subject_name": "두 번째 비공개 이름"})
     _set_job(
         service,
-        older.id,
-        created_at=base,
-        status=JobStatus.COMPLETED,
+        older_job.report_job_id,
+        created_at=base_timestamp,
+        job_status=JobStatus.COMPLETED,
     )
     _set_job(
         service,
-        newer.id,
-        created_at=base + timedelta(minutes=1),
-        status=JobStatus.FAILED,
-        error="redacted operational failure",
+        newer_job.report_job_id,
+        created_at=base_timestamp + timedelta(minutes=1),
+        job_status=JobStatus.FAILED,
+        job_error_message="redacted operational failure",
     )
 
     with http:
@@ -175,11 +177,11 @@ def test_report_history_is_paginated_filtered_and_privacy_safe(tmp_path: Path) -
         completed = http.get("/v1/reports", params={"status": "completed"})
 
     assert first.status_code == 200
-    assert [item["id"] for item in first_payload["items"]] == [newer.id]
+    assert [item["id"] for item in first_payload["items"]] == [newer_job.report_job_id]
     assert first_payload["next_cursor"]
-    assert [item["id"] for item in second.json()["items"]] == [older.id]
+    assert [item["id"] for item in second.json()["items"]] == [older_job.report_job_id]
     assert second.json()["next_cursor"] is None
-    assert [item["id"] for item in completed.json()["items"]] == [older.id]
+    assert [item["id"] for item in completed.json()["items"]] == [older_job.report_job_id]
     for item in [*first_payload["items"], *second.json()["items"]]:
         assert set(item) == {
             "id",
