@@ -40,44 +40,69 @@ class JobStore:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS report_jobs (
-                    id TEXT PRIMARY KEY,
-                    status TEXT NOT NULL,
+                    report_job_id TEXT PRIMARY KEY,
+                    job_status TEXT NOT NULL,
                     request_json TEXT NOT NULL,
                     request_fingerprint TEXT NOT NULL,
                     idempotency_key_digest TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
-                    error TEXT,
+                    job_error_message TEXT,
                     artifact_dir TEXT
                 )
                 """
             )
-            columns = {
-                row["name"] for row in connection.execute("PRAGMA table_info(report_jobs)")
+            schema_columns = {
+                database_row["name"]
+                for database_row in connection.execute("PRAGMA table_info(report_jobs)")
             }
-            if "request_fingerprint" not in columns:
+            if "report_job_id" not in schema_columns and "id" in schema_columns:
+                connection.execute(
+                    "ALTER TABLE report_jobs RENAME COLUMN id TO report_job_id"
+                )
+            if "job_status" not in schema_columns and "status" in schema_columns:
+                connection.execute(
+                    "ALTER TABLE report_jobs RENAME COLUMN status TO job_status"
+                )
+            if "job_error_message" not in schema_columns and "error" in schema_columns:
+                connection.execute(
+                    "ALTER TABLE report_jobs RENAME COLUMN error TO job_error_message"
+                )
+            schema_columns = {
+                database_row["name"]
+                for database_row in connection.execute("PRAGMA table_info(report_jobs)")
+            }
+            if "request_fingerprint" not in schema_columns:
                 connection.execute(
                     "ALTER TABLE report_jobs ADD COLUMN request_fingerprint TEXT"
                 )
-            if "idempotency_key_digest" not in columns:
+            if "idempotency_key_digest" not in schema_columns:
                 connection.execute(
                     "ALTER TABLE report_jobs ADD COLUMN idempotency_key_digest TEXT"
                 )
-            legacy_rows = connection.execute(
+            legacy_job_rows = connection.execute(
                 """
-                SELECT id, request_json
+                SELECT report_job_id, request_json
                 FROM report_jobs
                 WHERE request_fingerprint IS NULL OR request_fingerprint=''
                 """
             ).fetchall()
-            for row in legacy_rows:
-                fingerprint = request_fingerprint(json.loads(row["request_json"]))
-                connection.execute(
-                    "UPDATE report_jobs SET request_fingerprint=? WHERE id=?",
-                    (fingerprint, row["id"]),
+            for legacy_job_row in legacy_job_rows:
+                request_digest = request_fingerprint(
+                    json.loads(legacy_job_row["request_json"])
                 )
+                connection.execute(
+                    "UPDATE report_jobs SET request_fingerprint=? WHERE report_job_id=?",
+                    (request_digest, legacy_job_row["report_job_id"]),
+                )
+            connection.execute("DROP INDEX IF EXISTS idx_report_jobs_status_created")
+            connection.execute("DROP INDEX IF EXISTS idx_report_jobs_created_id")
+            connection.execute("DROP INDEX IF EXISTS idx_report_jobs_status_created_id")
             connection.execute(
-                "CREATE INDEX IF NOT EXISTS idx_report_jobs_status_created ON report_jobs(status, created_at)"
+                """
+                CREATE INDEX IF NOT EXISTS idx_report_jobs_job_status_created_at
+                ON report_jobs(job_status, created_at)
+                """
             )
             connection.execute(
                 """
@@ -88,32 +113,33 @@ class JobStore:
             )
             connection.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_report_jobs_created_id
-                ON report_jobs(created_at DESC, id DESC)
+                CREATE INDEX IF NOT EXISTS idx_report_jobs_created_at_job_id
+                ON report_jobs(created_at DESC, report_job_id DESC)
                 """
             )
             connection.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_report_jobs_status_created_id
-                ON report_jobs(status, created_at DESC, id DESC)
+                CREATE INDEX IF NOT EXISTS idx_report_jobs_job_status_created_at_job_id
+                ON report_jobs(job_status, created_at DESC, report_job_id DESC)
                 """
             )
             connection.execute("COMMIT")
 
     @staticmethod
-    def _row(row: sqlite3.Row | None) -> ReportJob | None:
-        if row is None:
+    def _row_to_report_job(database_row: sqlite3.Row | None) -> ReportJob | None:
+        """Translate one SQLite row into the semantic report-job domain model."""
+        if database_row is None:
             return None
         return ReportJob(
-            id=row["id"],
-            status=JobStatus(row["status"]),
-            request=json.loads(row["request_json"]),
-            created_at=datetime.fromisoformat(row["created_at"]),
-            updated_at=datetime.fromisoformat(row["updated_at"]),
-            request_fingerprint=row["request_fingerprint"],
-            idempotency_key_digest=row["idempotency_key_digest"],
-            error=row["error"],
-            artifact_dir=row["artifact_dir"],
+            report_job_id=database_row["report_job_id"],
+            job_status=JobStatus(database_row["job_status"]),
+            report_request=json.loads(database_row["request_json"]),
+            created_at=datetime.fromisoformat(database_row["created_at"]),
+            updated_at=datetime.fromisoformat(database_row["updated_at"]),
+            request_fingerprint=database_row["request_fingerprint"],
+            idempotency_key_digest=database_row["idempotency_key_digest"],
+            job_error_message=database_row["job_error_message"],
+            artifact_dir=database_row["artifact_dir"],
         )
 
     @staticmethod
@@ -125,10 +151,10 @@ class JobStore:
         """Create and return one queued job containing a JSON-serializable request."""
         now = datetime.now(UTC)
         fingerprint = request_fingerprint(request)
-        job = ReportJob(
-            id=str(uuid.uuid4()),
-            status=JobStatus.QUEUED,
-            request=request,
+        report_job = ReportJob(
+            report_job_id=str(uuid.uuid4()),
+            job_status=JobStatus.QUEUED,
+            report_request=request,
             created_at=now,
             updated_at=now,
             request_fingerprint=fingerprint,
@@ -137,13 +163,13 @@ class JobStore:
             connection.execute(
                 """
                 INSERT INTO report_jobs(
-                    id,status,request_json,request_fingerprint,
+                    report_job_id,job_status,request_json,request_fingerprint,
                     idempotency_key_digest,created_at,updated_at
                 ) VALUES(?,?,?,?,?,?,?)
                 """,
                 (
-                    job.id,
-                    job.status.value,
+                    report_job.report_job_id,
+                    report_job.job_status.value,
                     self._request_json(request),
                     fingerprint,
                     None,
@@ -151,7 +177,7 @@ class JobStore:
                     now.isoformat(),
                 ),
             )
-        return job
+        return report_job
 
     def create_idempotent(
         self,
@@ -174,25 +200,25 @@ class JobStore:
         """
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            row = connection.execute(
+            database_row = connection.execute(
                 "SELECT * FROM report_jobs WHERE idempotency_key_digest=?",
                 (idempotency_key_digest,),
             ).fetchone()
-            if row is not None:
-                existing = self._row(row)
-                assert existing is not None
-                if existing.request_fingerprint != fingerprint:
+            if database_row is not None:
+                existing_job = self._row_to_report_job(database_row)
+                assert existing_job is not None
+                if existing_job.request_fingerprint != fingerprint:
                     raise IdempotencyKeyReuseError(
                         "Idempotency-Key is already used with a different payload"
                     )
                 connection.execute("COMMIT")
-                return existing, True
+                return existing_job, True
 
             now = datetime.now(UTC)
-            job = ReportJob(
-                id=str(uuid.uuid4()),
-                status=JobStatus.QUEUED,
-                request=request,
+            report_job = ReportJob(
+                report_job_id=str(uuid.uuid4()),
+                job_status=JobStatus.QUEUED,
+                report_request=request,
                 created_at=now,
                 updated_at=now,
                 request_fingerprint=fingerprint,
@@ -201,13 +227,13 @@ class JobStore:
             connection.execute(
                 """
                 INSERT INTO report_jobs(
-                    id,status,request_json,request_fingerprint,
+                    report_job_id,job_status,request_json,request_fingerprint,
                     idempotency_key_digest,created_at,updated_at
                 ) VALUES(?,?,?,?,?,?,?)
                 """,
                 (
-                    job.id,
-                    job.status.value,
+                    report_job.report_job_id,
+                    report_job.job_status.value,
                     self._request_json(request),
                     fingerprint,
                     idempotency_key_digest,
@@ -216,13 +242,16 @@ class JobStore:
                 ),
             )
             connection.execute("COMMIT")
-        return job, False
+        return report_job, False
 
     def get(self, job_id: str) -> ReportJob | None:
         """Return one job by UUID or ``None`` when no matching row exists."""
         with self._connect() as connection:
-            row = connection.execute("SELECT * FROM report_jobs WHERE id=?", (job_id,)).fetchone()
-        return self._row(row)
+            database_row = connection.execute(
+                "SELECT * FROM report_jobs WHERE report_job_id=?",
+                (job_id,),
+            ).fetchone()
+        return self._row_to_report_job(database_row)
 
     def list_jobs(
         self,
@@ -234,39 +263,39 @@ class JobStore:
         """Return one stable newest-first page of report jobs and its continuation."""
         if not 1 <= limit <= 100:
             raise ValueError("Report history limit must be between 1 and 100")
-        boundary: tuple[str, str] | None = None
+        history_boundary: tuple[str, str] | None = None
         if cursor is not None:
-            created_at, job_id = decode_history_cursor(cursor)
-            boundary = (created_at.isoformat(), job_id)
+            boundary_created_at, boundary_job_id = decode_history_cursor(cursor)
+            history_boundary = (boundary_created_at.isoformat(), boundary_job_id)
         fetch_limit = limit + 1
         with self._connect() as connection:
-            if status is None and boundary is None:
-                rows = connection.execute(
+            if status is None and history_boundary is None:
+                database_rows = connection.execute(
                     """
                     SELECT * FROM report_jobs
-                    ORDER BY created_at DESC, id DESC
+                    ORDER BY created_at DESC, report_job_id DESC
                     LIMIT ?
                     """,
                     (fetch_limit,),
                 ).fetchall()
-            elif status is not None and boundary is None:
-                rows = connection.execute(
+            elif status is not None and history_boundary is None:
+                database_rows = connection.execute(
                     """
                     SELECT * FROM report_jobs
-                    WHERE status=?
-                    ORDER BY created_at DESC, id DESC
+                    WHERE job_status=?
+                    ORDER BY created_at DESC, report_job_id DESC
                     LIMIT ?
                     """,
                     (status.value, fetch_limit),
                 ).fetchall()
             elif status is None:
-                assert boundary is not None
-                boundary_created_at, boundary_job_id = boundary
-                rows = connection.execute(
+                assert history_boundary is not None
+                boundary_created_at, boundary_job_id = history_boundary
+                database_rows = connection.execute(
                     """
                     SELECT * FROM report_jobs
-                    WHERE created_at < ? OR (created_at = ? AND id < ?)
-                    ORDER BY created_at DESC, id DESC
+                    WHERE created_at < ? OR (created_at = ? AND report_job_id < ?)
+                    ORDER BY created_at DESC, report_job_id DESC
                     LIMIT ?
                     """,
                     (
@@ -277,14 +306,14 @@ class JobStore:
                     ),
                 ).fetchall()
             else:
-                assert boundary is not None
-                boundary_created_at, boundary_job_id = boundary
-                rows = connection.execute(
+                assert history_boundary is not None
+                boundary_created_at, boundary_job_id = history_boundary
+                database_rows = connection.execute(
                     """
                     SELECT * FROM report_jobs
-                    WHERE status=?
-                      AND (created_at < ? OR (created_at = ? AND id < ?))
-                    ORDER BY created_at DESC, id DESC
+                    WHERE job_status=?
+                      AND (created_at < ? OR (created_at = ? AND report_job_id < ?))
+                    ORDER BY created_at DESC, report_job_id DESC
                     LIMIT ?
                     """,
                     (
@@ -295,35 +324,56 @@ class JobStore:
                         fetch_limit,
                     ),
                 ).fetchall()
-        has_more = len(rows) > limit
-        jobs = [self._row(row) for row in rows[:limit]]
-        page = [job for job in jobs if job is not None]
+        has_more = len(database_rows) > limit
+        report_jobs = [
+            self._row_to_report_job(database_row)
+            for database_row in database_rows[:limit]
+        ]
+        report_page = [report_job for report_job in report_jobs if report_job is not None]
         next_cursor = None
-        if has_more and page:
-            last = page[-1]
-            next_cursor = encode_history_cursor(last.created_at, last.id)
-        return page, next_cursor
+        if has_more and report_page:
+            last_report_job = report_page[-1]
+            next_cursor = encode_history_cursor(
+                last_report_job.created_at,
+                last_report_job.report_job_id,
+            )
+        return report_page, next_cursor
 
     def claim_next(self) -> ReportJob | None:
         """Atomically claim the oldest queued job for a worker."""
         now = datetime.now(UTC).isoformat()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            row = connection.execute(
-                "SELECT id FROM report_jobs WHERE status=? ORDER BY created_at LIMIT 1",
+            database_row = connection.execute(
+                """
+                SELECT report_job_id
+                FROM report_jobs
+                WHERE job_status=?
+                ORDER BY created_at
+                LIMIT 1
+                """,
                 (JobStatus.QUEUED.value,),
             ).fetchone()
-            if row is None:
+            if database_row is None:
                 connection.execute("COMMIT")
                 return None
-            cursor = connection.execute(
-                "UPDATE report_jobs SET status=?, updated_at=? WHERE id=? AND status=?",
-                (JobStatus.RUNNING.value, now, row["id"], JobStatus.QUEUED.value),
+            update_cursor = connection.execute(
+                """
+                UPDATE report_jobs
+                SET job_status=?, updated_at=?
+                WHERE report_job_id=? AND job_status=?
+                """,
+                (
+                    JobStatus.RUNNING.value,
+                    now,
+                    database_row["report_job_id"],
+                    JobStatus.QUEUED.value,
+                ),
             )
             connection.execute("COMMIT")
-            if cursor.rowcount != 1:
+            if update_cursor.rowcount != 1:
                 return None
-        return self.get(row["id"])
+        return self.get(database_row["report_job_id"])
 
     def finish(self, job_id: str, artifact_dir: Path) -> ReportJob:
         """Mark a job completed and record its published artifact directory."""
@@ -331,35 +381,46 @@ class JobStore:
 
     def fail(self, job_id: str, error: str, *, quality: bool = False) -> ReportJob:
         """Mark a job failed, optionally distinguishing deterministic quality failure."""
-        status = JobStatus.QUALITY_FAILED if quality else JobStatus.FAILED
-        return self._transition(job_id, status, error=error[:4000])
+        job_status = JobStatus.QUALITY_FAILED if quality else JobStatus.FAILED
+        return self._transition(
+            job_id,
+            job_status,
+            job_error_message=error[:4000],
+        )
 
     def _transition(
         self,
         job_id: str,
-        status: JobStatus,
+        job_status: JobStatus,
         *,
-        error: str | None = None,
+        job_error_message: str | None = None,
         artifact_dir: str | None = None,
     ) -> ReportJob:
         now = datetime.now(UTC).isoformat()
         with self._connect() as connection:
-            cursor = connection.execute(
-                "UPDATE report_jobs SET status=?,updated_at=?,error=?,artifact_dir=? WHERE id=?",
-                (status.value, now, error, artifact_dir, job_id),
+            update_cursor = connection.execute(
+                """
+                UPDATE report_jobs
+                SET job_status=?,updated_at=?,job_error_message=?,artifact_dir=?
+                WHERE report_job_id=?
+                """,
+                (job_status.value, now, job_error_message, artifact_dir, job_id),
             )
-        if cursor.rowcount != 1:
+        if update_cursor.rowcount != 1:
             raise KeyError(f"Unknown report job: {job_id}")
-        result = self.get(job_id)
-        if result is None:
+        updated_report_job = self.get(job_id)
+        if updated_report_job is None:
             raise KeyError(f"Unknown report job after transition: {job_id}")
-        return result
+        return updated_report_job
 
     def delete(self, job_id: str) -> bool:
         """Delete one terminal job and report whether a row was removed."""
         with self._connect() as connection:
-            cursor = connection.execute(
-                "DELETE FROM report_jobs WHERE id=? AND status IN (?,?,?)",
+            delete_cursor = connection.execute(
+                """
+                DELETE FROM report_jobs
+                WHERE report_job_id=? AND job_status IN (?,?,?)
+                """,
                 (
                     job_id,
                     JobStatus.COMPLETED.value,
@@ -367,21 +428,28 @@ class JobStore:
                     JobStatus.QUALITY_FAILED.value,
                 ),
             )
-        return cursor.rowcount == 1
+        return delete_cursor.rowcount == 1
 
     def purge(self, retention_days: int) -> list[str]:
         """Delete expired terminal rows and return their job UUIDs for artifact cleanup."""
-        cutoff = (datetime.now(UTC) - timedelta(days=retention_days)).isoformat()
+        retention_cutoff = (datetime.now(UTC) - timedelta(days=retention_days)).isoformat()
         with self._connect() as connection:
-            rows = connection.execute(
-                "SELECT id FROM report_jobs WHERE updated_at < ? AND status IN (?,?,?)",
+            database_rows = connection.execute(
+                """
+                SELECT report_job_id
+                FROM report_jobs
+                WHERE updated_at < ? AND job_status IN (?,?,?)
+                """,
                 (
-                    cutoff,
+                    retention_cutoff,
                     JobStatus.COMPLETED.value,
                     JobStatus.FAILED.value,
                     JobStatus.QUALITY_FAILED.value,
                 ),
             ).fetchall()
-            ids = [row["id"] for row in rows]
-            connection.executemany("DELETE FROM report_jobs WHERE id=?", ((job_id,) for job_id in ids))
-        return ids
+            report_job_ids = [database_row["report_job_id"] for database_row in database_rows]
+            connection.executemany(
+                "DELETE FROM report_jobs WHERE report_job_id=?",
+                ((job_id,) for job_id in report_job_ids),
+            )
+        return report_job_ids
