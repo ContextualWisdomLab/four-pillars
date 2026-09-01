@@ -8,44 +8,9 @@ from typing import Any
 from .analysis import GeneratedReport, generate_report
 from .contextual_orchestrator import ContextualOrchestratorClient
 from .models import Chart, DaewoonResult, LuckSnapshot, ReportDocument
-from .nim import NimClient
 from .ports import ReportInterpreter
 from .reporting import write_artifacts
 from .settings import Settings
-
-
-class NimReportInterpreter:
-    """Legacy direct-NIM adapter retained only for compatibility injection tests.
-
-    Product-owned runtime composition never selects this adapter. New LLM-backed
-    product paths must use :class:`ContextualOrchestratorReportInterpreter`.
-    """
-
-    def __init__(self, settings: Settings) -> None:
-        """Store legacy NIM connection settings without opening a client."""
-        self.settings = settings
-
-    async def generate(
-        self,
-        *,
-        subject_name: str,
-        chart: Chart,
-        daewoon: DaewoonResult,
-        annual: LuckSnapshot,
-        monthly: LuckSnapshot,
-        user_context: str,
-    ) -> GeneratedReport:
-        """Open one bounded legacy NIM client for explicitly injected compatibility use."""
-        async with NimClient(self.settings) as client:
-            return await generate_report(
-                client=client,
-                subject_name=subject_name,
-                chart=chart,
-                daewoon=daewoon,
-                annual=annual,
-                monthly=monthly,
-                user_context=user_context,
-            )
 
 
 class ContextualOrchestratorReportInterpreter:
