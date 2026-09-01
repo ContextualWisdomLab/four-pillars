@@ -197,7 +197,7 @@ def test_optional_capabilities_preserve_existing_repository_adapters(tmp_path: P
     assert isinstance(repository, ReportJobRepository)
     assert not isinstance(repository, IdempotentReportJobRepository)
     assert not isinstance(repository, ReportJobHistoryRepository)
-    assert service.enqueue(request()).status is JobStatus.QUEUED
+    assert service.enqueue(request()).job_status is JobStatus.QUEUED
     with pytest.raises(IdempotencyNotSupportedError, match="idempotent"):
         service.enqueue_idempotent(request(), "0" * 64)
     with pytest.raises(HistoryNotSupportedError, match="history"):
@@ -220,19 +220,19 @@ async def test_injected_ports_process_a_job_without_nim_or_default_filesystem_pu
         publisher=publisher,
     )
 
-    queued = service.enqueue(request())
-    completed = await service.process_next()
+    queued_job = service.enqueue(request())
+    completed_job = await service.process_next()
 
-    assert isinstance(completed, ReportJob)
-    assert completed.id == queued.id
-    assert completed.status is JobStatus.COMPLETED
-    assert completed.artifact_dir is not None
-    assert Path(completed.artifact_dir).name == queued.id
-    assert service.available_artifacts(queued.id) == ["report.json"]
+    assert isinstance(completed_job, ReportJob)
+    assert completed_job.report_job_id == queued_job.report_job_id
+    assert completed_job.job_status is JobStatus.COMPLETED
+    assert completed_job.artifact_dir is not None
+    assert Path(completed_job.artifact_dir).name == queued_job.report_job_id
+    assert service.available_artifacts(queued_job.report_job_id) == ["report.json"]
     assert len(interpreter.calls) == 1
     assert interpreter.calls[0]["subject_name"] == "모듈 사용자"
     assert interpreter.calls[0]["user_context"] == "MSA adapter contract"
     assert interpreter.calls[0]["chart"].fingerprint
     assert len(publisher.calls) == 1
     assert publisher.calls[0]["report"].calculation_fingerprint == interpreter.calls[0]["chart"].fingerprint
-    assert publisher.calls[0]["directory"].name == f".{queued.id}.tmp"
+    assert publisher.calls[0]["directory"].name == f".{queued_job.report_job_id}.tmp"
