@@ -26,6 +26,8 @@ Under the DDD context map, Four Pillars' **Fortune Interpretation** application 
 9. Shared OpenAI-compatible transport and the Contextual Orchestrator client live under the provider-neutral `infrastructure/orchestration` namespace.
 10. The top-level `four_pillars.contextual_orchestrator` module is a compatibility re-export only; implementation ownership remains in the infrastructure ACL.
 
+The earlier migration allowance — “Direct provider compatibility code may remain temporarily as a test harness” — is now closed. New product or test code must not restore a provider-native transport under Four Pillars.
+
 ## DDD placement
 
 The accepted implementation is:
