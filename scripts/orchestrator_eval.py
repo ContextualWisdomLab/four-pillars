@@ -94,7 +94,14 @@ async def main() -> None:
 
     print(
         json.dumps(
-            {"result": result.model_dump(), "trace": trace.__dict__},
+            {
+                "result": result.model_dump(),
+                "trace": {
+                    "model": trace.model,
+                    "attempts": trace.attempts,
+                    "repairs": trace.repairs,
+                },
+            },
             ensure_ascii=False,
             indent=2,
         )
