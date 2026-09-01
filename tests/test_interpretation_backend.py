@@ -17,7 +17,6 @@ from four_pillars.adapters import (
 from four_pillars.analysis import GeneratedReport
 from four_pillars.generation import GenerationTrace, StructuredGenerationClient
 from four_pillars.models import BirthInput, Gender
-from four_pillars.nim import NimTrace
 from four_pillars.ports import ReportInterpreter
 from four_pillars.service import (
     ReportRequest,
@@ -57,13 +56,13 @@ def request() -> ReportRequest:
 def test_top_level_package_exports_modular_interpretation_contract() -> None:
     """Expose integration ports without requiring internal module imports."""
     assert four_pillars.GenerationTrace is GenerationTrace
-    assert NimTrace is GenerationTrace
     assert four_pillars.StructuredGenerationClient is StructuredGenerationClient
     assert four_pillars.build_report_interpreter is build_report_interpreter
     assert (
         four_pillars.ContextualOrchestratorReportInterpreter
         is ContextualOrchestratorReportInterpreter
     )
+    assert not hasattr(four_pillars, "NimReportInterpreter")
 
 
 def test_backend_factory_uses_contextual_orchestrator_by_default(tmp_path: Path) -> None:
