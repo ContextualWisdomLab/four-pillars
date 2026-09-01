@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "four-pillars"
 version = "0.8.0"
-description = "Deterministic Korean Four Pillars calculation and NVIDIA NIM report generation service"
+description = "Deterministic Korean Four Pillars calculation with Contextual Orchestrator report generation"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
@@ -45,7 +45,7 @@ packages = ["src/four_pillars"]
 addopts = "-ra --strict-markers"
 testpaths = ["tests"]
 markers = [
-  "nim_live: calls the hosted NVIDIA NIM API and requires NVIDIA_NIM_API_KEY"
+  "orchestrator_live: calls Contextual Orchestrator through orchestrator/free and requires gateway configuration"
 ]
 filterwarnings = [
   "error::ResourceWarning",
