@@ -1,15 +1,16 @@
 # Standalone and Modular Service Architecture
 
-Four Pillars is designed to run as an independent product and to be imported as a bounded module in a larger ContextualWisdomLab platform. The same deterministic domain contracts survive both forms; integration may replace infrastructure adapters but must not redefine calendar evidence, prompt semantics, quality gates, or artifact provenance.
+Four Pillars can run as an independent product or be imported as a bounded module in a larger ContextualWisdomLab platform. Deterministic domain contracts survive both forms; integration may replace infrastructure adapters but must not redefine calendar evidence, prompt semantics, quality gates, or artifact provenance.
 
 ## Architectural goals
 
-1. **Standalone completeness:** one repository, image, API process, worker process, SQLite queue, local artifact store, browser studio, CLI, and direct NVIDIA NIM adapter can calculate and publish reports without another service.
+1. **Product completeness:** one repository, image, API process, worker process, SQLite queue, local artifact store, browser studio, CLI, and Contextual Orchestrator adapter can calculate and publish reports.
 2. **Module portability:** callers can import calculation functions and Pydantic contracts without starting FastAPI, SQLite, a worker, or a model client.
 3. **Bounded trust:** deterministic calculation, interpretation, editorial validation, persistence, and delivery remain separate boundaries.
-4. **Replaceable infrastructure:** a platform integration may replace the queue, artifact store, authentication edge, deployment workflow, and interpretation adapter while retaining application and domain behavior.
-5. **Central governance compatibility:** organization `.github` workflows, `naruon`, Contextual Orchestrator, and other repositories can invoke or compose checked-in contracts rather than duplicating product rules.
-6. **No implicit fallback:** direct NIM and Contextual Orchestrator are explicit alternatives; a failed selection never changes providers silently.
+4. **Replaceable infrastructure:** a platform integration may replace the queue, artifact store, authentication edge, deployment workflow, or injected interpretation port while retaining application and domain behavior.
+5. **Central governance compatibility:** organization `.github`, `naruon`, Contextual Orchestrator, and other repositories consume checked-in contracts rather than duplicating product rules.
+6. **Orchestration ownership:** provider discovery, provider credentials, free-pool eligibility, routing, and provider fallback belong to the Contextual Orchestrator bounded context.
+7. **Fail closed:** the repository-owned LLM route is `orchestrator/free`; a gateway or free-pool failure never activates a direct provider.
 
 ## Bounded components
 
@@ -33,23 +34,22 @@ This boundary owns solar/lunar normalization, solar terms, pillars, Ten Gods, hi
 
 `generation.py` defines `StructuredGenerationClient`, the protocol consumed by `analysis.py`. The protocol returns a Pydantic-validated object and compatible generation trace. It does not expose provider administration or routing internals to the domain layer.
 
-`nim.py` supplies the shared OpenAI-compatible JSON transport and direct `NimClient`. `contextual_orchestrator.py` configures the same contract for the organization gateway. Both use an explicit untrusted-input envelope, JSON response mode, Pydantic validation, bounded retry, and bounded schema repair.
+`contextual_orchestrator.py` implements the Model Orchestration anti-corruption layer. It speaks the gateway's OpenAI-compatible transport, labels user/calculation payloads as untrusted input, validates Pydantic output, and applies bounded retry and schema repair. The active product contract fixes the virtual model to `orchestrator/free`.
+
+`nim.py` is transitional provider-specific compatibility infrastructure retained while low-level offline transport tests are migrated. It is not used by the repository composition root. ADR 0004 requires a later bounded namespace refactor to move shared transport under `infrastructure/orchestration` while updating imports, tests, UML, and compatibility exports together.
 
 ### Interpretation adapters
 
-`NimReportInterpreter` is the standalone default and opens a direct NIM client only when a report is generated. It requires `NVIDIA_NIM_API_KEY` at that point.
+`ContextualOrchestratorReportInterpreter` is the repository-owned implementation of `ReportInterpreter`. It opens `ContextualOrchestratorClient` only when a report is generated, attaches prompt-safe organizational attribution, and preserves strict report schemas.
 
-`ContextualOrchestratorReportInterpreter` is optional. It opens `ContextualOrchestratorClient` only when selected and requires `CONTEXTUAL_ORCHESTRATOR_TOKEN`. It attaches prompt-safe organizational usage attribution and preserves strict report schemas. The orchestrator may route to approved NVIDIA or other workers, but Four Pillars sees one organization gateway and never receives worker credentials.
+`build_report_interpreter(settings)` has no provider-selection branch. Product configuration accepts only:
 
-`build_report_interpreter(settings)` selects the explicit standalone adapter:
-
-```python
-INTERPRETATION_BACKEND=nvidia_nim
-# or
+```env
 INTERPRETATION_BACKEND=contextual_orchestrator
+CONTEXTUAL_ORCHESTRATOR_MODEL=orchestrator/free
 ```
 
-Callers that inject `ReportInterpreter` directly bypass the factory, preserving organization-specific composition.
+A caller may inject another `ReportInterpreter` directly for an independently owned MSA composition. That caller-owned choice does not reintroduce a provider option into Four Pillars' configuration or composition root.
 
 ### Application orchestration
 
@@ -66,7 +66,7 @@ Two runtime-checkable capabilities are layered on the repository boundary withou
 
 Existing organization adapters remain compatible with normal creation, lookup, processing, deletion, and retention. Keyed creation or history traversal fails explicitly with HTTP 501 when the corresponding capability is absent; the service never substitutes process-local locking or history for a distributed guarantee.
 
-If no ports are supplied, the service creates `JobStore`, the settings-selected interpreter, and `FilesystemArtifactPublisher`. `JobStore` implements the base repository plus both optional capabilities. An integration may replace one adapter without replacing the others.
+If no ports are supplied, the service creates `JobStore`, `ContextualOrchestratorReportInterpreter`, and `FilesystemArtifactPublisher`. `JobStore` implements the base repository plus both optional capabilities. An integration may replace one adapter without replacing the others.
 
 ```python
 from four_pillars.service import ReportService
@@ -83,7 +83,7 @@ Injected implementations are structurally typed. They do not need to inherit pro
 
 ### Infrastructure adapters
 
-`jobs.py` is the single-node SQLite implementation of the base, idempotency, and history repository contracts. `history.py` owns strict privacy-safe cursor encoding. `adapters.py` contains the default interpretation adapters and filesystem publisher. `reporting.py` owns atomic JSON, HTML, PDF, trace, and manifest writing. `api.py`, `web.py`, and `cli.py` are delivery adapters. None redefine chart or report schemas.
+`jobs.py` is the single-node SQLite implementation of the base, idempotency, and history repository contracts. `history.py` owns strict privacy-safe cursor encoding. `adapters.py` contains the orchestration ACL adapter and filesystem publisher. `reporting.py` owns atomic JSON, HTML, PDF, trace, and manifest writing. `api.py`, `web.py`, and `cli.py` are delivery adapters. None redefine chart or report schemas.
 
 A multi-node deployment should substitute PostgreSQL or a managed queue and object storage behind the same ports. It must preserve atomic claim semantics, terminal-state deletion, allow-listed artifact names, content hashes, fingerprints, database-enforced idempotency, and deterministic `(created_at DESC, id DESC)` history ordering.
 
@@ -91,7 +91,7 @@ A multi-node deployment should substitute PostgreSQL or a managed queue and obje
 
 ### Independent product
 
-The shipped container runs API or worker commands against a shared artifact volume and SQLite database. Direct NVIDIA NIM is the default interpretation path. This form is appropriate for one node, a private team, or a product-specific service boundary.
+The shipped container runs API or worker commands against a shared artifact volume and SQLite database. LLM-backed reports require an approved Contextual Orchestrator gateway. This form is appropriate for one node, a private team, or a product-specific service boundary; it is independent in application ownership, not in provider routing.
 
 ### Imported Python module
 
@@ -101,23 +101,24 @@ The top-level package exposes the required structural ports and optional reposit
 
 ### Internal MSA service with Contextual Orchestrator
 
-A platform can deploy API and worker separately, front them with organization authentication, replace persistence and artifacts, and set:
+A platform can deploy API and worker separately, front them with organization authentication, replace persistence and artifacts, and configure:
 
 ```env
 INTERPRETATION_BACKEND=contextual_orchestrator
 CONTEXTUAL_ORCHESTRATOR_BASE_URL=https://orchestrator.internal.example/v1
 CONTEXTUAL_ORCHESTRATOR_TOKEN=...
+CONTEXTUAL_ORCHESTRATOR_MODEL=orchestrator/free
 CONTEXTUAL_ORCHESTRATOR_COMPANY=ContextualWisdomLab
 CONTEXTUAL_ORCHESTRATOR_TEAM=fortune-products
 ```
 
-Four Pillars sends schema-constrained requests through the OpenAI-compatible surface. Usage attribution contains only approved organization labels. Subject names, birth data, user notes, fingerprints, generated text, artifact paths, and credentials never become attribution dimensions.
+Four Pillars sends schema-constrained requests through the gateway's OpenAI-compatible surface. Usage attribution contains only approved organization labels. Subject names, birth data, user notes, fingerprints, generated text, artifact paths, and credentials never become attribution dimensions.
 
-Calls across services preserve model, prompt versions, and calculation fingerprint through Four Pillars traces and manifests. Current traces are not W3C distributed traces; `traceparent` propagation is a separately documented target state.
+Calls across services preserve virtual model, prompt versions, and calculation fingerprint through Four Pillars traces and manifests. Current traces are not W3C distributed traces; `traceparent` propagation is a separately documented target state.
 
 ### Central workflow consumption
 
-Organization-wide `.github` or `naruon` workflows should invoke repository-owned commands:
+Organization-wide maintainers and `naruon` workflows should invoke repository-owned commands:
 
 ```bash
 python -m pip install --require-hashes -r requirements/ci.txt
@@ -126,11 +127,11 @@ ruff check .
 python -m compileall -q src tests scripts
 python scripts/check_docs.py
 python scripts/check_prompts.py
-pytest -m 'not nim_live' --cov=four_pillars --cov-report=term-missing
+pytest -m 'not orchestrator_live' --cov=four_pillars --cov-report=term-missing
 python -m build --no-isolation
 ```
 
-The repository remains the source of product-specific policy. Central workflows may add organization controls, attestations, deployment, or promotion without copying calculation and quality rules.
+The repository remains the source of product-specific policy. The organization-level autonomous development loop may add research, review orchestration, DDD audits, and bounded product increments without embedding another provider-credentialed writer in this repository.
 
 ## Port behavior contracts
 
@@ -148,11 +149,11 @@ The repository remains the source of product-specific policy. Central workflows 
 
 ### Report interpreter
 
-The interpreter receives subject label, natal chart, daewoon, annual snapshot, monthly snapshot, and untrusted context. It returns `GeneratedReport` and cannot mutate or recalculate evidence. Provider/model/prompt/retry/repair metadata remains traceable. A selected backend failure is visible and never invokes an unselected adapter.
+The interpreter receives subject label, natal chart, daewoon, annual snapshot, monthly snapshot, and untrusted context. It returns `GeneratedReport` and cannot mutate or recalculate evidence. Virtual-model/prompt/retry/repair metadata remains traceable. The repository-owned implementation never calls a direct provider.
 
 ### Structured generation client
 
-A client accepts a system prompt, untrusted payload, Pydantic response model, optional model override, temperature, and token bound. It returns a validated object and trace. The Contextual Orchestrator implementation additionally sends approved attribution and routing metadata but returns the same application-level trace contract.
+A client accepts a system prompt, untrusted payload, Pydantic response model, optional model override within its own internal interface, temperature, and token bound. The product configuration prevents changing the repository-owned virtual model away from `orchestrator/free`. Contextual Orchestrator additionally receives approved attribution and routing metadata while returning the same application-level trace contract.
 
 ### Artifact publisher
 
@@ -166,16 +167,17 @@ Public files and messages use UUID job identifiers rather than subject names. In
 
 ## Versioning and compatibility
 
-Package/API versions follow Semantic Versioning. Calculation and prompt versions are independently recorded. A breaking calculation-policy change requires a new calculation version and golden fixtures. A breaking report, required-port, or API schema change requires a major version. Optional adapters may be added in a minor version when direct defaults and required ports remain compatible.
+Package/API versions follow Semantic Versioning. Calculation and prompt versions are independently recorded. A breaking calculation-policy change requires a new calculation version and golden fixtures. A breaking report, required-port, or API schema change requires a major version. Optional adapters may be added in a minor version when required ports and product trust boundaries remain compatible.
 
 ## Integration acceptance criteria
 
 An integration is conformant when:
 
-- deterministic fixtures and fingerprints match the standalone package;
+- deterministic fixtures and fingerprints match the package;
 - interpretation receives immutable evidence as untrusted input;
-- direct NIM uses `NVIDIA_NIM_API_KEY` and the gateway uses `CONTEXTUAL_ORCHESTRATOR_TOKEN`;
-- backend selection is explicit and no fallback occurs;
+- the repository composition routes LLM work only through Contextual Orchestrator;
+- the product virtual model is `orchestrator/free` and direct-provider backend/model values are rejected;
+- no provider-native credential appears in product runtime configuration;
 - prompt/model/attempt/repair provenance remains available;
 - report quality validation runs before publication;
 - queue creation/claims are atomic and terminal states remain distinguishable;
