@@ -43,21 +43,23 @@ def configured(tmp_path: Path, service_type):
 @pytest.mark.asyncio
 async def test_provider_exception_marks_job_failed_and_removes_temp_directory(tmp_path: Path) -> None:
     service = configured(tmp_path, FailingService)
-    queued = service.enqueue(request())
-    result = await service.process_next()
-    assert result is not None
-    assert result.status is JobStatus.FAILED
-    assert "provider unavailable" in result.error
-    assert not (service.settings.artifact_dir / f".{queued.id}.tmp").exists()
+    queued_job = service.enqueue(request())
+    failed_job = await service.process_next()
+    assert failed_job is not None
+    assert failed_job.job_status is JobStatus.FAILED
+    assert "provider unavailable" in failed_job.job_error_message
+    assert not (
+        service.settings.artifact_dir / f".{queued_job.report_job_id}.tmp"
+    ).exists()
 
 
 @pytest.mark.asyncio
 async def test_quality_exception_has_quality_failed_status(tmp_path: Path) -> None:
     service = configured(tmp_path, QualityFailingService)
     service.enqueue(request())
-    result = await service.process_next()
-    assert result is not None
-    assert result.status is JobStatus.QUALITY_FAILED
+    failed_job = await service.process_next()
+    assert failed_job is not None
+    assert failed_job.job_status is JobStatus.QUALITY_FAILED
 
 
 def test_default_request_uses_current_year_and_month() -> None:
