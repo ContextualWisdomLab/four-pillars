@@ -1,4 +1,4 @@
-"""Provide standalone interpretation and filesystem application adapters."""
+"""Provide interpretation and filesystem application adapters."""
 
 from __future__ import annotations
 
@@ -15,10 +15,14 @@ from .settings import Settings
 
 
 class NimReportInterpreter:
-    """Generate schema-validated reports through direct hosted NVIDIA NIM."""
+    """Legacy direct-NIM adapter retained only for compatibility injection tests.
+
+    Product-owned runtime composition never selects this adapter. New LLM-backed
+    product paths must use :class:`ContextualOrchestratorReportInterpreter`.
+    """
 
     def __init__(self, settings: Settings) -> None:
-        """Store NIM connection and model settings without opening a client."""
+        """Store legacy NIM connection settings without opening a client."""
         self.settings = settings
 
     async def generate(
@@ -31,7 +35,7 @@ class NimReportInterpreter:
         monthly: LuckSnapshot,
         user_context: str,
     ) -> GeneratedReport:
-        """Open one bounded NIM client and interpret immutable calculation evidence."""
+        """Open one bounded legacy NIM client for explicitly injected compatibility use."""
         async with NimClient(self.settings) as client:
             return await generate_report(
                 client=client,
@@ -75,10 +79,8 @@ class ContextualOrchestratorReportInterpreter:
 
 
 def build_report_interpreter(settings: Settings) -> ReportInterpreter:
-    """Build the explicitly selected standalone interpretation adapter."""
-    if settings.interpretation_backend == "contextual_orchestrator":
-        return ContextualOrchestratorReportInterpreter(settings)
-    return NimReportInterpreter(settings)
+    """Build the sole product-owned LLM adapter through Contextual Orchestrator."""
+    return ContextualOrchestratorReportInterpreter(settings)
 
 
 class FilesystemArtifactPublisher:
