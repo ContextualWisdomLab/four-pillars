@@ -88,14 +88,18 @@ def require_api_key(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
 
 
-def _job_view(job: ReportJob, service: ReportService) -> ReportJobView:
-    artifact_names = service.available_artifacts(job.id) if job.status is JobStatus.COMPLETED else []
+def _job_view(report_job: ReportJob, service: ReportService) -> ReportJobView:
+    artifact_names = (
+        service.available_artifacts(report_job.report_job_id)
+        if report_job.job_status is JobStatus.COMPLETED
+        else []
+    )
     return ReportJobView(
-        report_job_id=job.id,
-        job_status=job.status,
-        created_at=job.created_at,
-        updated_at=job.updated_at,
-        job_error_message=job.error,
+        report_job_id=report_job.report_job_id,
+        job_status=report_job.job_status,
+        created_at=report_job.created_at,
+        updated_at=report_job.updated_at,
+        job_error_message=report_job.job_error_message,
         artifact_names=artifact_names,
     )
 
@@ -161,7 +165,7 @@ def list_reports(
 ) -> ReportJobPageView:
     """Return one redacted keyset-paginated page of recent report jobs."""
     try:
-        jobs, next_cursor = service.list_jobs(
+        report_jobs, next_cursor = service.list_jobs(
             limit=limit,
             cursor=cursor,
             status=job_status,
@@ -177,7 +181,7 @@ def list_reports(
             detail=str(exc),
         ) from exc
     return ReportJobPageView(
-        report_jobs=[_job_view(job, service) for job in jobs],
+        report_jobs=[_job_view(report_job, service) for report_job in report_jobs],
         next_cursor=next_cursor,
     )
 
@@ -206,7 +210,7 @@ def create_report(
         ) from exc
     key_digest = hashlib.sha256(canonical_key.encode("utf-8")).hexdigest()
     try:
-        job, replayed = service.enqueue_idempotent(request, key_digest)
+        report_job, replayed = service.enqueue_idempotent(request, key_digest)
     except IdempotencyKeyReuseError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -218,7 +222,7 @@ def create_report(
             detail=str(exc),
         ) from exc
     response.headers["Idempotency-Replayed"] = "true" if replayed else "false"
-    return _job_view(job, service)
+    return _job_view(report_job, service)
 
 
 @app.get(
@@ -228,10 +232,10 @@ def create_report(
 )
 def get_report(job_id: str, service: ReportService = Depends(get_service)) -> ReportJobView:
     """Return the current public status and artifacts for one report job."""
-    job = service.store.get(job_id)
-    if job is None:
+    report_job = service.store.get(job_id)
+    if report_job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report job not found")
-    return _job_view(job, service)
+    return _job_view(report_job, service)
 
 
 @app.get("/v1/reports/{job_id}/artifacts/{filename}", dependencies=[Depends(require_api_key)])
@@ -257,13 +261,17 @@ def get_artifact(
 @app.delete("/v1/reports/{job_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_api_key)])
 def delete_report(job_id: str, service: ReportService = Depends(get_service)) -> None:
     """Delete a terminal job and only its validated UUID artifact directory."""
-    job = service.store.get(job_id)
-    if job is None:
+    report_job = service.store.get(job_id)
+    if report_job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report job not found")
-    if job.artifact_dir:
-        root = Path(job.artifact_dir).resolve()
+    if report_job.artifact_dir:
+        root = Path(report_job.artifact_dir).resolve()
         configured_root = service.settings.artifact_dir.resolve()
-        if root.parent == configured_root and root.name == job.id and root.exists():
+        if (
+            root.parent == configured_root
+            and root.name == report_job.report_job_id
+            and root.exists()
+        ):
             import shutil
 
             shutil.rmtree(root)
