@@ -10,7 +10,7 @@ The lunar claim is false for this input. Solar 1990-06-15 corresponds to regular
 
 ## Product decision and checks
 
-The deterministic core's existing `civil`, `mean_solar`, and `apparent_solar` policies remain explicit rather than changing the default. The CLI now exposes `--longitude` and `--time-basis` on `calculate` and `luck`. `tests/test_cli.py` asserts that the Bucheon result is within 30 seconds of 07:57 and that the hour pillar remains `壬辰`. `tests/test_calendar.py` separately asserts the regular and leap fifth-month conversions.
+The deterministic core's existing `civil`, `mean_solar`, and `apparent_solar` policies remain explicit rather than changing the default. The CLI now exposes `--calendar`, `--lunar-leap-month`, `--longitude`, and `--time-basis` on `calculate` and `luck`. `tests/test_cli.py` asserts that the Bucheon result is within 30 seconds of 07:57, that the hour pillar remains `壬辰`, and that regular and leap lunar 1990-05-23 normalize to the two distinct solar dates. `tests/test_calendar.py` independently asserts the same regular and leap fifth-month conversions through the deterministic core.
 
 The numeric longitude avoids retaining a birthplace label or adding a network geocoder. The calculation uses the IANA offset effective at the birth moment, so a historical DST hour is not separately subtracted a second time.
 

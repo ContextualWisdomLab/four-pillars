@@ -22,7 +22,12 @@ The editable product-design source is the Figma file `Four Pillars — Report Hi
 
 `POST /v1/chart` accepts a `BirthInput` object with local ISO `birth`, IANA `timezone`, `gender`, `calendar`, `lunar_leap_month`, `birth_time_known`, optional `longitude`, `time_basis`, and `day_boundary`. It returns the normalized moment, four pillars, day master, element balance, interactions, adjacent solar terms, warnings, policy version, and fingerprint.
 
-The CLI exposes the same location-time policy through `--longitude` and `--time-basis` on both `calculate` and `luck`. Longitude is east-positive and bounded to −180 through 180 degrees. `mean_solar` and `apparent_solar` require it; `civil` remains the backward-compatible default.
+The CLI exposes the same calendar and location-time policy through `--calendar`,
+`--lunar-leap-month`, `--longitude`, and `--time-basis` on both `calculate` and
+`luck`. `solar` and `civil` remain the backward-compatible defaults. Longitude
+is east-positive and bounded to −180 through 180 degrees; `mean_solar` and
+`apparent_solar` require it. `--lunar-leap-month` distinguishes an intercalary
+lunar month and never changes a solar input implicitly.
 
 `POST /v1/luck/daewoon` accepts the same `BirthInput` and returns one direction scenario when gender is known or two scenarios when gender is unspecified.
 

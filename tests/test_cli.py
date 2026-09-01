@@ -57,6 +57,24 @@ def test_calculate_command_applies_bucheon_apparent_solar_time() -> None:
     assert payload["hour"]["hanja"] == "壬辰"
 
 
+def test_calculate_command_distinguishes_regular_and_leap_lunar_months() -> None:
+    shared = [
+        "calculate",
+        "--birth",
+        "1990-05-23T08:30:00",
+        "--calendar",
+        "lunar",
+    ]
+
+    regular = runner.invoke(app, shared)
+    leap = runner.invoke(app, [*shared, "--lunar-leap-month"])
+
+    assert regular.exit_code == 0, regular.output
+    assert leap.exit_code == 0, leap.output
+    assert json.loads(regular.output)["normalized_birth"].startswith("1990-06-15T08:30:00")
+    assert json.loads(leap.output)["normalized_birth"].startswith("1990-07-15T08:30:00")
+
+
 def test_calculate_command_rejects_invalid_time_basis_without_traceback() -> None:
     result = runner.invoke(
         app,
