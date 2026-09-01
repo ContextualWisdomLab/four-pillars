@@ -48,22 +48,22 @@ class LuckRequest(BaseModel):
 class ReportJobView(BaseModel):
     """Public report-job status without the stored birth request or raw model text."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    id: str
-    status: JobStatus
+    report_job_id: str = Field(alias="id")
+    job_status: JobStatus = Field(alias="status")
     created_at: datetime
     updated_at: datetime
-    error: str | None = None
-    artifacts: list[str] = Field(default_factory=list)
+    job_error_message: str | None = Field(default=None, alias="error")
+    artifact_names: list[str] = Field(default_factory=list, alias="artifacts")
 
 
 class ReportJobPageView(BaseModel):
     """One privacy-safe newest-first page of report-job summaries."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    items: list[ReportJobView]
+    report_jobs: list[ReportJobView] = Field(alias="items")
     next_cursor: str | None = None
 
 
@@ -89,14 +89,14 @@ def require_api_key(
 
 
 def _job_view(job: ReportJob, service: ReportService) -> ReportJobView:
-    artifacts = service.available_artifacts(job.id) if job.status is JobStatus.COMPLETED else []
+    artifact_names = service.available_artifacts(job.id) if job.status is JobStatus.COMPLETED else []
     return ReportJobView(
-        id=job.id,
-        status=job.status,
+        report_job_id=job.id,
+        job_status=job.status,
         created_at=job.created_at,
         updated_at=job.updated_at,
-        error=job.error,
-        artifacts=artifacts,
+        job_error_message=job.error,
+        artifact_names=artifact_names,
     )
 
 
@@ -177,7 +177,7 @@ def list_reports(
             detail=str(exc),
         ) from exc
     return ReportJobPageView(
-        items=[_job_view(job, service) for job in jobs],
+        report_jobs=[_job_view(job, service) for job in jobs],
         next_cursor=next_cursor,
     )
 
