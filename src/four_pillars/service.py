@@ -166,73 +166,85 @@ class ReportService:
         )
         return bundle, generated
 
-    async def process(self, job: ReportJob) -> ReportJob:
+    async def process(self, report_job: ReportJob) -> ReportJob:
         """Generate one claimed job and atomically publish or fail its artifacts."""
-        request = ReportRequest.model_validate(job.request)
-        temporary = self.settings.artifact_dir / f".{job.id}.tmp"
-        final = self.settings.artifact_dir / job.id
-        shutil.rmtree(temporary, ignore_errors=True)
-        shutil.rmtree(final, ignore_errors=True)
+        report_request = ReportRequest.model_validate(report_job.report_request)
+        temporary_artifact_dir = (
+            self.settings.artifact_dir / f".{report_job.report_job_id}.tmp"
+        )
+        final_artifact_dir = self.settings.artifact_dir / report_job.report_job_id
+        shutil.rmtree(temporary_artifact_dir, ignore_errors=True)
+        shutil.rmtree(final_artifact_dir, ignore_errors=True)
         try:
-            bundle, generated = await self.generate(request)
+            calculation_bundle, generated_report = await self.generate(report_request)
             self.publisher.publish(
-                temporary,
-                report=generated.report,
-                chart=bundle.chart,
-                daewoon=bundle.daewoon,
-                annual=bundle.annual,
-                monthly=bundle.monthly,
-                traces=generated.traces,
+                temporary_artifact_dir,
+                report=generated_report.report,
+                chart=calculation_bundle.chart,
+                daewoon=calculation_bundle.daewoon,
+                annual=calculation_bundle.annual,
+                monthly=calculation_bundle.monthly,
+                traces=generated_report.traces,
             )
-            temporary.replace(final)
-            return self.store.finish(job.id, final)
+            temporary_artifact_dir.replace(final_artifact_dir)
+            return self.store.finish(report_job.report_job_id, final_artifact_dir)
         except ReportQualityError as exc:
-            shutil.rmtree(temporary, ignore_errors=True)
-            return self.store.fail(job.id, str(exc), quality=True)
+            shutil.rmtree(temporary_artifact_dir, ignore_errors=True)
+            return self.store.fail(
+                report_job.report_job_id,
+                str(exc),
+                quality=True,
+            )
         except Exception as exc:
-            shutil.rmtree(temporary, ignore_errors=True)
-            return self.store.fail(job.id, f"{type(exc).__name__}: {exc}")
+            shutil.rmtree(temporary_artifact_dir, ignore_errors=True)
+            return self.store.fail(
+                report_job.report_job_id,
+                f"{type(exc).__name__}: {exc}",
+            )
 
     async def process_next(self) -> ReportJob | None:
         """Claim and process the next queued job, or return ``None`` when idle."""
-        job = self.store.claim_next()
-        if job is None:
+        report_job = self.store.claim_next()
+        if report_job is None:
             return None
-        return await self.process(job)
+        return await self.process(report_job)
 
     async def worker(self, poll_seconds: float = 1.0) -> None:
         """Continuously process queued jobs and sleep only while the queue is empty."""
         while True:
-            processed = await self.process_next()
-            if processed is None:
+            processed_job = await self.process_next()
+            if processed_job is None:
                 await asyncio.sleep(poll_seconds)
 
     def artifact(self, job_id: str, filename: str) -> Path:
         """Resolve one allow-listed artifact while enforcing its configured UUID boundary."""
         if filename not in ARTIFACT_NAMES:
             raise ValueError("Unsupported artifact name")
-        job = self.store.get(job_id)
-        if job is None or job.artifact_dir is None:
+        report_job = self.store.get(job_id)
+        if report_job is None or report_job.artifact_dir is None:
             raise FileNotFoundError(job_id)
         configured_root = self.settings.artifact_dir.resolve()
-        root = Path(job.artifact_dir).resolve()
-        if root.parent != configured_root or root.name != job.id:
+        artifact_root = Path(report_job.artifact_dir).resolve()
+        if (
+            artifact_root.parent != configured_root
+            or artifact_root.name != report_job.report_job_id
+        ):
             raise FileNotFoundError(job_id)
-        candidate = (root / filename).resolve()
-        if candidate.parent != root or not candidate.is_file():
+        artifact_path = (artifact_root / filename).resolve()
+        if artifact_path.parent != artifact_root or not artifact_path.is_file():
             raise FileNotFoundError(filename)
-        return candidate
+        return artifact_path
 
     def available_artifacts(self, job_id: str) -> list[str]:
         """Return the sorted allow-listed artifact names that safely exist for a job."""
-        available: list[str] = []
-        for filename in sorted(ARTIFACT_NAMES):
+        available_artifact_names: list[str] = []
+        for artifact_name in sorted(ARTIFACT_NAMES):
             try:
-                self.artifact(job_id, filename)
+                self.artifact(job_id, artifact_name)
             except FileNotFoundError:
                 continue
-            available.append(filename)
-        return available
+            available_artifact_names.append(artifact_name)
+        return available_artifact_names
 
 
 def default_request(subject_name: str, birth: BirthInput) -> ReportRequest:
