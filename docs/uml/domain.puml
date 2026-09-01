@@ -106,10 +106,10 @@ interface StructuredGenerationClient {
   +generate(system_prompt, user_payload, response_model, model, temperature, max_tokens)
 }
 
-class NimReportInterpreter
 class ContextualOrchestratorReportInterpreter
-class NimClient
-class ContextualOrchestratorClient
+class ContextualOrchestratorClient {
+  +virtual_model: orchestrator/free
+}
 class QualityGate
 class ArtifactRenderer
 
@@ -125,13 +125,9 @@ LuckSnapshot --> Pillar
 ReportRequest --> BirthInput
 ReportRequest --> ReportJob : enqueue
 ReportJob --> ReportInterpreter : process
-ReportInterpreter <|.. NimReportInterpreter
 ReportInterpreter <|.. ContextualOrchestratorReportInterpreter
-StructuredGenerationClient <|.. NimClient
 StructuredGenerationClient <|.. ContextualOrchestratorClient
-NimReportInterpreter --> NimClient
-ContextualOrchestratorReportInterpreter --> ContextualOrchestratorClient
-NimClient --> ReportDocument : validated JSON
+ContextualOrchestratorReportInterpreter --> ContextualOrchestratorClient : ACL
 ContextualOrchestratorClient --> ReportDocument : validated JSON
 ReportDocument --> QualityGate : validate
 QualityGate --> ArtifactRenderer : approved
