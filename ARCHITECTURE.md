@@ -97,25 +97,21 @@ An MSA installation may inject organization repositories, object storage, a queu
 
 ## DDD directory convergence
 
-The current package predates the explicit bounded-context layout. The desired direction is:
+The orchestration boundary has completed its first path migration:
 
 ```text
 src/four_pillars/
-  domain/
-    calculation/
-  application/
-    interpretation/
-    reporting/
+  generation.py
+  ports.py
+  adapters.py
   infrastructure/
     orchestration/
-    persistence/
-    publishing/
-  interfaces/
-    api/
-    cli/
-    web/
+      openai_compatible.py
+      contextual_orchestrator.py
 ```
 
-A path move is not performed partially. Each bounded refactor must move implementation, imports, tests, docs, UML, and architecture-fitness checks together and preserve public compatibility where promised. The highest-priority remaining path debt is the provider-specific `nim.py` namespace, because the active product route is now provider-neutral orchestration.
+The former provider-specific `nim.py` path is removed. The top-level `contextual_orchestrator.py` is a compatibility re-export, while implementation ownership remains under `infrastructure/orchestration`.
+
+The broader package predates a complete bounded-context layout. The next coherent path changes may separate deterministic calculation under `domain`, use cases under `application`, persistence/publishing under `infrastructure`, and API/CLI/web under `interfaces`. A path move is never performed partially: implementation, imports, tests, docs, UML, and architecture-fitness checks move together and public compatibility is preserved where promised.
 
 Detailed operational and standards evidence lives in `docs/operations/ORCHESTRATION.md`, `docs/operations/HOURLY_PRODUCT_LOOP.md`, `docs/standards/TRACEABILITY.md`, and ADR 0004.
