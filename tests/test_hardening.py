@@ -67,16 +67,19 @@ def test_artifact_reader_rejects_database_path_outside_configured_root(tmp_path:
         artifact_dir=tmp_path / "artifacts",
         database_url=f"sqlite:///{tmp_path / 'jobs.sqlite3'}",
     )
-    store = JobStore(settings.sqlite_path)
-    service = ReportService(settings, store)
-    job = store.create({"subject_name": "test"})
-    store.claim_next()
-    outside = tmp_path / "outside"
-    outside.mkdir()
-    (outside / "report.json").write_text('{"sensitive":true}', encoding="utf-8")
-    store.finish(job.id, outside)
+    report_job_store = JobStore(settings.sqlite_path)
+    service = ReportService(settings, report_job_store)
+    report_job = report_job_store.create({"subject_name": "test"})
+    report_job_store.claim_next()
+    outside_artifact_dir = tmp_path / "outside"
+    outside_artifact_dir.mkdir()
+    (outside_artifact_dir / "report.json").write_text(
+        '{"sensitive":true}',
+        encoding="utf-8",
+    )
+    report_job_store.finish(report_job.report_job_id, outside_artifact_dir)
     with pytest.raises(FileNotFoundError):
-        service.artifact(job.id, "report.json")
+        service.artifact(report_job.report_job_id, "report.json")
 
 
 def test_llm_response_models_forbid_unknown_fields() -> None:
