@@ -8,13 +8,18 @@ GitHub Actions runs `.github/workflows/hourly-product-loop.yml` at minute 17 of 
 
 The workflow uses one concurrency group and does not cancel an in-progress run. A slow verification therefore finishes with coherent evidence instead of being replaced by the next scheduled invocation.
 
-## Separate product-development loop
+## Shared autonomous development loop
 
-The deterministic sentinel is intentionally not a coding agent. A separate `.github/workflows/hourly-nim-product-development.yml` workflow runs at minute 47 and may use checksum-pinned OpenCode with `NVIDIA_NIM_API_KEY` to propose one bounded pull request only when open-PR inventory is readable and empty.
+The deterministic sentinel is intentionally not a coding agent. Repository-specific model-backed writer automation is also intentionally absent.
 
-That workflow separates model execution, uncredentialed verification, and late publication onto three fresh runners. It never approves, merges, tags, releases, deploys, or changes reviewer-agent credentials. Its full trust boundary, configuration, failure modes, rollback, and APA 7 evidence are documented in `docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md` and `docs/doctoring/hourly-nim-opencode-development.md`.
+ContextualWisdomLab operates a shared hourly autonomous-development loop across eligible repositories. That organization-level coordinator owns repository selection, direct-LLM-bypass discovery, Contextual Orchestrator consumer-contract enforcement, review/check/merge sequencing, DDD path audits, and bounded product-gap development. Four Pillars is a consumer of that shared loop rather than another independent writer.
 
-The two schedules use different concurrency groups and responsibilities. A minute-47 proposal cannot substitute for a minute-17 quality result, and the quality sentinel cannot publish source changes.
+This separation has two consequences:
+
+1. `.github/workflows/hourly-product-loop.yml` remains the model-free, repository-local quality sentinel; and
+2. model-backed development is coordinated once at organization scope, so Four Pillars does not hold NVIDIA, OpenAI, OpenRouter, Bytez, or other provider credentials for a coding agent.
+
+The shared maintainer loop must route model work through Contextual Orchestrator and use `orchestrator/free` for product-development tests when the task requires an LLM. It must still obey the repository's exact-head review and verification gates.
 
 ## Release-quality gate
 
@@ -39,9 +44,9 @@ Every command writes a bounded log excerpt to `artifacts/hourly-product-loop.md`
 - package/runtime/changelog version consistency;
 - the exactly 100% statement and branch coverage floor;
 - prompt semantic versions and SHA-256 digests;
-- direct `NVIDIA_NIM_API_KEY` and optional `CONTEXTUAL_ORCHESTRATOR_TOKEN` boundaries;
-- explicit interpretation backend selection and no implicit fallback;
-- Contextual Orchestrator adapter, attribution, and structural-generation contracts;
+- product-runtime rejection of direct-provider configuration;
+- `ContextualOrchestratorClient`, `ReportInterpreter`, and the `orchestrator/free` contract;
+- absence of provider-native credentials in operator-facing product configuration;
 - ISO, NIST, IETF, W3C, and peer-reviewed APA 7th reference traceability;
 - deterministic-core dependency boundaries;
 - the presence of the hourly and reusable release workflows; and
@@ -75,9 +80,9 @@ The workflow has read-only repository-content permission and issue write permiss
 
 The issue is evidence and coordination, not an automated source-code change. Remediation follows the normal branch, test-first pull request, review, check, and merge process.
 
-## Security and NIM boundary
+## Security and orchestration boundary
 
-The minute-17 hourly loop never calls direct hosted NVIDIA NIM or Contextual Orchestrator and receives neither `NVIDIA_NIM_API_KEY` nor `CONTEXTUAL_ORCHESTRATOR_TOKEN`. Hosted generation, the separate minute-47 proposal workflow, and LLM-as-a-judge evaluation retain independent secret and trust boundaries.
+The repository-local hourly loop never calls a hosted model and receives no model-provider or Contextual Orchestrator credential. Live `orchestrator/free` evaluation is a separate manual lane with an inference-scoped gateway token.
 
 User birth data, notes, report prompts, generated prose, API authentication values, provider credentials, gateway attribution, and artifact content are not uploaded by the minute-17 loop. The scheduled audit verifies configuration names and source contracts only.
 
