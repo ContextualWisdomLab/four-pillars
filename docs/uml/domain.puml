@@ -91,11 +91,11 @@ class ReportDocument {
 }
 
 class ReportJob {
-  +id: UUID
-  +status: JobStatus
-  +request: JSON
+  +report_job_id: UUID
+  +job_status: JobStatus
+  +report_request: JSON
   +artifact_dir: str?
-  +error: str?
+  +job_error_message: str?
 }
 
 interface ReportInterpreter {
