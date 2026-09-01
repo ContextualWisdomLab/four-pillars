@@ -86,41 +86,57 @@ def test_request_fingerprint_is_canonical_and_payload_sensitive() -> None:
 
 def test_store_replays_the_same_request_without_storing_the_raw_key(tmp_path: Path) -> None:
     """Return one durable job for repeated key and payload pairs."""
-    database = tmp_path / "report_jobs.sqlite3"
-    store = JobStore(database)
+    database_path = tmp_path / "report_jobs.sqlite3"
+    report_job_store = JobStore(database_path)
     canonical_key = parse_idempotency_key(KEY)
     key_digest = hashlib.sha256(canonical_key.encode()).hexdigest()
     fingerprint = request_fingerprint(REPORT)
 
-    first, first_replayed = store.create_idempotent(REPORT, key_digest, fingerprint)
-    second, second_replayed = store.create_idempotent(REPORT, key_digest, fingerprint)
+    first_job, first_replayed = report_job_store.create_idempotent(
+        REPORT,
+        key_digest,
+        fingerprint,
+    )
+    second_job, second_replayed = report_job_store.create_idempotent(
+        REPORT,
+        key_digest,
+        fingerprint,
+    )
 
-    assert first.id == second.id
-    assert first.status is JobStatus.QUEUED
+    assert first_job.report_job_id == second_job.report_job_id
+    assert first_job.job_status is JobStatus.QUEUED
     assert first_replayed is False
     assert second_replayed is True
-    assert second.request_fingerprint == fingerprint
-    assert second.idempotency_key_digest == key_digest
-    database_bytes = database.read_bytes()
+    assert second_job.request_fingerprint == fingerprint
+    assert second_job.idempotency_key_digest == key_digest
+    database_bytes = database_path.read_bytes()
     assert canonical_key.encode() not in database_bytes
 
 
 def test_store_rejects_reusing_a_key_for_a_different_payload(tmp_path: Path) -> None:
     """Protect clients from accidentally assigning one key to different reports."""
-    store = JobStore(tmp_path / "report_jobs.sqlite3")
+    report_job_store = JobStore(tmp_path / "report_jobs.sqlite3")
     key_digest = hashlib.sha256(parse_idempotency_key(KEY).encode()).hexdigest()
-    store.create_idempotent(REPORT, key_digest, request_fingerprint(REPORT))
-    changed = {**REPORT, "monthly_month": 9}
+    report_job_store.create_idempotent(
+        REPORT,
+        key_digest,
+        request_fingerprint(REPORT),
+    )
+    changed_report = {**REPORT, "monthly_month": 9}
 
     with pytest.raises(IdempotencyKeyReuseError):
-        store.create_idempotent(changed, key_digest, request_fingerprint(changed))
+        report_job_store.create_idempotent(
+            changed_report,
+            key_digest,
+            request_fingerprint(changed_report),
+        )
 
 
 def test_existing_job_database_is_migrated_without_losing_queued_requests(tmp_path: Path) -> None:
-    """Backfill fingerprints and add the unique idempotency index to a v0.3 database."""
-    database = tmp_path / "report_jobs.sqlite3"
-    now = datetime.now(UTC).isoformat()
-    with sqlite3.connect(database) as connection:
+    """Backfill legacy rows while migrating report-job names and idempotency indexes."""
+    database_path = tmp_path / "report_jobs.sqlite3"
+    observed_at = datetime.now(UTC).isoformat()
+    with sqlite3.connect(database_path) as connection:
         connection.execute(
             """
             CREATE TABLE report_jobs (
@@ -136,20 +152,35 @@ def test_existing_job_database_is_migrated_without_losing_queued_requests(tmp_pa
         )
         connection.execute(
             "INSERT INTO report_jobs(id,status,request_json,created_at,updated_at) VALUES(?,?,?,?,?)",
-            ("legacy-job", "queued", '{"subject_name":"legacy"}', now, now),
+            ("legacy-job", "queued", '{"subject_name":"legacy"}', observed_at, observed_at),
         )
 
-    store = JobStore(database)
-    migrated = store.get("legacy-job")
-    with sqlite3.connect(database) as connection:
-        columns = {row[1] for row in connection.execute("PRAGMA table_info(report_jobs)")}
-        indexes = {row[1] for row in connection.execute("PRAGMA index_list(report_jobs)")}
+    report_job_store = JobStore(database_path)
+    migrated_job = report_job_store.get("legacy-job")
+    with sqlite3.connect(database_path) as connection:
+        schema_columns = {
+            database_row[1]
+            for database_row in connection.execute("PRAGMA table_info(report_jobs)")
+        }
+        index_names = {
+            database_row[1]
+            for database_row in connection.execute("PRAGMA index_list(report_jobs)")
+        }
 
-    assert migrated is not None
-    assert migrated.request_fingerprint == request_fingerprint({"subject_name": "legacy"})
-    assert migrated.idempotency_key_digest is None
-    assert {"request_fingerprint", "idempotency_key_digest"} <= columns
-    assert "idx_report_jobs_idempotency_key_digest" in indexes
+    assert migrated_job is not None
+    assert migrated_job.report_job_id == "legacy-job"
+    assert migrated_job.job_status is JobStatus.QUEUED
+    assert migrated_job.request_fingerprint == request_fingerprint({"subject_name": "legacy"})
+    assert migrated_job.idempotency_key_digest is None
+    assert {
+        "report_job_id",
+        "job_status",
+        "job_error_message",
+        "request_fingerprint",
+        "idempotency_key_digest",
+    } <= schema_columns
+    assert {"id", "status", "error"}.isdisjoint(schema_columns)
+    assert "idx_report_jobs_idempotency_key_digest" in index_names
 
 
 def test_api_replays_same_payload_and_marks_the_response(tmp_path: Path) -> None:
