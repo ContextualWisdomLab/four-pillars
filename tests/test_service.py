@@ -7,10 +7,9 @@ import pytest
 
 from four_pillars.analysis import GeneratedReport
 from four_pillars.jobs import JobStore
-from four_pillars.models import JobStatus, PracticalSkill, ReportDocument, ReportSection
+from four_pillars.models import BirthInput, Gender, JobStatus, PracticalSkill, ReportDocument, ReportSection
 from four_pillars.service import ReportRequest, ReportService, calculate_bundle
 from four_pillars.settings import Settings
-from four_pillars.models import BirthInput, Gender
 
 
 REQUIRED = ("natal", "daewoon", "annual", "monthly", "work", "money", "relationships", "daily_rhythm")
@@ -75,15 +74,15 @@ async def test_worker_processes_job_and_publishes_complete_artifacts(tmp_path: P
         database_url=f"sqlite:///{tmp_path / 'jobs.sqlite3'}",
     )
     service = FakeService(settings, JobStore(settings.sqlite_path))
-    queued = service.enqueue(request())
-    completed = await service.process_next()
-    assert completed is not None
-    assert completed.id == queued.id
-    assert completed.status is JobStatus.COMPLETED
-    assert service.artifact(queued.id, "report.pdf").read_bytes().startswith(b"%PDF")
-    assert service.artifact(queued.id, "manifest.json").is_file()
+    queued_job = service.enqueue(request())
+    completed_job = await service.process_next()
+    assert completed_job is not None
+    assert completed_job.report_job_id == queued_job.report_job_id
+    assert completed_job.job_status is JobStatus.COMPLETED
+    assert service.artifact(queued_job.report_job_id, "report.pdf").read_bytes().startswith(b"%PDF")
+    assert service.artifact(queued_job.report_job_id, "manifest.json").is_file()
     with pytest.raises(ValueError):
-        service.artifact(queued.id, "../../etc/passwd")
+        service.artifact(queued_job.report_job_id, "../../etc/passwd")
 
 
 @pytest.mark.asyncio
