@@ -33,29 +33,6 @@ class Settings(BaseSettings):
     api_key_sha256: str | None = None
 
     interpretation_backend: InterpretationBackend = "contextual_orchestrator"
-
-    # Legacy direct-provider transport configuration is retained temporarily for
-    # offline compatibility tests only. Product composition never selects it.
-    nvidia_nim_api_key: str | None = None
-    nim_base_url: str = Field(
-        default="https://integrate.api.nvidia.com/v1",
-        min_length=1,
-        max_length=2048,
-    )
-    nim_model: str = Field(
-        default="nvidia/llama-3.3-nemotron-super-49b-v1.5",
-        min_length=1,
-        max_length=256,
-    )
-    nim_eval_model: str = Field(
-        default="nvidia/llama-3.3-nemotron-super-49b-v1.5",
-        min_length=1,
-        max_length=256,
-    )
-    nim_timeout_seconds: float = Field(default=120, gt=0, le=600)
-    nim_max_retries: int = Field(default=3, ge=0, le=10)
-    nim_max_schema_repairs: int = Field(default=1, ge=0, le=3)
-
     contextual_orchestrator_base_url: str = Field(
         default="http://127.0.0.1:8100/v1",
         min_length=1,
@@ -87,7 +64,7 @@ class Settings(BaseSettings):
         max_length=128,
     )
 
-    @field_validator("nim_base_url", "contextual_orchestrator_base_url")
+    @field_validator("contextual_orchestrator_base_url")
     @classmethod
     def validate_credential_endpoint(cls, value: str) -> str:
         """Require HTTPS remotely and allow cleartext only on an explicit loopback host."""
