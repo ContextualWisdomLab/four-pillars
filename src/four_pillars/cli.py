@@ -8,7 +8,7 @@ from datetime import datetime
 
 import typer
 
-from .calendar import calculate_chart
+from .calendar import calculate_chart, normalize_birth
 from .fortune import calculate_annual_luck, calculate_daewoon, calculate_monthly_luck
 from .models import BirthInput, CalendarKind, Gender, TimeBasis
 from .prompts import prompt_manifest
@@ -41,7 +41,7 @@ def _birth_input(
             "longitude is required for mean or apparent solar time",
             param_hint="--longitude",
         )
-    return BirthInput(
+    value = BirthInput(
         birth=datetime.fromisoformat(birth),
         timezone=timezone,
         gender=Gender(gender),
@@ -50,6 +50,12 @@ def _birth_input(
         longitude=longitude,
         time_basis=time_basis,
     )
+    if value.calendar is CalendarKind.LUNAR:
+        try:
+            normalize_birth(value)
+        except ValueError as exc:
+            raise typer.BadParameter(str(exc), param_hint="--birth") from exc
+    return value
 
 
 @app.command()
