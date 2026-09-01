@@ -230,7 +230,10 @@ async def test_orchestrator_retries_rate_limit_then_succeeds(
     async def fake_sleep(delay: float) -> None:
         sleeps.append(delay)
 
-    monkeypatch.setattr("four_pillars.nim.asyncio.sleep", fake_sleep)
+    monkeypatch.setattr(
+        "four_pillars.infrastructure.orchestration.openai_compatible.asyncio.sleep",
+        fake_sleep,
+    )
 
     def handler(request: httpx.Request) -> httpx.Response:
         nonlocal calls
