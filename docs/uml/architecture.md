@@ -12,13 +12,10 @@ flowchart LR
   Worker --> Core
   Worker --> Prompt[Versioned Prompt Registry]
   Worker --> Interpreter[ReportInterpreter Port]
-  Interpreter --> Direct[NimReportInterpreter]
-  Interpreter --> Gateway[ContextualOrchestratorReportInterpreter]
-  Direct --> NIM[NVIDIA Hosted NIM]
-  Gateway --> CO[Contextual Orchestrator]
-  CO --> Approved[Organization-approved Model Workers]
-  NIM --> Schema[Pydantic Schema Validation]
-  Approved --> Schema
+  Interpreter --> ACL[ContextualOrchestratorReportInterpreter]
+  ACL --> CO[Contextual Orchestrator / orchestrator/free]
+  CO --> Approved[Eligible Free Model Workers]
+  Approved --> Schema[Pydantic Schema Validation]
   Schema --> Quality[Deterministic & Editorial Quality Gate]
   Quality --> Render[HTML / PDF / JSON Renderer]
   Render --> Artifacts[(UUID Artifact Store)]
@@ -28,7 +25,7 @@ flowchart LR
   Fingerprint --> Quality
 ```
 
-The calculator does not depend on interpretation, rendering, HTTP, or the queue. `ReportService` composes structural ports. Direct NVIDIA NIM is the standalone default; Contextual Orchestrator is optional and selected explicitly. The worker is the only built-in component that combines calculation, interpretation, validation, and publication. Calculations remain available during model-provider outages, and custom queue, interpreter, or artifact implementations can be injected without rewriting calendar rules.
+The calculator does not depend on interpretation, rendering, HTTP, or the queue. `ReportService` composes structural ports. The repository-owned interpretation path is an anti-corruption layer into Contextual Orchestrator and fixes its virtual model to `orchestrator/free`. Provider discovery, provider credentials, and free-pool failover remain outside Four Pillars. Calculations remain available during orchestration outages, and custom queue, interpreter, or artifact implementations can be injected without rewriting calendar rules.
 
 ## Interpretation adapter class view
 
@@ -38,35 +35,21 @@ classDiagram
     <<Protocol>>
     +generate(system_prompt, user_payload, response_model, model, temperature, max_tokens)
   }
-  class OpenAICompatibleJsonClient {
-    -AsyncClient http
-    -retry_budget
-    -repair_budget
-    +generate(...)
-    +aclose()
-  }
-  class NimClient
   class ContextualOrchestratorClient
   class ReportInterpreter {
     <<Protocol>>
     +generate(subject_name, chart, daewoon, annual, monthly, user_context)
   }
-  class NimReportInterpreter
   class ContextualOrchestratorReportInterpreter
   class ReportService
 
-  StructuredGenerationClient <|.. NimClient
   StructuredGenerationClient <|.. ContextualOrchestratorClient
-  OpenAICompatibleJsonClient <|-- NimClient
-  OpenAICompatibleJsonClient <|-- ContextualOrchestratorClient
-  ReportInterpreter <|.. NimReportInterpreter
   ReportInterpreter <|.. ContextualOrchestratorReportInterpreter
-  NimReportInterpreter --> NimClient
   ContextualOrchestratorReportInterpreter --> ContextualOrchestratorClient
   ReportService --> ReportInterpreter
 ```
 
-`NimTrace` remains the compatible application trace model for model identity, attempts, repairs, and raw validation content. Public trace artifacts expose only privacy-safe fields assembled by `analysis.py`. The orchestrator receives organization attribution separately; personal data and generated content are prohibited from attribution.
+Provider-specific compatibility transport remains transitional test infrastructure and is deliberately omitted from the product class view. ADR 0004 records its later move into a provider-neutral `infrastructure/orchestration` namespace.
 
 ## Report sequence
 
@@ -77,8 +60,8 @@ sequenceDiagram
   participant Q as ReportJobRepository
   participant W as Worker
   participant C as Calculator
-  participant I as Selected Interpreter
-  participant M as Direct NIM or Contextual Orchestrator
+  participant I as Orchestration ACL
+  participant O as Contextual Orchestrator
   participant G as Quality Gate
   participant R as ArtifactPublisher
   participant S as Artifact Store
@@ -90,16 +73,16 @@ sequenceDiagram
   W->>C: calculate chart and luck
   C-->>W: immutable models + fingerprint
   W->>I: immutable evidence + untrusted context
-  I->>M: versioned stage prompts + JSON response mode
-  M-->>I: schema-oriented JSON content
+  I->>O: orchestrator/free + versioned prompt
+  O-->>I: schema-oriented JSON content
   I-->>W: Pydantic-validated drafts and traces
   W->>G: fingerprint + synthesized report
   alt quality passes
     G-->>W: approved
   else editorial issue
     W->>I: bounded editorial repair
-    I->>M: repair prompt + JSON Schema
-    M-->>I: repaired complete report
+    I->>O: same orchestrator/free route + repair prompt
+    O-->>I: repaired complete report
     I-->>W: validated report
     W->>G: validate again
   end
@@ -111,7 +94,7 @@ sequenceDiagram
   A-->>U: redacted state or allow-listed file
 ```
 
-The selected interpreter never changes during one job. Missing credentials, unavailable gateways, invalid responses, and exhausted retry or repair budgets become visible failures rather than provider fallback.
+The virtual route never changes during one job. Missing gateway credentials, an empty free pool, invalid responses, and exhausted retry or repair budgets become visible failures rather than direct-provider fallback.
 
 ## Calculation sequence
 
@@ -133,7 +116,7 @@ sequenceDiagram
   F-->>V: immutable Chart
 ```
 
-## Standalone deployment view
+## Single-node product view
 
 ```mermaid
 flowchart TB
@@ -142,13 +125,14 @@ flowchart TB
   API1 --> DB[(SQLite WAL)]
   Worker1[Worker Container] --> DB
   Worker1 --> V
-  Worker1 --> NIM[Hosted NVIDIA NIM]
+  Worker1 --> Gateway[Contextual Orchestrator]
+  Gateway --> Free[orchestrator/free pool]
   Secret[Secret Manager] --> API1
   Secret --> Worker1
   Probe[Health / Readiness Probes] --> API1
 ```
 
-SQLite and a shared filesystem intentionally define the single-node edition. `INTERPRETATION_BACKEND=nvidia_nim` and `NVIDIA_NIM_API_KEY` provide the independent default.
+SQLite and a shared filesystem intentionally define the single-node data plane. LLM-backed reports still use the organization orchestration boundary; standalone refers to application deployment, not provider routing ownership.
 
 ## Organization MSA deployment view
 
@@ -158,20 +142,19 @@ flowchart TB
   API --> Repo[(PostgreSQL or Managed Queue Adapter)]
   Worker[Four Pillars Worker] --> Repo
   Worker --> Object[Object Storage ArtifactPublisher]
-  Worker --> Gateway[Contextual Orchestrator]
-  Gateway --> NIMW[NVIDIA NIM Worker]
-  Gateway --> Other[Other Approved Worker]
+  Worker --> Gateway[Contextual Orchestrator / orchestrator/free]
+  Gateway --> FreeWorkers[Eligible Free Workers]
   Ledger[(Usage / Cost Ledger)] <-- prompt-safe attribution --> Gateway
-  Central[Central .github / naruon] --> Checks[Repository-owned Verification Commands]
+  Central[Shared CWL Maintainer Loop] --> Checks[Repository-owned Verification Commands]
   Secrets[Secret Manager] --> API
   Secrets --> Worker
   Traces[Organization Observability] -. future W3C Trace Context .- API
   Traces -. future W3C Trace Context .- Gateway
 ```
 
-The organization form selects `INTERPRETATION_BACKEND=contextual_orchestrator`, uses a gateway-specific token, and may inject remote repository and artifact adapters. Four Pillars does not install or import gateway internals. `service=four-pillars` and optional account/team/group/company labels support usage attribution; subject data, prompts, outputs, fingerprints, paths, and credentials are excluded.
+Four Pillars uses a gateway-specific token and may inject remote repository and artifact adapters. `service=four-pillars` and optional account/team/group/company labels support usage attribution; subject data, prompts, outputs, fingerprints, paths, and credentials are excluded.
 
-Current generation traces are local evidence, not W3C distributed traces. `traceparent`/`tracestate` propagation and RFC 9457 problem responses are documented future changes that require separate compatibility PRs.
+Current generation traces are local evidence, not W3C distributed traces. `traceparent`/`tracestate` propagation and RFC 9457 problem responses remain separately versioned changes.
 
 ## State machine
 
@@ -180,7 +163,7 @@ stateDiagram-v2
   [*] --> queued
   queued --> running: worker claims
   running --> completed: quality passes + artifacts published
-  running --> failed: calculation, selected backend, schema, or rendering error
+  running --> failed: calculation, orchestration, schema, or rendering error
   running --> quality_failed: bounded editorial repair still fails
   completed --> [*]: retention or explicit deletion
   failed --> [*]: retention or explicit deletion
