@@ -2,18 +2,20 @@
 
 ## 1. Architecture principles
 
-The system has four trust boundaries. The **calculation core** accepts validated birth input and produces immutable chart/luck models. The **interpretation boundary** serializes those models as untrusted evidence and calls one explicitly selected OpenAI-compatible adapter: direct NVIDIA NIM by default or optional Contextual Orchestrator for organization routing and governance. The **quality boundary** validates schema, fingerprint, completeness, balance, Korean copy, and safety. The **delivery boundary** stores and renders only approved results. No layer may silently assume responsibilities owned by an earlier layer.
+The system has four trust boundaries. The **calculation core** accepts validated birth input and produces immutable chart/luck models. The **interpretation application boundary** serializes those models as untrusted evidence and crosses a `ReportInterpreter` port into the external **Model Orchestration** bounded context through a Contextual Orchestrator anti-corruption layer. The **quality boundary** validates schema, fingerprint, completeness, balance, Korean copy, and safety. The **delivery boundary** stores and renders only approved results. No layer may silently assume responsibilities owned by another bounded context.
 
-The selected interpretation adapter never changes deterministic evidence and never silently fails over to another backend. Traditional Four Pillars prose is symbolic and conditional; standards traceability governs software and AI operations rather than asserting scientific prediction.
+Four Pillars owns interpretation intent, prompts, evidence, report schemas, quality rules, and artifacts. Provider discovery, provider credentials, free-pool eligibility, routing, and provider fallback are owned by Contextual Orchestrator. The repository-owned runtime fixes the virtual model to `orchestrator/free` and fails closed when that route is unavailable.
+
+The interpretation adapter never changes deterministic evidence. Traditional Four Pillars prose is symbolic and conditional; standards traceability governs software and AI operations rather than asserting scientific prediction.
 
 ## 2. Technology stack
 
 - Python 3.11 and 3.12
-- Pydantic 2 and Pydantic Settings 2 for data, LLM, and configuration contracts
+- Pydantic 2 and Pydantic Settings 2 for data, orchestration, and configuration contracts
 - FastAPI and Uvicorn for HTTP
 - Typer for CLI
 - SQLite WAL for the durable work queue
-- HTTPX for direct NVIDIA NIM and optional Contextual Orchestrator
+- HTTPX for the Contextual Orchestrator OpenAI-compatible ACL
 - ReportLab CJK CID fonts for searchable Korean PDF
 - Korean Lunar Calendar for solar/lunar input conversion
 - Pytest, pytest-cov, Ruff, and GitHub Actions for verification
@@ -31,13 +33,17 @@ All twelve 2026 `jie` boundaries are checked against committed KASI/NAOJ minute-
 
 Consumes a `Chart` and creates daewoon scenarios, annual snapshots, and monthly snapshots. It preserves the chart day master when assigning ten gods and returns interactions between temporary pillars and natal pillars.
 
-### 3.3 `generation.py`, `nim.py`, `contextual_orchestrator.py`, and `analysis.py`
+### 3.3 `generation.py`, `contextual_orchestrator.py`, transitional `nim.py`, and `analysis.py`
 
-`StructuredGenerationClient` is the structural boundary consumed by staged report generation. `nim.py` owns the shared OpenAI-compatible structured-generation transport: Bearer authentication, timeouts, retry, JSON extraction, Pydantic validation, and bounded schema repair. `NimClient` configures that behavior for direct hosted NVIDIA NIM.
+`StructuredGenerationClient` is the structural boundary consumed by staged report generation. `ContextualOrchestratorClient` implements the active Model Orchestration anti-corruption layer for `POST /v1/chat/completions`. It owns the gateway Bearer transport, bounded retry, JSON extraction, Pydantic validation, bounded schema repair, prompt-safe attribution, and synchronous orchestration metadata needed by Four Pillars.
 
-`ContextualOrchestratorClient` configures the same behavior for `POST /v1/chat/completions` on the organization gateway. It adds prompt-safe attribution—always `service=four-pillars` plus optional account, team, group, and company—and synchronous routing metadata. It uses `response_format={"type":"json_object"}` so provider features survive the orchestrator's structured-output passthrough. No birth data, user notes, report content, fingerprint, path, or credential is used as attribution.
+The active settings contract permits only the virtual model `orchestrator/free`. `auto`, `route`, and `conduct` may alter test-time compute depth, but they do not change the free-pool contract. The adapter intentionally omits `response_format`, tool, and function-calling passthrough fields that could collapse a routed/conducted request to one upstream provider path. JSON correctness is enforced by the prompt, Pydantic response model, and bounded same-route repair.
 
-`analysis.py` calls versioned stage prompts through the structural client, synthesizes the report, and requests one editorial repair only when deterministic quality checks fail. The trace contract remains compatible across backends.
+Attribution always includes `service=four-pillars` plus optional account, team, group, and company. Birth data, user notes, report content, fingerprints, paths, prompts, and credentials are prohibited from attribution.
+
+`nim.py` remains temporarily because historical offline compatibility tests share portions of its transport implementation. It is not selected by the product composition root and its provider-specific namespace is a documented DDD debt. ADR 0004 requires a bounded follow-up that moves shared transport under a provider-neutral `infrastructure/orchestration` namespace while updating imports, compatibility exports, tests, UML, and coverage evidence together.
+
+`analysis.py` calls versioned stage prompts through the structural client, synthesizes the report, and requests one editorial repair only when deterministic quality checks fail. The application trace contract records the virtual model, attempts, repairs, prompt versions, and prompt hashes without taking ownership of provider administration.
 
 ### 3.4 `quality.py`
 
@@ -45,11 +51,11 @@ The quality gate compares calculation fingerprints, verifies required chapters, 
 
 ### 3.5 `jobs.py`, `history.py`, `service.py`, and `api.py`
 
-SQLite stores queued, running, completed, failed, and quality-failed jobs. `BEGIN IMMEDIATE` provides atomic keyed creation and claim operations. `history.py` encodes strict versioned continuation cursors containing only a UTC timestamp and random UUID. `JobStore` implements indexed `(created_at DESC, id DESC)` keyset traversal with exact optional status filtering. The service calculates, invokes the selected interpreter, writes to a temporary artifact directory, and atomically renames it. FastAPI exposes calculation, enqueue, redacted history, individual status, deletion, and allow-listed artifact endpoints.
+SQLite stores queued, running, completed, failed, and quality-failed jobs. `BEGIN IMMEDIATE` provides atomic keyed creation and claim operations. `history.py` encodes strict versioned continuation cursors containing only a UTC timestamp and random UUID. `JobStore` implements indexed `(created_at DESC, id DESC)` keyset traversal with exact optional status filtering. The service calculates, invokes the interpreter, writes to a temporary artifact directory, and atomically renames it. FastAPI exposes calculation, enqueue, redacted history, individual status, deletion, and allow-listed artifact endpoints.
 
 The required `ReportJobRepository` remains backward compatible. Atomic keyed creation and history traversal are separate runtime-checkable capabilities, so an existing organization or MSA adapter can continue serving required operations and fails explicitly only when an unsupported optional endpoint is invoked.
 
-When no interpreter is injected, `build_report_interpreter(settings)` selects `NimReportInterpreter` for `nvidia_nim` or `ContextualOrchestratorReportInterpreter` for `contextual_orchestrator`. Explicitly injected MSA interpreters remain authoritative.
+When no interpreter is injected, `build_report_interpreter(settings)` builds `ContextualOrchestratorReportInterpreter`. The repository configuration no longer contains a provider selection branch. Explicitly injected MSA interpreters remain authoritative for caller-owned composition, but that extension point does not make provider selection a Four Pillars domain concern.
 
 ### 3.6 `reporting.py`
 
@@ -60,13 +66,14 @@ The renderer escapes HTML, uses fixed semantic colors, builds searchable Korean 
 1. API or CLI validates `BirthInput` and `ReportRequest`.
 2. Calculation core creates `Chart`, `DaewoonResult`, annual `LuckSnapshot`, and monthly `LuckSnapshot`.
 3. The chart fingerprint and full immutable JSON are passed to each prompt.
-4. The selected structured-generation backend returns a Pydantic-validated section or draft.
-5. Synthesis returns the full report structure.
-6. Quality gate compares report and deterministic source.
-7. Optional editorial repair changes copy but cannot change calculations.
-8. Renderer writes JSON, HTML, PDF, traces, and manifest to a temporary UUID directory.
-9. Successful generation atomically publishes the directory and marks the job completed.
-10. Authenticated history reads return only redacted job summaries and an opaque exclusive keyset boundary; they never read or serialize stored report requests.
+4. `ContextualOrchestratorReportInterpreter` sends the request through `orchestrator/free`.
+5. The gateway returns content that is validated against the requested Pydantic model.
+6. Synthesis returns the full report structure.
+7. Quality gate compares report and deterministic source.
+8. Optional editorial repair changes copy but cannot change calculations and remains on `orchestrator/free`.
+9. Renderer writes JSON, HTML, PDF, traces, and manifest to a temporary UUID directory.
+10. Successful generation atomically publishes the directory and marks the job completed.
+11. Authenticated history reads return only redacted job summaries and an opaque exclusive keyset boundary; they never read or serialize stored report requests.
 
 ## 5. Calculation policy
 
@@ -74,29 +81,33 @@ Modern Gregorian dates use integer Julian day numbers for the sexagenary day and
 
 The service records calculation version `calendar-1.1.0` and warns within six hours of a boundary. The KASI 2026 fixture and signed timing deltas are independently reviewable; historical timezone and pre-1972 timescale limitations remain explicit. See `CALCULATION.md` and `docs/doctoring/kasi-solar-term-golden-fixtures.md`.
 
-## 6. Interpretation backend contract
+## 6. Model orchestration contract
 
-### Direct NVIDIA NIM
+### Contextual Orchestrator ACL
 
-The direct key is supplied only through `NVIDIA_NIM_API_KEY`. The base URL, model, timeout, retry budget, and repair budget use the `NIM_*` settings. The client sends `response_format={"type":"json_object"}` and includes Pydantic JSON Schema in a bounded repair instruction when the first output is invalid.
+The gateway token is supplied only through `CONTEXTUAL_ORCHESTRATOR_TOKEN`. The base URL, timeout, retry budget, repair budget, orchestration mode, and organizational attribution use `CONTEXTUAL_ORCHESTRATOR_*` settings. The model setting is constrained to `orchestrator/free`.
 
-### Contextual Orchestrator
+The gateway may route among eligible free NVIDIA or other provider workers according to Contextual Orchestrator policy, but Four Pillars receives no provider administration credential and cannot select a provider directly. If the free pool is empty, the operation fails explicitly rather than crossing to a paid route.
 
-The gateway token is supplied only through `CONTEXTUAL_ORCHESTRATOR_TOKEN`. The base URL, model, timeout, retry budget, repair budget, and organizational attribution use `CONTEXTUAL_ORCHESTRATOR_*` settings. The gateway may route to NVIDIA workers or other organization-approved providers, but Four Pillars sees one explicit orchestrator boundary and does not receive provider administration credentials.
+### Reliability
 
-### Shared reliability
+HTTP 408, 429, and 5xx responses are retried using integer `Retry-After` or bounded exponential delay. Network timeouts and connection failures are retried. Other 4xx responses fail immediately. Repair requests use the same virtual model. Exhausted retry/repair budgets become visible job failures and never trigger a provider-native fallback.
 
-HTTP 408, 429, and 5xx responses are retried using integer `Retry-After` or bounded exponential delay. Network timeouts and connection failures are retried. Other 4xx responses fail immediately. A selected backend failure is visible and never triggers implicit fallback.
+### Caller-owned interpreter injection
+
+The `ReportInterpreter` port remains public for modular MSA composition. A caller may inject another implementation when it owns that integration boundary. The Four Pillars settings, API, runbook, and default composition nevertheless expose only the Contextual Orchestrator ACL. This preserves dependency inversion without reintroducing provider routing into the product domain.
 
 ## 7. Reliability and failure handling
 
-The queue persists before model work begins. Workers claim one job atomically. Partial artifact directories are hidden with a dot prefix and deleted after failure. Terminal errors are truncated before database storage. A worker restart leaves already-running jobs visible for operational inspection; a future recovery command may requeue them after an operator confirms that no worker owns them. Calculation and quality errors are distinguished from network/model errors.
+The queue persists before model work begins. Workers claim one job atomically. Partial artifact directories are hidden with a dot prefix and deleted after failure. Terminal errors are truncated before database storage. A worker restart leaves already-running jobs visible for operational inspection; a future recovery command may requeue them after an operator confirms that no worker owns them. Calculation and quality errors are distinguished from orchestration/network/model errors.
 
 History pages fetch one more row than requested and emit a cursor only when another row exists. Equal timestamps use the UUID as a deterministic tie-breaker. New concurrent inserts appear on a future first-page read rather than inside an existing continuation sequence. Unsupported cursor versions and malformed payloads fail closed.
 
 ## 8. Security and privacy
 
-Birth context is untrusted data enclosed in a JSON input boundary. API keys use digest comparison. Provider and orchestrator credentials use Authorization headers. Artifact names are allow-listed and path-resolved. HTML is escaped. UUIDs avoid personal filenames. Container execution uses a non-root account. Production must use TLS, restricted artifact storage, secret management, log redaction, and retention/deletion procedures.
+Birth context is untrusted data enclosed in a JSON input boundary. API keys use digest comparison. The gateway credential uses the Authorization header. Artifact names are allow-listed and path-resolved. HTML is escaped. UUIDs avoid personal filenames. Container execution uses a non-root account. Production must use TLS, restricted artifact storage, secret management, log redaction, and retention/deletion procedures.
+
+Provider-native credentials are not Four Pillars product configuration. They remain inside the Contextual Orchestrator trust boundary. The repository's normal quality/release workflows receive no model credential; the manual live lane receives only the gateway token and URL.
 
 Report-history responses and cursors exclude subject labels, birth data, user notes, request fingerprints, idempotency material, generated copy, model traces, and artifact paths. The history cursor is not an authorization credential; the same optional API-key dependency protects the endpoint.
 
@@ -104,7 +115,7 @@ Interpretation attribution contains organizational labels only. It must never co
 
 ## 9. Observability
 
-Health checks prove process availability; readiness verifies artifact writes and database reads. Job rows record state and timestamps. `traces.json` records model, request-attempt count, and schema-repair count without storing credentials or model content. `manifest.json` records calculation fingerprint, model, prompt versions, and file hashes. Contextual Orchestrator may maintain its own usage and cost ledger by approved organizational dimensions.
+Health checks prove process availability; readiness verifies artifact writes and database reads. Job rows record state and timestamps. `traces.json` records virtual model, request-attempt count, and schema-repair count without storing credentials or raw model content. `manifest.json` records calculation fingerprint, virtual model, prompt versions, and file hashes. Contextual Orchestrator owns provider-route telemetry and may maintain its own usage/cost ledger by approved organizational dimensions.
 
 Current generation traces are not W3C distributed traces. A future separately reviewed change may propagate `traceparent` and `tracestate` under the target-state controls in `docs/standards/TRACEABILITY.md`.
 
@@ -112,7 +123,9 @@ Current generation traces are not W3C distributed traces. A future separately re
 
 Unit tests cover known pillars, all twelve externally published 2026 solar-term instants and transitions, time policies, ten gods, daewoon direction, monthly period dates, queue transitions, idempotent creation, strict history cursors, stable multi-page traversal, privacy redaction, optional adapter behavior, quality rules, report rendering, and API authentication.
 
-Structured-generation contract tests use `httpx.MockTransport` to verify both direct NIM and orchestrator authentication, endpoint shape, JSON mode, attribution, routing, schema validation, bounded repair, transient retry, terminal error, backend selection, and no-fallback behavior. Live direct NIM tests are marked and skipped without `NVIDIA_NIM_API_KEY`.
+Offline orchestration contract tests use `httpx.MockTransport` to verify gateway authentication, endpoint shape, `orchestrator/free`, attribution, routing, absence of provider passthrough fields, schema validation, bounded repair, transient retry, terminal error, direct-backend rejection, non-free-model rejection, and no-fallback behavior.
+
+Live model tests are marked `orchestrator_live`, require an independently deployed gateway and `CONTEXTUAL_ORCHESTRATOR_TOKEN`, and assert that the trace remains `orchestrator/free`. No provider-native secret is available to the live workflow.
 
 CI compiles source, validates documents/prompts, runs Ruff, enforces exactly 100 percent statement and branch coverage, builds distributions, and verifies the pinned runtime container. LLM judge results are supplementary because peer-reviewed research documents adversarial and judgment-bias risks.
 
@@ -120,7 +133,9 @@ CI compiles source, validates documents/prompts, runs Ruff, enforces exactly 100
 
 The same image runs API or worker commands. Docker Compose mounts one shared artifact volume. SQLite is appropriate for a single-node deployment; a multi-node edition should replace `JobStore` with PostgreSQL or a managed queue while preserving required and optional application interfaces. A history-capable remote adapter must preserve deterministic exclusive keyset ordering across every API instance.
 
-Direct NIM remains the default independent product. An organization module may select Contextual Orchestrator without installing it as a Python dependency or changing domain/application contracts. The Contextual Orchestrator URL and token are deployment concerns; the gateway may itself be shared with central `.github`, `naruon`, and other services.
+LLM-backed interpretation always uses Contextual Orchestrator in repository-owned composition. The gateway URL and token are deployment concerns; the gateway may itself be shared with central `.github`, `naruon`, and other services. The product can still be deployed independently as an application, but model-provider routing is intentionally a shared infrastructure responsibility.
+
+The repository keeps one local model-free hourly quality sentinel. Model-backed autonomous product development is coordinated by the organization-level CWL hourly maintainer instead of a second provider-credentialed writer inside this repository.
 
 ## 12. Standards and research traceability
 
