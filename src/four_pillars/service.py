@@ -73,11 +73,21 @@ class CalculationBundle(BaseModel):
 
 def calculate_bundle(request: ReportRequest) -> CalculationBundle:
     """Calculate all deterministic evidence required by the report prompts."""
-    chart = calculate_chart(request.birth)
-    daewoon = calculate_daewoon(chart, request.birth.gender)
-    annual = calculate_annual_luck(chart, request.annual_year)
-    monthly = calculate_monthly_luck(chart, request.monthly_year, request.monthly_month)
-    return CalculationBundle(chart=chart, daewoon=daewoon, annual=annual, monthly=monthly)
+    report_request = request
+    natal_chart = calculate_chart(report_request.birth)
+    daewoon_result = calculate_daewoon(natal_chart, report_request.birth.gender)
+    annual_luck = calculate_annual_luck(natal_chart, report_request.annual_year)
+    monthly_luck = calculate_monthly_luck(
+        natal_chart,
+        report_request.monthly_year,
+        report_request.monthly_month,
+    )
+    return CalculationBundle(
+        chart=natal_chart,
+        daewoon=daewoon_result,
+        annual=annual_luck,
+        monthly=monthly_luck,
+    )
 
 
 class ReportService:
@@ -105,7 +115,8 @@ class ReportService:
 
     def enqueue(self, request: ReportRequest) -> ReportJob:
         """Persist one validated report request as a queued job."""
-        return self.store.create(request.model_dump(mode="json"))
+        report_request = request
+        return self.store.create(report_request.model_dump(mode="json"))
 
     def enqueue_idempotent(
         self,
@@ -118,16 +129,17 @@ class ReportService:
             IdempotencyNotSupportedError: When an injected legacy repository does
                 not implement ``IdempotentReportJobRepository``.
         """
-        repository = self.store
-        if not isinstance(repository, IdempotentReportJobRepository):
+        report_request = request
+        report_repository = self.store
+        if not isinstance(report_repository, IdempotentReportJobRepository):
             raise IdempotencyNotSupportedError(
                 "The configured report repository does not support idempotent creation"
             )
-        payload = request.model_dump(mode="json")
-        return repository.create_idempotent(
-            payload,
+        report_payload = report_request.model_dump(mode="json")
+        return report_repository.create_idempotent(
+            report_payload,
             idempotency_key_digest,
-            request_fingerprint(payload),
+            request_fingerprint(report_payload),
         )
 
     def list_jobs(
@@ -143,105 +155,121 @@ class ReportService:
             HistoryNotSupportedError: When an injected legacy repository does not
                 implement ``ReportJobHistoryRepository``.
         """
-        repository = self.store
-        if not isinstance(repository, ReportJobHistoryRepository):
+        report_repository = self.store
+        if not isinstance(report_repository, ReportJobHistoryRepository):
             raise HistoryNotSupportedError(
                 "The configured report repository does not support report history"
             )
-        return repository.list_jobs(limit=limit, cursor=cursor, status=status)
+        return report_repository.list_jobs(limit=limit, cursor=cursor, status=status)
 
     async def generate(
         self,
         request: ReportRequest,
     ) -> tuple[CalculationBundle, GeneratedReport]:
         """Calculate immutable evidence and invoke the configured interpretation port."""
-        bundle = calculate_bundle(request)
-        generated = await self.interpreter.generate(
-            subject_name=request.subject_name,
-            chart=bundle.chart,
-            daewoon=bundle.daewoon,
-            annual=bundle.annual,
-            monthly=bundle.monthly,
-            user_context=request.user_context,
+        report_request = request
+        calculation_bundle = calculate_bundle(report_request)
+        generated_report = await self.interpreter.generate(
+            subject_name=report_request.subject_name,
+            chart=calculation_bundle.chart,
+            daewoon=calculation_bundle.daewoon,
+            annual=calculation_bundle.annual,
+            monthly=calculation_bundle.monthly,
+            user_context=report_request.user_context,
         )
-        return bundle, generated
+        return calculation_bundle, generated_report
 
-    async def process(self, job: ReportJob) -> ReportJob:
+    async def process(self, report_job: ReportJob) -> ReportJob:
         """Generate one claimed job and atomically publish or fail its artifacts."""
-        request = ReportRequest.model_validate(job.request)
-        temporary = self.settings.artifact_dir / f".{job.id}.tmp"
-        final = self.settings.artifact_dir / job.id
-        shutil.rmtree(temporary, ignore_errors=True)
-        shutil.rmtree(final, ignore_errors=True)
+        report_request = ReportRequest.model_validate(report_job.report_request)
+        temporary_artifact_directory = (
+            self.settings.artifact_dir / f".{report_job.report_job_id}.tmp"
+        )
+        final_artifact_directory = self.settings.artifact_dir / report_job.report_job_id
+        shutil.rmtree(temporary_artifact_directory, ignore_errors=True)
+        shutil.rmtree(final_artifact_directory, ignore_errors=True)
         try:
-            bundle, generated = await self.generate(request)
+            calculation_bundle, generated_report = await self.generate(report_request)
             self.publisher.publish(
-                temporary,
-                report=generated.report,
-                chart=bundle.chart,
-                daewoon=bundle.daewoon,
-                annual=bundle.annual,
-                monthly=bundle.monthly,
-                traces=generated.traces,
+                temporary_artifact_directory,
+                report=generated_report.report,
+                chart=calculation_bundle.chart,
+                daewoon=calculation_bundle.daewoon,
+                annual=calculation_bundle.annual,
+                monthly=calculation_bundle.monthly,
+                traces=generated_report.traces,
             )
-            temporary.replace(final)
-            return self.store.finish(job.id, final)
-        except ReportQualityError as exc:
-            shutil.rmtree(temporary, ignore_errors=True)
-            return self.store.fail(job.id, str(exc), quality=True)
-        except Exception as exc:
-            shutil.rmtree(temporary, ignore_errors=True)
-            return self.store.fail(job.id, f"{type(exc).__name__}: {exc}")
+            temporary_artifact_directory.replace(final_artifact_directory)
+            return self.store.finish(
+                report_job.report_job_id,
+                final_artifact_directory,
+            )
+        except ReportQualityError as quality_exception:
+            shutil.rmtree(temporary_artifact_directory, ignore_errors=True)
+            return self.store.fail(
+                report_job.report_job_id,
+                str(quality_exception),
+                quality=True,
+            )
+        except Exception as processing_exception:
+            shutil.rmtree(temporary_artifact_directory, ignore_errors=True)
+            return self.store.fail(
+                report_job.report_job_id,
+                f"{type(processing_exception).__name__}: {processing_exception}",
+            )
 
     async def process_next(self) -> ReportJob | None:
         """Claim and process the next queued job, or return ``None`` when idle."""
-        job = self.store.claim_next()
-        if job is None:
+        claimed_report_job = self.store.claim_next()
+        if claimed_report_job is None:
             return None
-        return await self.process(job)
+        return await self.process(claimed_report_job)
 
     async def worker(self, poll_seconds: float = 1.0) -> None:
         """Continuously process queued jobs and sleep only while the queue is empty."""
         while True:
-            processed = await self.process_next()
-            if processed is None:
+            processed_report_job = await self.process_next()
+            if processed_report_job is None:
                 await asyncio.sleep(poll_seconds)
 
     def artifact(self, job_id: str, filename: str) -> Path:
         """Resolve one allow-listed artifact while enforcing its configured UUID boundary."""
         if filename not in ARTIFACT_NAMES:
             raise ValueError("Unsupported artifact name")
-        job = self.store.get(job_id)
-        if job is None or job.artifact_dir is None:
+        report_job = self.store.get(job_id)
+        if report_job is None or report_job.artifact_directory is None:
             raise FileNotFoundError(job_id)
-        configured_root = self.settings.artifact_dir.resolve()
-        root = Path(job.artifact_dir).resolve()
-        if root.parent != configured_root or root.name != job.id:
+        configured_artifact_root = self.settings.artifact_dir.resolve()
+        artifact_directory = Path(report_job.artifact_directory).resolve()
+        if (
+            artifact_directory.parent != configured_artifact_root
+            or artifact_directory.name != report_job.report_job_id
+        ):
             raise FileNotFoundError(job_id)
-        candidate = (root / filename).resolve()
-        if candidate.parent != root or not candidate.is_file():
+        artifact_path = (artifact_directory / filename).resolve()
+        if artifact_path.parent != artifact_directory or not artifact_path.is_file():
             raise FileNotFoundError(filename)
-        return candidate
+        return artifact_path
 
     def available_artifacts(self, job_id: str) -> list[str]:
         """Return the sorted allow-listed artifact names that safely exist for a job."""
-        available: list[str] = []
-        for filename in sorted(ARTIFACT_NAMES):
+        available_artifact_names: list[str] = []
+        for artifact_name in sorted(ARTIFACT_NAMES):
             try:
-                self.artifact(job_id, filename)
+                self.artifact(job_id, artifact_name)
             except FileNotFoundError:
                 continue
-            available.append(filename)
-        return available
+            available_artifact_names.append(artifact_name)
+        return available_artifact_names
 
 
 def default_request(subject_name: str, birth: BirthInput) -> ReportRequest:
     """Create a report request targeting the current local year and month."""
-    now = datetime.now()
+    current_local_time = datetime.now()
     return ReportRequest(
         subject_name=subject_name,
         birth=birth,
-        annual_year=now.year,
-        monthly_year=now.year,
-        monthly_month=now.month,
+        annual_year=current_local_time.year,
+        monthly_year=current_local_time.year,
+        monthly_month=current_local_time.month,
     )
