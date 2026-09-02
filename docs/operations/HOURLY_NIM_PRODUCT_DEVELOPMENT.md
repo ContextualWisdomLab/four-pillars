@@ -13,9 +13,10 @@ avoids the busiest scheduler boundary. A repository-scoped concurrency group
 does not cancel an active run.
 
 Before checkout or model execution, the proposal job reads at most one open pull
-request. Unreadable inventory, any open PR, a missing `NVIDIA_NIM_API_KEY`, or a
-missing Maintainer App configuration produces a stable fail-closed no-op. A dry
-run may print the task contract without either credential.
+request. Unreadable inventory, any open PR, none of the five org provider
+secrets configured, or a missing Maintainer App configuration produces a
+stable fail-closed no-op. A dry run may print the task contract without either
+credential.
 
 When a PR exists, normal review → repair → exact-head Checks → merge governance
 owns the hour. The scheduler does not create a competing branch.
@@ -24,7 +25,12 @@ owns the hour. The scheduler does not create a competing branch.
 
 Configure these repository or organization values:
 
-- Secret `NVIDIA_NIM_API_KEY` for the proposal runner only.
+- At least one of the five org provider secrets for the vendored
+  contextual-orchestrator gateway sidecar: `BYTEZ_API_KEY`,
+  `NVIDIA_NIM_API_KEY`, `NVIDIA_NIM_API_KEY_SUB`, `OPENROUTER_API_KEY`,
+  `OPENAI_API_KEY`. Each is optional individually; auto-discovery skips a
+  provider whose secret is absent. These reach only the proposal runner's
+  gateway-start step, never the model-execution step.
 - Variable `FOUR_PILLARS_MAINTAINER_APP_CLIENT_ID`.
 - Secret `FOUR_PILLARS_MAINTAINER_APP_PRIVATE_KEY`.
 - A repository-scoped GitHub App installation with metadata read, contents
@@ -44,12 +50,25 @@ developer disabled rather than falling back to `GITHUB_TOKEN`.
 
 The proposal runner has read-only repository and pull-request permissions.
 OpenCode is downloaded from an immutable versioned URL and checked against a
-committed SHA-256. Its only model provider is NVIDIA NIM.
+committed SHA-256. Its only model provider is the vendored
+[contextual-orchestrator](https://github.com/ContextualWisdomLab/contextual-orchestrator)
+gateway, pinned to the fail-closed `orchestrator/free` pool (same vendoring
+commit `ContextualWisdomLab/.github`'s central review sidecar trusts). A
+dedicated step git-clones that pinned commit, installs its hash-locked
+dependencies into an isolated virtual environment (never the runner's own
+`requirements/ci.txt` interpreter), and starts it as a loopback-only HTTP
+process authenticated by a per-run ephemeral bearer token before OpenCode
+runs.
 
-The OpenCode process receives `NVIDIA_NIM_API_KEY` but has GitHub, OIDC, Actions
-runtime/cache, and runner command-file variables removed. Network tools, GitHub
-CLI, remote Git operations, commits, pushes, tags, external-directory access,
-task delegation, interactive questions, and OpenCode web tools are denied.
+The gateway-start step alone receives the five org provider secrets and
+registers them into the gateway process's own in-memory credential store;
+they are never read again from the environment afterward. The OpenCode
+process itself receives only the ephemeral `CONTEXTUAL_ORCHESTRATOR_TOKEN`
+bearer — valid solely against `127.0.0.1` for this one run — plus GitHub,
+OIDC, Actions runtime/cache, and runner command-file variables removed.
+Network tools, GitHub CLI, remote Git operations, commits, pushes, tags,
+external-directory access, task delegation, interactive questions, and
+OpenCode web tools are denied.
 
 The model may edit the local working tree and run repository tests. The trusted
 step stages the complete proposal, rejects whitespace errors, symbolic links,
@@ -103,14 +122,15 @@ Stable no-op reasons are:
 
 - `pull_request_inventory_unavailable`
 - `open_pull_request`
-- `nim_api_key_unavailable`
+- `provider_api_key_unavailable`
 - `maintainer_app_unavailable`
 - `ready_dry_run_without_credentials`
 
-A failed model candidate is discarded before a later candidate runs. A cleanup
-or reinstall failure stops fallback. A failed verifier publishes nothing. A
-publisher aborts if the artifact, base, queue, or metadata changed. If branch
-push succeeds but PR creation fails, the error trap removes the orphan branch.
+If the vendored gateway does not answer `/healthz` within its startup budget,
+the step fails closed with the tail of its own log rather than falling back to
+a direct provider call. A failed verifier publishes nothing. A publisher
+aborts if the artifact, base, queue, or metadata changed. If branch push
+succeeds but PR creation fails, the error trap removes the orphan branch.
 
 Investigate the exact run and job log, reproduce the relevant command on the
 same commit, add or retain a failing regression, and repair through a normal PR.
@@ -131,10 +151,15 @@ references them.
 
 ## Residual risks
 
-- The model process necessarily receives the NIM credential. A future narrow
-  inference broker could keep the upstream secret outside the model process.
-- NVIDIA NIM may process repository source; operators must review confidentiality,
-  retention, regional, and contractual obligations.
+- The model process no longer receives any upstream provider credential
+  directly (resolving the prior residual risk): only the loopback-scoped,
+  per-run gateway bearer token, generated fresh each run and invalid outside
+  it. The vendored gateway process itself still holds the five provider
+  secrets in memory for the run's duration.
+- Whichever upstream provider the gateway's live discovery selects for a run
+  may process repository source; operators must review confidentiality,
+  retention, regional, and contractual obligations for every provider behind
+  `orchestrator/free`, not NVIDIA NIM alone.
 - The verifier executes untrusted code on an ephemeral hosted runner with
   outbound network access, but receives no publication, NIM, OIDC, artifact/cache
   runtime, command-file, or reviewer credential.

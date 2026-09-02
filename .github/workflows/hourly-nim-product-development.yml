@@ -25,10 +25,19 @@ env:
   # for the newer Linux x64 asset is committed.
   OPENCODE_VERSION: "1.17.13"
   OPENCODE_SHA256: 157afa289d1a8d9372de0ce19ac726119b937a1f6b201808d46f06e4e59bb348
-  OPENCODE_MODELS: >-
-    nvidia-nim/nvidia/llama-3.3-nemotron-super-49b-v1.5
-    nvidia-nim/nvidia/nemotron-3-super-120b-a12b
-    nvidia-nim/deepseek-ai/deepseek-v4-pro
+  # The single virtual model served by the vendored contextual-orchestrator
+  # gateway (see "Vendor and start the contextual-orchestrator gateway"
+  # below). The gateway itself fails closed across every live-discovered
+  # free-priced provider route, so OpenCode no longer needs its own
+  # named-model fallback list.
+  OPENCODE_MODEL: contextual_orchestrator_gateway/orchestrator/free
+  # Same contextual-orchestrator commit ContextualWisdomLab/.github's central
+  # review sidecar pins (scripts/ci/contextual_orchestrator_review_sidecar.sh)
+  # so the org tracks one reviewed vendoring commit, not several drifting ones.
+  ORCHESTRATOR_PIN_SHA: 045d17da5e2aea56a97e241ee158ab1628d78660
+  ORCHESTRATOR_GIT_URL: https://github.com/ContextualWisdomLab/contextual-orchestrator.git
+  ORCHESTRATOR_HOST: 127.0.0.1
+  ORCHESTRATOR_PORT: "8000"
   OPENCODE_RUN_TIMEOUT_SECONDS: "900"
   OPENCODE_KILL_GRACE_SECONDS: "30"
   MAX_CHANGED_FILES: "40"
@@ -60,7 +69,16 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          NIM_CONFIGURED: ${{ secrets.NVIDIA_NIM_API_KEY != '' }}
+          # At least one of the five org provider secrets must be configured
+          # for the vendored contextual-orchestrator gateway's live discovery
+          # to seed a non-empty orchestrator/free pool. Matching
+          # ContextualWisdomLab/.github's sidecar contract, an individual
+          # missing secret is fine; auto-discovery just skips that provider.
+          BYTEZ_CONFIGURED: ${{ secrets.BYTEZ_API_KEY != '' }}
+          NVIDIA_NIM_CONFIGURED: ${{ secrets.NVIDIA_NIM_API_KEY != '' }}
+          NVIDIA_NIM_SUB_CONFIGURED: ${{ secrets.NVIDIA_NIM_API_KEY_SUB != '' }}
+          OPENROUTER_CONFIGURED: ${{ secrets.OPENROUTER_API_KEY != '' }}
+          OPENAI_CONFIGURED: ${{ secrets.OPENAI_API_KEY != '' }}
           APP_ID_CONFIGURED: ${{ vars.FOUR_PILLARS_MAINTAINER_APP_CLIENT_ID != '' }}
           APP_KEY_CONFIGURED: ${{ secrets.FOUR_PILLARS_MAINTAINER_APP_PRIVATE_KEY != '' }}
         run: |
@@ -75,9 +93,11 @@ jobs:
             echo 'reason=open_pull_request' >>"$GITHUB_OUTPUT"
             exit 0
           fi
-          if [ "$NIM_CONFIGURED" != true ] && [ "$DRY_RUN" != true ]; then
+          if [ "$BYTEZ_CONFIGURED" != true ] && [ "$NVIDIA_NIM_CONFIGURED" != true ] \
+            && [ "$NVIDIA_NIM_SUB_CONFIGURED" != true ] && [ "$OPENROUTER_CONFIGURED" != true ] \
+            && [ "$OPENAI_CONFIGURED" != true ] && [ "$DRY_RUN" != true ]; then
             echo 'dispatch=false' >>"$GITHUB_OUTPUT"
-            echo 'reason=nim_api_key_unavailable' >>"$GITHUB_OUTPUT"
+            echo 'reason=provider_api_key_unavailable' >>"$GITHUB_OUTPUT"
             exit 0
           fi
           if { [ "$APP_ID_CONFIGURED" != true ] || [ "$APP_KEY_CONFIGURED" != true ]; } \
@@ -174,7 +194,67 @@ jobs:
           install -D -m 0755 "$RUNNER_TEMP/opencode" "$HOME/.opencode/bin/opencode"
           echo "$HOME/.opencode/bin" >>"$GITHUB_PATH"
 
-      - name: Configure OpenCode for NVIDIA NIM only
+      - name: Vendor the contextual-orchestrator gateway
+        if: steps.gate.outputs.dispatch == 'true' && env.DRY_RUN != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          orchestrator_source="$RUNNER_TEMP/contextual-orchestrator"
+          rm -rf "$orchestrator_source"
+          git clone --quiet --filter=blob:none --no-checkout \
+            "$ORCHESTRATOR_GIT_URL" "$orchestrator_source"
+          git -C "$orchestrator_source" -c advice.detachedHead=false \
+            checkout --quiet "$ORCHESTRATOR_PIN_SHA"
+          checked_out="$(git -C "$orchestrator_source" rev-parse HEAD)"
+          [ "$checked_out" = "$ORCHESTRATOR_PIN_SHA" ]
+          # An isolated venv keeps the gateway's own hash-pinned dependency
+          # set (fastapi, alembic, ...) from ever touching the interpreter
+          # this job's own requirements/ci.txt install and the agent's own
+          # `pytest`/`ruff` invocations rely on.
+          python -m venv "$RUNNER_TEMP/orchestrator-venv"
+          "$RUNNER_TEMP/orchestrator-venv/bin/pip" install --quiet \
+            --disable-pip-version-check --no-cache-dir --require-hashes \
+            --no-deps -r "$orchestrator_source/requirements.lock"
+
+      - name: Start the contextual-orchestrator gateway (orchestrator/free)
+        if: steps.gate.outputs.dispatch == 'true' && env.DRY_RUN != 'true'
+        shell: bash
+        env:
+          # Bootstrap transport only: scripts/ci/serve_seeded_gateway.py
+          # registers these into its own process-local KV and pops them from
+          # its environment immediately; the opencode agent's own step below
+          # never receives any of them, only the ephemeral loopback bearer.
+          BYTEZ_API_KEY: ${{ secrets.BYTEZ_API_KEY }}
+          NVIDIA_NIM_API_KEY: ${{ secrets.NVIDIA_NIM_API_KEY }}
+          NVIDIA_NIM_API_KEY_SUB: ${{ secrets.NVIDIA_NIM_API_KEY_SUB }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+          gateway_token="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+          echo "::add-mask::$gateway_token"
+          echo "CONTEXTUAL_ORCHESTRATOR_TOKEN=$gateway_token" >>"$GITHUB_ENV"
+          export CONTEXTUAL_ORCHESTRATOR_TOKEN="$gateway_token"
+          cd "$RUNNER_TEMP/contextual-orchestrator"
+          nohup "$RUNNER_TEMP/orchestrator-venv/bin/python" \
+            -m scripts.ci.serve_seeded_gateway \
+            --serve --agents examples/agents.mock.json --auto-discover-model-agents \
+            --auth-token-key CONTEXTUAL_ORCHESTRATOR_TOKEN \
+            --host "$ORCHESTRATOR_HOST" --port "$ORCHESTRATOR_PORT" \
+            >"$RUNNER_TEMP/orchestrator-gateway.log" 2>&1 &
+          for _attempt in $(seq 1 30); do
+            if curl -fsS -H "Authorization: Bearer ${CONTEXTUAL_ORCHESTRATOR_TOKEN}" \
+              "http://${ORCHESTRATOR_HOST}:${ORCHESTRATOR_PORT}/healthz" >/dev/null 2>&1; then
+              echo 'gateway ready'
+              exit 0
+            fi
+            sleep 2
+          done
+          echo '::error::contextual-orchestrator gateway did not become healthy'
+          tail -n 100 "$RUNNER_TEMP/orchestrator-gateway.log"
+          exit 1
+
+      - name: Configure OpenCode for the contextual-orchestrator gateway
         if: steps.gate.outputs.dispatch == 'true' && env.DRY_RUN != 'true'
         shell: bash
         run: |
@@ -185,7 +265,7 @@ jobs:
             "autoupdate": false,
             "lsp": false,
             "mcp": {},
-            "enabled_providers": ["nvidia-nim"],
+            "enabled_providers": ["contextual_orchestrator_gateway"],
             "permission": {
               "*": "allow",
               "external_directory": "deny",
@@ -209,17 +289,15 @@ jobs:
               }
             },
             "provider": {
-              "nvidia-nim": {
+              "contextual_orchestrator_gateway": {
                 "npm": "@ai-sdk/openai-compatible",
-                "name": "NVIDIA NIM",
+                "name": "Contextual Orchestrator Gateway",
                 "options": {
-                  "baseURL": "https://integrate.api.nvidia.com/v1",
-                  "apiKey": "{env:NVIDIA_NIM_API_KEY}"
+                  "baseURL": "http://127.0.0.1:8000/v1",
+                  "apiKey": "{env:CONTEXTUAL_ORCHESTRATOR_TOKEN}"
                 },
                 "models": {
-                  "nvidia/llama-3.3-nemotron-super-49b-v1.5": {"tool_call": true},
-                  "nvidia/nemotron-3-super-120b-a12b": {"tool_call": true},
-                  "deepseek-ai/deepseek-v4-pro": {"tool_call": true}
+                  "orchestrator/free": {"tool_call": true}
                 }
               }
             }
@@ -227,11 +305,13 @@ jobs:
           CONFIG
           chmod 0400 "$RUNNER_TEMP/opencode.json"
 
-      - name: Run bounded NVIDIA NIM fallback
+      - name: Run the hourly product-development agent
         if: steps.gate.outputs.dispatch == 'true' && env.DRY_RUN != 'true'
         shell: bash
         env:
-          NVIDIA_NIM_API_KEY: ${{ secrets.NVIDIA_NIM_API_KEY }}
+          # CONTEXTUAL_ORCHESTRATOR_TOKEN is already in this job's environment
+          # (the previous step wrote it to $GITHUB_ENV); OpenCode resolves it
+          # itself via the config's {env:CONTEXTUAL_ORCHESTRATOR_TOKEN}.
           OPENCODE_CONFIG: ${{ runner.temp }}/opencode.json
           OPENCODE_DISABLE_AUTOUPDATE: 'true'
           XDG_CONFIG_HOME: ${{ runner.temp }}/opencode-config
@@ -239,33 +319,15 @@ jobs:
         run: |
           set -euo pipefail
           prompt="$(cat "$RUNNER_TEMP/agent-prompt.md")"
-          status=1
-          read -r -a models <<<"$OPENCODE_MODELS"
-          model_count=${#models[@]}
-          for ((model_index = 0; model_index < model_count; model_index++)); do
-            model="${models[$model_index]}"
-            if timeout --kill-after="${OPENCODE_KILL_GRACE_SECONDS}s" \
-              "${OPENCODE_RUN_TIMEOUT_SECONDS}s" \
-              env -u GH_TOKEN -u GITHUB_TOKEN -u REPOSITORY_TOKEN \
-              -u ACTIONS_ID_TOKEN_REQUEST_TOKEN -u ACTIONS_ID_TOKEN_REQUEST_URL \
-              -u ACTIONS_RUNTIME_TOKEN -u ACTIONS_RUNTIME_URL \
-              -u ACTIONS_RESULTS_URL -u ACTIONS_CACHE_URL \
-              -u GITHUB_ENV -u GITHUB_OUTPUT -u GITHUB_PATH \
-              -u GITHUB_STATE -u GITHUB_STEP_SUMMARY \
-              opencode run "$prompt" --agent build --model "$model"; then
-              status=0
-              break
-            fi
-            if [ "$model_index" -eq $((model_count - 1)) ]; then
-              break
-            fi
-            git reset --hard HEAD
-            git clean -fdx
-            env -u NVIDIA_NIM_API_KEY \
-              timeout --kill-after=15s 180s \
-              python -m pip install --require-hashes -r requirements/ci.txt
-          done
-          [ "$status" -eq 0 ] || { echo '::error::All NIM candidates failed'; exit 1; }
+          timeout --kill-after="${OPENCODE_KILL_GRACE_SECONDS}s" \
+            "${OPENCODE_RUN_TIMEOUT_SECONDS}s" \
+            env -u GH_TOKEN -u GITHUB_TOKEN -u REPOSITORY_TOKEN \
+            -u ACTIONS_ID_TOKEN_REQUEST_TOKEN -u ACTIONS_ID_TOKEN_REQUEST_URL \
+            -u ACTIONS_RUNTIME_TOKEN -u ACTIONS_RUNTIME_URL \
+            -u ACTIONS_RESULTS_URL -u ACTIONS_CACHE_URL \
+            -u GITHUB_ENV -u GITHUB_OUTPUT -u GITHUB_PATH \
+            -u GITHUB_STATE -u GITHUB_STEP_SUMMARY \
+            opencode run "$prompt" --agent build --model "$OPENCODE_MODEL"
 
       - name: Verify, bound, and export the uncredentialed proposal
         id: proposal
