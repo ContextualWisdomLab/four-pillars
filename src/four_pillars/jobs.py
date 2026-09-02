@@ -14,6 +14,38 @@ from .idempotency import request_fingerprint
 from .models import JobStatus, ReportJob
 
 
+LEGACY_REPORT_JOB_COLUMN_MIGRATIONS: tuple[tuple[str, str], ...] = (
+    ("id", "ALTER TABLE report_jobs RENAME COLUMN id TO report_job_id"),
+    ("status", "ALTER TABLE report_jobs RENAME COLUMN status TO job_status"),
+    (
+        "request_json",
+        "ALTER TABLE report_jobs RENAME COLUMN request_json TO report_request_json",
+    ),
+    (
+        "created_at",
+        "ALTER TABLE report_jobs RENAME COLUMN created_at TO job_created_at",
+    ),
+    (
+        "updated_at",
+        "ALTER TABLE report_jobs RENAME COLUMN updated_at TO job_updated_at",
+    ),
+    (
+        "error",
+        "ALTER TABLE report_jobs RENAME COLUMN error TO failure_message",
+    ),
+    (
+        "artifact_dir",
+        "ALTER TABLE report_jobs RENAME COLUMN artifact_dir TO artifact_directory",
+    ),
+)
+
+LEGACY_REPORT_JOB_INDEX_NAMES: tuple[str, ...] = (
+    "idx_report_jobs_status_created",
+    "idx_report_jobs_created_id",
+    "idx_report_jobs_status_created_id",
+)
+
+
 class IdempotencyKeyReuseError(ValueError):
     """Signal that one idempotency key was reused for a different request."""
 
@@ -28,130 +60,164 @@ class JobStore:
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.database_path, timeout=30, isolation_level=None)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA journal_mode=WAL")
-        connection.execute("PRAGMA foreign_keys=ON")
-        return connection
+        database_connection = sqlite3.connect(
+            self.database_path, timeout=30, isolation_level=None
+        )
+        database_connection.row_factory = sqlite3.Row
+        database_connection.execute("PRAGMA journal_mode=WAL")
+        database_connection.execute("PRAGMA foreign_keys=ON")
+        return database_connection
 
     def _initialize(self) -> None:
-        with self._connect() as connection:
-            connection.execute("BEGIN IMMEDIATE")
-            connection.execute(
+        with self._connect() as database_connection:
+            database_connection.execute("BEGIN IMMEDIATE")
+            database_connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS report_jobs (
-                    id TEXT PRIMARY KEY,
-                    status TEXT NOT NULL,
-                    request_json TEXT NOT NULL,
+                    report_job_id TEXT PRIMARY KEY,
+                    job_status TEXT NOT NULL,
+                    report_request_json TEXT NOT NULL,
                     request_fingerprint TEXT NOT NULL,
                     idempotency_key_digest TEXT,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    error TEXT,
-                    artifact_dir TEXT
+                    job_created_at TEXT NOT NULL,
+                    job_updated_at TEXT NOT NULL,
+                    failure_message TEXT,
+                    artifact_directory TEXT
                 )
                 """
             )
-            columns = {
-                row["name"] for row in connection.execute("PRAGMA table_info(report_jobs)")
+            column_names = {
+                schema_row["name"]
+                for schema_row in database_connection.execute(
+                    "PRAGMA table_info(report_jobs)"
+                )
             }
-            if "request_fingerprint" not in columns:
-                connection.execute(
+            for legacy_column_name, migration_statement in (
+                LEGACY_REPORT_JOB_COLUMN_MIGRATIONS
+            ):
+                if legacy_column_name in column_names:
+                    database_connection.execute(migration_statement)
+                    column_names = {
+                        schema_row["name"]
+                        for schema_row in database_connection.execute(
+                            "PRAGMA table_info(report_jobs)"
+                        )
+                    }
+            if "request_fingerprint" not in column_names:
+                database_connection.execute(
                     "ALTER TABLE report_jobs ADD COLUMN request_fingerprint TEXT"
                 )
-            if "idempotency_key_digest" not in columns:
-                connection.execute(
+            if "idempotency_key_digest" not in column_names:
+                database_connection.execute(
                     "ALTER TABLE report_jobs ADD COLUMN idempotency_key_digest TEXT"
                 )
-            legacy_rows = connection.execute(
+            legacy_job_rows = database_connection.execute(
                 """
-                SELECT id, request_json
+                SELECT report_job_id, report_request_json
                 FROM report_jobs
                 WHERE request_fingerprint IS NULL OR request_fingerprint=''
                 """
             ).fetchall()
-            for row in legacy_rows:
-                fingerprint = request_fingerprint(json.loads(row["request_json"]))
-                connection.execute(
-                    "UPDATE report_jobs SET request_fingerprint=? WHERE id=?",
-                    (fingerprint, row["id"]),
+            for legacy_job_row in legacy_job_rows:
+                report_request_fingerprint = request_fingerprint(
+                    json.loads(legacy_job_row["report_request_json"])
                 )
-            connection.execute(
-                "CREATE INDEX IF NOT EXISTS idx_report_jobs_status_created ON report_jobs(status, created_at)"
+                database_connection.execute(
+                    "UPDATE report_jobs SET request_fingerprint=? WHERE report_job_id=?",
+                    (
+                        report_request_fingerprint,
+                        legacy_job_row["report_job_id"],
+                    ),
+                )
+            for legacy_index_name in LEGACY_REPORT_JOB_INDEX_NAMES:
+                database_connection.execute(
+                    f"DROP INDEX IF EXISTS {legacy_index_name}"
+                )
+            database_connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_report_jobs_job_status_job_created_at
+                ON report_jobs(job_status, job_created_at)
+                """
             )
-            connection.execute(
+            database_connection.execute(
                 """
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_report_jobs_idempotency_key_digest
                 ON report_jobs(idempotency_key_digest)
                 WHERE idempotency_key_digest IS NOT NULL
                 """
             )
-            connection.execute(
+            database_connection.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_report_jobs_created_id
-                ON report_jobs(created_at DESC, id DESC)
-                """
-            )
-            connection.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_report_jobs_status_created_id
-                ON report_jobs(status, created_at DESC, id DESC)
+                CREATE INDEX IF NOT EXISTS idx_report_jobs_job_created_at_report_job_id
+                ON report_jobs(job_created_at DESC, report_job_id DESC)
                 """
             )
-            connection.execute("COMMIT")
+            database_connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_report_jobs_job_status_job_created_at_report_job_id
+                ON report_jobs(job_status, job_created_at DESC, report_job_id DESC)
+                """
+            )
+            database_connection.execute("COMMIT")
 
     @staticmethod
-    def _row(row: sqlite3.Row | None) -> ReportJob | None:
-        if row is None:
+    def _report_job_from_row(job_row: sqlite3.Row | None) -> ReportJob | None:
+        """Translate one persisted report-job row into the semantic domain model."""
+        if job_row is None:
             return None
         return ReportJob(
-            id=row["id"],
-            status=JobStatus(row["status"]),
-            request=json.loads(row["request_json"]),
-            created_at=datetime.fromisoformat(row["created_at"]),
-            updated_at=datetime.fromisoformat(row["updated_at"]),
-            request_fingerprint=row["request_fingerprint"],
-            idempotency_key_digest=row["idempotency_key_digest"],
-            error=row["error"],
-            artifact_dir=row["artifact_dir"],
+            report_job_id=job_row["report_job_id"],
+            job_status=JobStatus(job_row["job_status"]),
+            report_request=json.loads(job_row["report_request_json"]),
+            job_created_at=datetime.fromisoformat(job_row["job_created_at"]),
+            job_updated_at=datetime.fromisoformat(job_row["job_updated_at"]),
+            request_fingerprint=job_row["request_fingerprint"],
+            idempotency_key_digest=job_row["idempotency_key_digest"],
+            failure_message=job_row["failure_message"],
+            artifact_directory=job_row["artifact_directory"],
         )
 
     @staticmethod
-    def _request_json(request: dict[str, Any]) -> str:
+    def _report_request_json(report_request: dict[str, Any]) -> str:
         """Serialize one validated report request for durable storage."""
-        return json.dumps(request, ensure_ascii=False, default=str)
+        return json.dumps(report_request, ensure_ascii=False, default=str)
 
     def create(self, request: dict[str, Any]) -> ReportJob:
-        """Create and return one queued job containing a JSON-serializable request."""
-        now = datetime.now(UTC)
-        fingerprint = request_fingerprint(request)
-        job = ReportJob(
-            id=str(uuid.uuid4()),
-            status=JobStatus.QUEUED,
-            request=request,
-            created_at=now,
-            updated_at=now,
-            request_fingerprint=fingerprint,
+        """Create and return one queued job containing a JSON-serializable request.
+
+        ``request`` remains the structural-port keyword for compatibility; the
+        persistence implementation immediately translates it to report vocabulary.
+        """
+        report_request = request
+        current_timestamp = datetime.now(UTC)
+        report_request_fingerprint = request_fingerprint(report_request)
+        report_job = ReportJob(
+            report_job_id=str(uuid.uuid4()),
+            job_status=JobStatus.QUEUED,
+            report_request=report_request,
+            job_created_at=current_timestamp,
+            job_updated_at=current_timestamp,
+            request_fingerprint=report_request_fingerprint,
         )
-        with self._connect() as connection:
-            connection.execute(
+        with self._connect() as database_connection:
+            database_connection.execute(
                 """
                 INSERT INTO report_jobs(
-                    id,status,request_json,request_fingerprint,
-                    idempotency_key_digest,created_at,updated_at
+                    report_job_id,job_status,report_request_json,request_fingerprint,
+                    idempotency_key_digest,job_created_at,job_updated_at
                 ) VALUES(?,?,?,?,?,?,?)
                 """,
                 (
-                    job.id,
-                    job.status.value,
-                    self._request_json(request),
-                    fingerprint,
+                    report_job.report_job_id,
+                    report_job.job_status.value,
+                    self._report_request_json(report_request),
+                    report_request_fingerprint,
                     None,
-                    now.isoformat(),
-                    now.isoformat(),
+                    current_timestamp.isoformat(),
+                    current_timestamp.isoformat(),
                 ),
             )
-        return job
+        return report_job
 
     def create_idempotent(
         self,
@@ -160,6 +226,9 @@ class JobStore:
         fingerprint: str,
     ) -> tuple[ReportJob, bool]:
         """Create one job or replay the existing job for the same key and request.
+
+        ``request`` and ``fingerprint`` remain structural-port keyword names for
+        compatibility. They are translated immediately to report-domain vocabulary.
 
         Args:
             request: Validated JSON-compatible report request.
@@ -172,57 +241,64 @@ class JobStore:
         Raises:
             IdempotencyKeyReuseError: When the key already belongs to another request.
         """
-        with self._connect() as connection:
-            connection.execute("BEGIN IMMEDIATE")
-            row = connection.execute(
+        report_request = request
+        report_request_fingerprint = fingerprint
+        with self._connect() as database_connection:
+            database_connection.execute("BEGIN IMMEDIATE")
+            matching_job_row = database_connection.execute(
                 "SELECT * FROM report_jobs WHERE idempotency_key_digest=?",
                 (idempotency_key_digest,),
             ).fetchone()
-            if row is not None:
-                existing = self._row(row)
-                assert existing is not None
-                if existing.request_fingerprint != fingerprint:
+            if matching_job_row is not None:
+                existing_report_job = self._report_job_from_row(matching_job_row)
+                assert existing_report_job is not None
+                if (
+                    existing_report_job.request_fingerprint
+                    != report_request_fingerprint
+                ):
                     raise IdempotencyKeyReuseError(
                         "Idempotency-Key is already used with a different payload"
                     )
-                connection.execute("COMMIT")
-                return existing, True
+                database_connection.execute("COMMIT")
+                return existing_report_job, True
 
-            now = datetime.now(UTC)
-            job = ReportJob(
-                id=str(uuid.uuid4()),
-                status=JobStatus.QUEUED,
-                request=request,
-                created_at=now,
-                updated_at=now,
-                request_fingerprint=fingerprint,
+            current_timestamp = datetime.now(UTC)
+            report_job = ReportJob(
+                report_job_id=str(uuid.uuid4()),
+                job_status=JobStatus.QUEUED,
+                report_request=report_request,
+                job_created_at=current_timestamp,
+                job_updated_at=current_timestamp,
+                request_fingerprint=report_request_fingerprint,
                 idempotency_key_digest=idempotency_key_digest,
             )
-            connection.execute(
+            database_connection.execute(
                 """
                 INSERT INTO report_jobs(
-                    id,status,request_json,request_fingerprint,
-                    idempotency_key_digest,created_at,updated_at
+                    report_job_id,job_status,report_request_json,request_fingerprint,
+                    idempotency_key_digest,job_created_at,job_updated_at
                 ) VALUES(?,?,?,?,?,?,?)
                 """,
                 (
-                    job.id,
-                    job.status.value,
-                    self._request_json(request),
-                    fingerprint,
+                    report_job.report_job_id,
+                    report_job.job_status.value,
+                    self._report_request_json(report_request),
+                    report_request_fingerprint,
                     idempotency_key_digest,
-                    now.isoformat(),
-                    now.isoformat(),
+                    current_timestamp.isoformat(),
+                    current_timestamp.isoformat(),
                 ),
             )
-            connection.execute("COMMIT")
-        return job, False
+            database_connection.execute("COMMIT")
+        return report_job, False
 
     def get(self, job_id: str) -> ReportJob | None:
         """Return one job by UUID or ``None`` when no matching row exists."""
-        with self._connect() as connection:
-            row = connection.execute("SELECT * FROM report_jobs WHERE id=?", (job_id,)).fetchone()
-        return self._row(row)
+        with self._connect() as database_connection:
+            job_row = database_connection.execute(
+                "SELECT * FROM report_jobs WHERE report_job_id=?", (job_id,)
+            ).fetchone()
+        return self._report_job_from_row(job_row)
 
     def list_jobs(
         self,
@@ -231,42 +307,50 @@ class JobStore:
         cursor: str | None = None,
         status: JobStatus | None = None,
     ) -> tuple[list[ReportJob], str | None]:
-        """Return one stable newest-first page of report jobs and its continuation."""
-        if not 1 <= limit <= 100:
+        """Return one stable newest-first page of report jobs and its continuation.
+
+        ``limit``, ``cursor``, and ``status`` remain structural-port keyword names for
+        compatibility and are translated to report-history vocabulary internally.
+        """
+        page_limit = limit
+        history_cursor = cursor
+        job_status_filter = status
+        if not 1 <= page_limit <= 100:
             raise ValueError("Report history limit must be between 1 and 100")
-        boundary: tuple[str, str] | None = None
-        if cursor is not None:
-            created_at, job_id = decode_history_cursor(cursor)
-            boundary = (created_at.isoformat(), job_id)
-        fetch_limit = limit + 1
-        with self._connect() as connection:
-            if status is None and boundary is None:
-                rows = connection.execute(
+        page_boundary: tuple[str, str] | None = None
+        if history_cursor is not None:
+            boundary_created_at, boundary_job_id = decode_history_cursor(history_cursor)
+            page_boundary = (boundary_created_at.isoformat(), boundary_job_id)
+        fetch_limit = page_limit + 1
+        with self._connect() as database_connection:
+            if job_status_filter is None and page_boundary is None:
+                job_rows = database_connection.execute(
                     """
                     SELECT * FROM report_jobs
-                    ORDER BY created_at DESC, id DESC
+                    ORDER BY job_created_at DESC, report_job_id DESC
                     LIMIT ?
                     """,
                     (fetch_limit,),
                 ).fetchall()
-            elif status is not None and boundary is None:
-                rows = connection.execute(
+            elif job_status_filter is not None and page_boundary is None:
+                job_rows = database_connection.execute(
                     """
                     SELECT * FROM report_jobs
-                    WHERE status=?
-                    ORDER BY created_at DESC, id DESC
+                    WHERE job_status=?
+                    ORDER BY job_created_at DESC, report_job_id DESC
                     LIMIT ?
                     """,
-                    (status.value, fetch_limit),
+                    (job_status_filter.value, fetch_limit),
                 ).fetchall()
-            elif status is None:
-                assert boundary is not None
-                boundary_created_at, boundary_job_id = boundary
-                rows = connection.execute(
+            elif job_status_filter is None:
+                assert page_boundary is not None
+                boundary_created_at, boundary_job_id = page_boundary
+                job_rows = database_connection.execute(
                     """
                     SELECT * FROM report_jobs
-                    WHERE created_at < ? OR (created_at = ? AND id < ?)
-                    ORDER BY created_at DESC, id DESC
+                    WHERE job_created_at < ?
+                       OR (job_created_at = ? AND report_job_id < ?)
+                    ORDER BY job_created_at DESC, report_job_id DESC
                     LIMIT ?
                     """,
                     (
@@ -277,89 +361,133 @@ class JobStore:
                     ),
                 ).fetchall()
             else:
-                assert boundary is not None
-                boundary_created_at, boundary_job_id = boundary
-                rows = connection.execute(
+                assert page_boundary is not None
+                boundary_created_at, boundary_job_id = page_boundary
+                job_rows = database_connection.execute(
                     """
                     SELECT * FROM report_jobs
-                    WHERE status=?
-                      AND (created_at < ? OR (created_at = ? AND id < ?))
-                    ORDER BY created_at DESC, id DESC
+                    WHERE job_status=?
+                      AND (
+                        job_created_at < ?
+                        OR (job_created_at = ? AND report_job_id < ?)
+                      )
+                    ORDER BY job_created_at DESC, report_job_id DESC
                     LIMIT ?
                     """,
                     (
-                        status.value,
+                        job_status_filter.value,
                         boundary_created_at,
                         boundary_created_at,
                         boundary_job_id,
                         fetch_limit,
                     ),
                 ).fetchall()
-        has_more = len(rows) > limit
-        jobs = [self._row(row) for row in rows[:limit]]
-        page = [job for job in jobs if job is not None]
-        next_cursor = None
-        if has_more and page:
-            last = page[-1]
-            next_cursor = encode_history_cursor(last.created_at, last.id)
-        return page, next_cursor
+        has_more_jobs = len(job_rows) > page_limit
+        nullable_report_jobs = [
+            self._report_job_from_row(job_row) for job_row in job_rows[:page_limit]
+        ]
+        report_job_page = [
+            report_job
+            for report_job in nullable_report_jobs
+            if report_job is not None
+        ]
+        next_history_cursor = None
+        if has_more_jobs and report_job_page:
+            last_report_job = report_job_page[-1]
+            next_history_cursor = encode_history_cursor(
+                last_report_job.job_created_at,
+                last_report_job.report_job_id,
+            )
+        return report_job_page, next_history_cursor
 
     def claim_next(self) -> ReportJob | None:
         """Atomically claim the oldest queued job for a worker."""
-        now = datetime.now(UTC).isoformat()
-        with self._connect() as connection:
-            connection.execute("BEGIN IMMEDIATE")
-            row = connection.execute(
-                "SELECT id FROM report_jobs WHERE status=? ORDER BY created_at LIMIT 1",
+        current_timestamp = datetime.now(UTC).isoformat()
+        with self._connect() as database_connection:
+            database_connection.execute("BEGIN IMMEDIATE")
+            queued_job_row = database_connection.execute(
+                """
+                SELECT report_job_id FROM report_jobs
+                WHERE job_status=? ORDER BY job_created_at LIMIT 1
+                """,
                 (JobStatus.QUEUED.value,),
             ).fetchone()
-            if row is None:
-                connection.execute("COMMIT")
+            if queued_job_row is None:
+                database_connection.execute("COMMIT")
                 return None
-            cursor = connection.execute(
-                "UPDATE report_jobs SET status=?, updated_at=? WHERE id=? AND status=?",
-                (JobStatus.RUNNING.value, now, row["id"], JobStatus.QUEUED.value),
+            update_cursor = database_connection.execute(
+                """
+                UPDATE report_jobs SET job_status=?, job_updated_at=?
+                WHERE report_job_id=? AND job_status=?
+                """,
+                (
+                    JobStatus.RUNNING.value,
+                    current_timestamp,
+                    queued_job_row["report_job_id"],
+                    JobStatus.QUEUED.value,
+                ),
             )
-            connection.execute("COMMIT")
-            if cursor.rowcount != 1:
+            database_connection.execute("COMMIT")
+            if update_cursor.rowcount != 1:
                 return None
-        return self.get(row["id"])
+        return self.get(queued_job_row["report_job_id"])
 
     def finish(self, job_id: str, artifact_dir: Path) -> ReportJob:
         """Mark a job completed and record its published artifact directory."""
-        return self._transition(job_id, JobStatus.COMPLETED, artifact_dir=str(artifact_dir))
+        return self._transition(
+            job_id,
+            JobStatus.COMPLETED,
+            artifact_directory=str(artifact_dir),
+        )
 
     def fail(self, job_id: str, error: str, *, quality: bool = False) -> ReportJob:
         """Mark a job failed, optionally distinguishing deterministic quality failure."""
-        status = JobStatus.QUALITY_FAILED if quality else JobStatus.FAILED
-        return self._transition(job_id, status, error=error[:4000])
+        failure_status = JobStatus.QUALITY_FAILED if quality else JobStatus.FAILED
+        return self._transition(
+            job_id,
+            failure_status,
+            failure_message=error[:4000],
+        )
 
     def _transition(
         self,
         job_id: str,
-        status: JobStatus,
+        job_status: JobStatus,
         *,
-        error: str | None = None,
-        artifact_dir: str | None = None,
+        failure_message: str | None = None,
+        artifact_directory: str | None = None,
     ) -> ReportJob:
-        now = datetime.now(UTC).isoformat()
-        with self._connect() as connection:
-            cursor = connection.execute(
-                "UPDATE report_jobs SET status=?,updated_at=?,error=?,artifact_dir=? WHERE id=?",
-                (status.value, now, error, artifact_dir, job_id),
+        current_timestamp = datetime.now(UTC).isoformat()
+        with self._connect() as database_connection:
+            update_cursor = database_connection.execute(
+                """
+                UPDATE report_jobs
+                SET job_status=?,job_updated_at=?,failure_message=?,artifact_directory=?
+                WHERE report_job_id=?
+                """,
+                (
+                    job_status.value,
+                    current_timestamp,
+                    failure_message,
+                    artifact_directory,
+                    job_id,
+                ),
             )
-        if cursor.rowcount != 1:
+        if update_cursor.rowcount != 1:
             raise KeyError(f"Unknown report job: {job_id}")
-        result = self.get(job_id)
-        if result is None:
+        transitioned_report_job = self.get(job_id)
+        if transitioned_report_job is None:
             raise KeyError(f"Unknown report job after transition: {job_id}")
-        return result
+        return transitioned_report_job
 
     def delete(self, job_id: str) -> bool:
         """Delete one terminal job and report whether a row was removed."""
-        with self._connect() as connection:
-            cursor = connection.execute(
-                "DELETE FROM report_jobs WHERE id=? AND status IN (?,?,?)",
+        with self._connect() as database_connection:
+            delete_cursor = database_connection.execute(
+                """
+                DELETE FROM report_jobs
+                WHERE report_job_id=? AND job_status IN (?,?,?)
+                """,
                 (
                     job_id,
                     JobStatus.COMPLETED.value,
@@ -367,21 +495,32 @@ class JobStore:
                     JobStatus.QUALITY_FAILED.value,
                 ),
             )
-        return cursor.rowcount == 1
+        return delete_cursor.rowcount == 1
 
     def purge(self, retention_days: int) -> list[str]:
         """Delete expired terminal rows and return their job UUIDs for artifact cleanup."""
-        cutoff = (datetime.now(UTC) - timedelta(days=retention_days)).isoformat()
-        with self._connect() as connection:
-            rows = connection.execute(
-                "SELECT id FROM report_jobs WHERE updated_at < ? AND status IN (?,?,?)",
+        retention_cutoff = (
+            datetime.now(UTC) - timedelta(days=retention_days)
+        ).isoformat()
+        with self._connect() as database_connection:
+            expired_job_rows = database_connection.execute(
+                """
+                SELECT report_job_id FROM report_jobs
+                WHERE job_updated_at < ? AND job_status IN (?,?,?)
+                """,
                 (
-                    cutoff,
+                    retention_cutoff,
                     JobStatus.COMPLETED.value,
                     JobStatus.FAILED.value,
                     JobStatus.QUALITY_FAILED.value,
                 ),
             ).fetchall()
-            ids = [row["id"] for row in rows]
-            connection.executemany("DELETE FROM report_jobs WHERE id=?", ((job_id,) for job_id in ids))
-        return ids
+            report_job_ids = [
+                expired_job_row["report_job_id"]
+                for expired_job_row in expired_job_rows
+            ]
+            database_connection.executemany(
+                "DELETE FROM report_jobs WHERE report_job_id=?",
+                ((job_id,) for job_id in report_job_ids),
+            )
+        return report_job_ids
