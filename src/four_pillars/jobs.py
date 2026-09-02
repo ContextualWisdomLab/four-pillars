@@ -39,10 +39,10 @@ LEGACY_REPORT_JOB_COLUMN_MIGRATIONS: tuple[tuple[str, str], ...] = (
     ),
 )
 
-LEGACY_REPORT_JOB_INDEX_NAMES: tuple[str, ...] = (
-    "idx_report_jobs_status_created",
-    "idx_report_jobs_created_id",
-    "idx_report_jobs_status_created_id",
+LEGACY_REPORT_JOB_INDEX_DROP_STATEMENTS: tuple[str, ...] = (
+    "DROP INDEX IF EXISTS idx_report_jobs_status_created",
+    "DROP INDEX IF EXISTS idx_report_jobs_created_id",
+    "DROP INDEX IF EXISTS idx_report_jobs_status_created_id",
 )
 
 
@@ -129,10 +129,8 @@ class JobStore:
                         legacy_job_row["report_job_id"],
                     ),
                 )
-            for legacy_index_name in LEGACY_REPORT_JOB_INDEX_NAMES:
-                database_connection.execute(
-                    f"DROP INDEX IF EXISTS {legacy_index_name}"
-                )
+            for index_drop_statement in LEGACY_REPORT_JOB_INDEX_DROP_STATEMENTS:
+                database_connection.execute(index_drop_statement)
             database_connection.execute(
                 """
                 CREATE INDEX IF NOT EXISTS idx_report_jobs_job_status_job_created_at
