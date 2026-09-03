@@ -246,12 +246,14 @@ jobs:
             model="${models[$model_index]}"
             if timeout --kill-after="${OPENCODE_KILL_GRACE_SECONDS}s" \
               "${OPENCODE_RUN_TIMEOUT_SECONDS}s" \
-              env -u GH_TOKEN -u GITHUB_TOKEN -u REPOSITORY_TOKEN \
-              -u ACTIONS_ID_TOKEN_REQUEST_TOKEN -u ACTIONS_ID_TOKEN_REQUEST_URL \
-              -u ACTIONS_RUNTIME_TOKEN -u ACTIONS_RUNTIME_URL \
-              -u ACTIONS_RESULTS_URL -u ACTIONS_CACHE_URL \
-              -u GITHUB_ENV -u GITHUB_OUTPUT -u GITHUB_PATH \
-              -u GITHUB_STATE -u GITHUB_STEP_SUMMARY \
+              env -i \
+              PATH="$PATH" \
+              HOME="$HOME" \
+              NVIDIA_NIM_API_KEY="$NVIDIA_NIM_API_KEY" \
+              OPENCODE_CONFIG="$OPENCODE_CONFIG" \
+              OPENCODE_DISABLE_AUTOUPDATE="$OPENCODE_DISABLE_AUTOUPDATE" \
+              XDG_CONFIG_HOME="$XDG_CONFIG_HOME" \
+              XDG_CACHE_HOME="$XDG_CACHE_HOME" \
               opencode run "$prompt" --agent build --model "$model"; then
               status=0
               break
@@ -380,26 +382,35 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          unset GH_TOKEN GITHUB_TOKEN REPOSITORY_TOKEN
-          unset ACTIONS_ID_TOKEN_REQUEST_TOKEN ACTIONS_ID_TOKEN_REQUEST_URL
-          unset ACTIONS_RUNTIME_TOKEN ACTIONS_RUNTIME_URL
-          unset ACTIONS_RESULTS_URL ACTIONS_CACHE_URL
-          unset GITHUB_ENV GITHUB_OUTPUT GITHUB_PATH
-          unset GITHUB_STATE GITHUB_STEP_SUMMARY
-          python -m pip check
-          python scripts/product_gap_audit.py
-          ruff check .
-          python -m compileall -q src tests scripts
-          python scripts/check_docs.py
-          python scripts/check_prompts.py
-          pytest -m 'not nim_live' -W error::ResourceWarning \
-            --cov=four_pillars --cov-report=term-missing
-          python -m build --no-isolation
-          [ -z "$(git diff --name-only)" ]
-          [ -z "$(git ls-files --others --exclude-standard)" ]
-          post_patch="$RUNNER_TEMP/post-verify.patch"
-          git diff --cached --binary --full-index >"$post_patch"
-          [ "$(sha256sum "$post_patch" | awk '{print $1}')" = "${{ needs.propose_product_increment.outputs.patch_sha256 }}" ]
+          PYTHONPATH="${PYTHONPATH:-src}"
+          PIP_DISABLE_PIP_VERSION_CHECK="${PIP_DISABLE_PIP_VERSION_CHECK:-1}"
+          EXPECTED_PATCH_SHA256="${{ needs.propose_product_increment.outputs.patch_sha256 }}"
+          env -i \
+            PATH="$PATH" \
+            HOME="$HOME" \
+            PYTHONPATH="$PYTHONPATH" \
+            PIP_DISABLE_PIP_VERSION_CHECK="$PIP_DISABLE_PIP_VERSION_CHECK" \
+            RUNNER_TEMP="$RUNNER_TEMP" \
+            EXPECTED_PATCH_SHA256="$EXPECTED_PATCH_SHA256" \
+            LANG="${LANG:-C.UTF-8}" \
+            bash --noprofile --norc -ceu '
+              python -m pip check
+              python scripts/product_gap_audit.py
+              ruff check .
+              python -m compileall -q src tests scripts
+              python scripts/check_docs.py
+              python scripts/check_prompts.py
+              pytest -m "not nim_live" -W error::ResourceWarning \
+                --cov=four_pillars --cov-report=term-missing
+              python -m build --no-isolation
+              [ -z "$(git diff --name-only)" ]
+              [ -z "$(git ls-files --others --exclude-standard)" ]
+              post_patch="$RUNNER_TEMP/post-verify.patch"
+              git diff --cached --binary --full-index >"$post_patch"
+              actual_patch="$(sha256sum "$post_patch")"
+              actual_patch="${actual_patch%% *}"
+              [ "$actual_patch" = "$EXPECTED_PATCH_SHA256" ]
+            '
 
   publish_product_increment:
     if: >-
@@ -542,6 +553,20 @@ jobs:
           cleanup() { git push origin --delete "$branch" >/dev/null 2>&1 || true; }
           trap cleanup ERR
           git push origin "HEAD:refs/heads/${branch}"
+          expected_base="${{ needs.propose_product_increment.outputs.base_sha }}"
+          expected_source="$(git rev-parse HEAD)"
+          live_base="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${DEFAULT_BRANCH}" --jq ".object.sha")"
+          [ "$live_base" = "$expected_base" ] || {
+            echo '::error::base_branch_advanced_after_push'
+            cleanup
+            exit 1
+          }
+          remote_source="$(git ls-remote --heads origin "refs/heads/${branch}" | cut -f1)"
+          [ "$remote_source" = "$expected_source" ] || {
+            echo '::error::proposal_branch_identity_mismatch'
+            cleanup
+            exit 1
+          }
           gh pr create --repo "$GITHUB_REPOSITORY" --base "$DEFAULT_BRANCH" \
             --head "$branch" --title "$title" --body-file "$body_file"
           trap - ERR

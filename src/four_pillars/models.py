@@ -96,7 +96,13 @@ class SolarTerm(BaseModel):
 class Interaction(BaseModel):
     """Supported combination, clash, or harm between two calculated pillars."""
 
-    kind: Literal["stem_combine", "stem_clash", "branch_combine", "branch_clash", "branch_harm"]
+    kind: Literal[
+        "stem_combine",
+        "stem_clash",
+        "branch_combine",
+        "branch_clash",
+        "branch_harm",
+    ]
     left: str
     right: str
     description: str
@@ -221,14 +227,51 @@ class JobStatus(StrEnum):
 
 
 class ReportJob(BaseModel):
-    """Internal durable job record including request, status, and retry provenance."""
+    """Internal durable report-job record with legacy Python aliases at its boundary."""
 
-    id: str
-    status: JobStatus
-    request: dict[str, Any]
-    created_at: datetime
-    updated_at: datetime
+    model_config = ConfigDict(populate_by_name=True)
+
+    report_job_id: str = Field(alias="id")
+    job_status: JobStatus = Field(alias="status")
+    report_request: dict[str, Any] = Field(alias="request")
+    job_created_at: datetime = Field(alias="created_at")
+    job_updated_at: datetime = Field(alias="updated_at")
     request_fingerprint: str | None = None
     idempotency_key_digest: str | None = None
-    error: str | None = None
-    artifact_dir: str | None = None
+    failure_message: str | None = Field(default=None, alias="error")
+    artifact_directory: str | None = Field(default=None, alias="artifact_dir")
+
+    @property
+    def id(self) -> str:
+        """Return the legacy report-job identifier attribute."""
+        return self.report_job_id
+
+    @property
+    def status(self) -> JobStatus:
+        """Return the legacy report-job status attribute."""
+        return self.job_status
+
+    @property
+    def request(self) -> dict[str, Any]:
+        """Return the legacy stored report-request attribute."""
+        return self.report_request
+
+    @property
+    def created_at(self) -> datetime:
+        """Return the legacy report-job creation timestamp attribute."""
+        return self.job_created_at
+
+    @property
+    def updated_at(self) -> datetime:
+        """Return the legacy report-job update timestamp attribute."""
+        return self.job_updated_at
+
+    @property
+    def error(self) -> str | None:
+        """Return the legacy failure-message attribute."""
+        return self.failure_message
+
+    @property
+    def artifact_dir(self) -> str | None:
+        """Return the legacy artifact-directory attribute."""
+        return self.artifact_directory

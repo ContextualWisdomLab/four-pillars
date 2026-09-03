@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import shutil
 from datetime import UTC, datetime, tzinfo
 from pathlib import Path
 
 import pytest
 from fastapi import HTTPException
+from pydantic import ValidationError
 
 import four_pillars.api as api_module
 import four_pillars.calendar as calendar_module
@@ -15,7 +17,7 @@ from four_pillars.fortune import (
     calculate_monthly_luck,
 )
 from four_pillars.jobs import JobStore
-from four_pillars.models import BirthInput, CalendarKind, Gender, TimeBasis
+from four_pillars.models import BirthInput, CalendarKind, Gender, JobStatus, TimeBasis
 from four_pillars.service import ReportService
 from four_pillars.settings import Settings, get_settings
 
@@ -68,6 +70,20 @@ def test_default_service_and_settings_are_loaded_from_environment(
     get_settings.cache_clear()
 
 
+def test_public_job_view_bounds_operational_error_text() -> None:
+    """Keep the canonical status API from becoming an unbounded diagnostic channel."""
+    now = datetime.now(UTC)
+
+    with pytest.raises(ValidationError):
+        api_module.ReportJobView(
+            id="00000000-0000-0000-0000-000000000001",
+            status=JobStatus.FAILED,
+            created_at=now,
+            updated_at=now,
+            error="x" * 4001,
+        )
+
+
 def test_delete_report_handles_terminal_jobs_without_artifacts(tmp_path: Path) -> None:
     service = configured_service(tmp_path)
     job = service.store.create({"subject_name": "failed"})
@@ -87,6 +103,113 @@ def test_delete_report_rejects_a_non_terminal_job(tmp_path: Path) -> None:
 
     assert captured.value.status_code == 409
     assert service.store.get(job.id) is not None
+
+
+@pytest.mark.parametrize(
+    "missing_job_id",
+    ["missing-job", "../escape", "00000000-0000-0000-0000-00000000000A"],
+)
+def test_delete_report_rejects_missing_jobs_without_a_trusted_orphan(
+    missing_job_id: str,
+    tmp_path: Path,
+) -> None:
+    """Return not-found without deleting outside or nonexistent artifact roots."""
+    service = configured_service(tmp_path)
+
+    with pytest.raises(HTTPException) as captured:
+        api_module.delete_report(missing_job_id, service)
+
+    assert captured.value.status_code == 404
+
+
+def test_delete_report_rejects_a_non_uuid_orphan_directory(tmp_path: Path) -> None:
+    """Never treat an arbitrary direct child as a recoverable report artifact."""
+    service = configured_service(tmp_path)
+    unrelated = service.settings.artifact_dir / "operator-backup"
+    unrelated.mkdir(parents=True)
+    marker = unrelated / "keep.txt"
+    marker.write_text("keep", encoding="utf-8")
+
+    with pytest.raises(HTTPException) as captured:
+        api_module.delete_report("operator-backup", service)
+
+    assert captured.value.status_code == 404
+    assert marker.read_text(encoding="utf-8") == "keep"
+
+
+def test_delete_report_rejects_a_staging_directory_name(tmp_path: Path) -> None:
+    """Keep hidden staging directories outside the missing-row orphan recovery path."""
+    service = configured_service(tmp_path)
+    job = service.store.create({"subject_name": "staged"})
+    staged = service.settings.artifact_dir / f".{job.id}.tmp"
+    staged.mkdir(parents=True)
+    marker = staged / "keep.txt"
+    marker.write_text("keep", encoding="utf-8")
+    service.store.delete(job.id)
+
+    with pytest.raises(HTTPException) as captured:
+        api_module.delete_report(f".{job.id}.tmp", service)
+
+    assert captured.value.status_code == 404
+    assert marker.read_text(encoding="utf-8") == "keep"
+
+
+def test_delete_report_preserves_artifacts_when_terminal_row_delete_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Never destroy the only artifact copy before durable deletion is accepted."""
+    service = configured_service(tmp_path)
+    job = service.store.create({"subject_name": "delete-refused"})
+    service.store.claim_next()
+    artifact_dir = service.settings.artifact_dir / job.id
+    artifact_dir.mkdir(parents=True)
+    (artifact_dir / "report.json").write_text("{}", encoding="utf-8")
+    service.store.finish(job.id, artifact_dir)
+    monkeypatch.setattr(service.store, "delete", lambda _: False)
+
+    with pytest.raises(HTTPException) as captured:
+        api_module.delete_report(job.id, service)
+
+    assert captured.value.status_code == 409
+    assert service.store.get(job.id) is not None
+    assert (artifact_dir / "report.json").is_file()
+
+
+def test_delete_report_can_retry_artifact_cleanup_after_row_deletion(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Keep a failed artifact cleanup retryable after the terminal row is removed."""
+    service = configured_service(tmp_path)
+    job = service.store.create({"subject_name": "cleanup-retry"})
+    service.store.claim_next()
+    artifact_dir = service.settings.artifact_dir / job.id
+    artifact_dir.mkdir(parents=True)
+    (artifact_dir / "report.json").write_text("{}", encoding="utf-8")
+    service.store.finish(job.id, artifact_dir)
+    real_rmtree = shutil.rmtree
+    calls = 0
+
+    def fail_once(path: Path) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OSError("simulated cleanup failure")
+        real_rmtree(path)
+
+    monkeypatch.setattr(shutil, "rmtree", fail_once)
+
+    with pytest.raises(HTTPException) as captured:
+        api_module.delete_report(job.id, service)
+
+    assert captured.value.status_code == 500
+    assert service.store.get(job.id) is None
+    assert artifact_dir.is_dir()
+
+    api_module.delete_report(job.id, service)
+
+    assert not artifact_dir.exists()
 
 
 @pytest.mark.parametrize("artifact_mode", ["outside", "wrong_name", "missing"])

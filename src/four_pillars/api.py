@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+import shutil
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
+from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, status
 from fastapi.responses import FileResponse, HTMLResponse
@@ -46,7 +48,7 @@ class LuckRequest(BaseModel):
 
 
 class ReportJobView(BaseModel):
-    """Public report-job status without the stored birth request or raw model text."""
+    """Public report-job status using the established HTTP compatibility field names."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -54,12 +56,12 @@ class ReportJobView(BaseModel):
     status: JobStatus
     created_at: datetime
     updated_at: datetime
-    error: str | None = None
+    error: str | None = Field(default=None, max_length=4000)
     artifacts: list[str] = Field(default_factory=list)
 
 
 class ReportJobPageView(BaseModel):
-    """One privacy-safe newest-first page of report-job summaries."""
+    """One privacy-safe newest-first page using the established HTTP wire contract."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -88,16 +90,70 @@ def require_api_key(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
 
 
-def _job_view(job: ReportJob, service: ReportService) -> ReportJobView:
-    artifacts = service.available_artifacts(job.id) if job.status is JobStatus.COMPLETED else []
-    return ReportJobView(
-        id=job.id,
-        status=job.status,
-        created_at=job.created_at,
-        updated_at=job.updated_at,
-        error=job.error,
-        artifacts=artifacts,
+def _public_job_error(report_job: ReportJob) -> str | None:
+    """Map private stored diagnostics to one stable non-sensitive public failure message."""
+    if report_job.job_status is JobStatus.QUALITY_FAILED:
+        return "Report quality validation failed."
+    if report_job.job_status is JobStatus.FAILED:
+        return "Report generation failed."
+    return None
+
+
+def _job_view(report_job: ReportJob, report_service: ReportService) -> ReportJobView:
+    """Adapt semantic internal report-job fields to the stable public HTTP shape."""
+    artifact_names = (
+        report_service.available_artifacts(report_job.report_job_id)
+        if report_job.job_status is JobStatus.COMPLETED
+        else []
     )
+    return ReportJobView(
+        id=report_job.report_job_id,
+        status=report_job.job_status,
+        created_at=report_job.job_created_at,
+        updated_at=report_job.job_updated_at,
+        error=_public_job_error(report_job),
+        artifacts=artifact_names,
+    )
+
+
+def _trusted_artifact_root(
+    report_service: ReportService,
+    job_id: str,
+    stored_artifact_directory: str | None,
+) -> Path | None:
+    """Return only an exact canonical-UUID direct child of the artifact root."""
+    try:
+        parsed_job_id = UUID(job_id)
+    except ValueError:
+        return None
+    if str(parsed_job_id) != job_id:
+        return None
+
+    configured_artifact_root = report_service.settings.artifact_dir.resolve()
+    artifact_root_candidate = (
+        Path(stored_artifact_directory).resolve()
+        if stored_artifact_directory is not None
+        else (configured_artifact_root / job_id).resolve()
+    )
+    if (
+        artifact_root_candidate.parent != configured_artifact_root
+        or artifact_root_candidate.name != job_id
+    ):
+        return None
+    return artifact_root_candidate
+
+
+def _remove_artifact_root(artifact_root: Path | None) -> None:
+    """Remove one trusted artifact tree or expose a retryable cleanup failure."""
+    if artifact_root is None or not artifact_root.exists():
+        return
+    try:
+        shutil.rmtree(artifact_root)
+    except OSError as cleanup_exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Report row deleted; artifact cleanup incomplete. Retry deletion.",
+        ) from cleanup_exception
 
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
@@ -144,7 +200,7 @@ def annual(request: LuckRequest) -> LuckSnapshot:
 
 @app.post("/v1/luck/monthly", response_model=LuckSnapshot, dependencies=[Depends(require_api_key)])
 def monthly(request: LuckRequest) -> LuckSnapshot:
-    """Calculate one solar-term-bounded monthly luck snapshot."""
+    """Calculate one solar-term-bounded monthly luck snapshot for one month."""
     return calculate_monthly_luck(calculate_chart(request.birth), request.year, request.month)
 
 
@@ -161,23 +217,23 @@ def list_reports(
 ) -> ReportJobPageView:
     """Return one redacted keyset-paginated page of recent report jobs."""
     try:
-        jobs, next_cursor = service.list_jobs(
+        report_jobs, next_cursor = service.list_jobs(
             limit=limit,
             cursor=cursor,
             status=job_status,
         )
-    except HistoryCursorError as exc:
+    except HistoryCursorError as history_cursor_exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except HistoryNotSupportedError as exc:
+            detail=str(history_cursor_exception),
+        ) from history_cursor_exception
+    except HistoryNotSupportedError as history_support_exception:
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail=str(exc),
-        ) from exc
+            detail=str(history_support_exception),
+        ) from history_support_exception
     return ReportJobPageView(
-        items=[_job_view(job, service) for job in jobs],
+        items=[_job_view(report_job, service) for report_job in report_jobs],
         next_cursor=next_cursor,
     )
 
@@ -199,26 +255,26 @@ def create_report(
         return _job_view(service.enqueue(request), service)
     try:
         canonical_key = parse_idempotency_key(idempotency_key)
-    except ValueError as exc:
+    except ValueError as idempotency_key_exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
+            detail=str(idempotency_key_exception),
+        ) from idempotency_key_exception
     key_digest = hashlib.sha256(canonical_key.encode("utf-8")).hexdigest()
     try:
-        job, replayed = service.enqueue_idempotent(request, key_digest)
-    except IdempotencyKeyReuseError as exc:
+        report_job, replayed = service.enqueue_idempotent(request, key_digest)
+    except IdempotencyKeyReuseError as key_reuse_exception:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=str(exc),
-        ) from exc
-    except IdempotencyNotSupportedError as exc:
+            detail=str(key_reuse_exception),
+        ) from key_reuse_exception
+    except IdempotencyNotSupportedError as idempotency_support_exception:
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail=str(exc),
-        ) from exc
+            detail=str(idempotency_support_exception),
+        ) from idempotency_support_exception
     response.headers["Idempotency-Replayed"] = "true" if replayed else "false"
-    return _job_view(job, service)
+    return _job_view(report_job, service)
 
 
 @app.get(
@@ -228,10 +284,10 @@ def create_report(
 )
 def get_report(job_id: str, service: ReportService = Depends(get_service)) -> ReportJobView:
     """Return the current public status and artifacts for one report job."""
-    job = service.store.get(job_id)
-    if job is None:
+    report_job = service.store.get(job_id)
+    if report_job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report job not found")
-    return _job_view(job, service)
+    return _job_view(report_job, service)
 
 
 @app.get("/v1/reports/{job_id}/artifacts/{filename}", dependencies=[Depends(require_api_key)])
@@ -243,29 +299,40 @@ def get_artifact(
 ) -> FileResponse:
     """Serve one allow-listed report artifact after path-boundary validation."""
     try:
-        path = service.artifact(job_id, filename)
-    except (FileNotFoundError, ValueError) as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found") from exc
+        artifact_path = service.artifact(job_id, filename)
+    except (FileNotFoundError, ValueError) as artifact_exception:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Artifact not found",
+        ) from artifact_exception
     media_types = {".pdf": "application/pdf", ".html": "text/html", ".json": "application/json"}
     return FileResponse(
-        path,
-        media_type=media_types.get(path.suffix, "application/octet-stream"),
-        filename=path.name if download else None,
+        artifact_path,
+        media_type=media_types.get(artifact_path.suffix, "application/octet-stream"),
+        filename=artifact_path.name if download else None,
     )
 
 
 @app.delete("/v1/reports/{job_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_api_key)])
 def delete_report(job_id: str, service: ReportService = Depends(get_service)) -> None:
-    """Delete a terminal job and only its validated UUID artifact directory."""
-    job = service.store.get(job_id)
-    if job is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report job not found")
-    if job.artifact_dir:
-        root = Path(job.artifact_dir).resolve()
-        configured_root = service.settings.artifact_dir.resolve()
-        if root.parent == configured_root and root.name == job.id and root.exists():
-            import shutil
+    """Delete terminal state first, then remove only its trusted artifact tree."""
+    report_job = service.store.get(job_id)
+    if report_job is None:
+        retry_artifact_root = _trusted_artifact_root(service, job_id, None)
+        if retry_artifact_root is None or not retry_artifact_root.exists():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report job not found")
+        _remove_artifact_root(retry_artifact_root)
+        return
 
-            shutil.rmtree(root)
+    artifact_root = (
+        _trusted_artifact_root(
+            service,
+            report_job.report_job_id,
+            report_job.artifact_directory,
+        )
+        if report_job.artifact_directory
+        else None
+    )
     if not service.store.delete(job_id):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only terminal jobs can be deleted")
+    _remove_artifact_root(artifact_root)

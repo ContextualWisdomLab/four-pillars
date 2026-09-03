@@ -8,11 +8,24 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ### Added
 
+- An evidence-bound product and technical gap baseline mapping PRD, TRD, architecture, data, security, tests, operations, live PR maturity, next actions, and acceptance evidence without claiming certification or scientific prediction.
 - Independent KASI/NAOJ 2026 golden fixtures for all twelve month-changing solar terms, enforcing a two-minute timing budget and five-minute year/month pillar transition checks without network or test-only ephemeris dependencies.
 - Offline authority-fixture governance that detects missing evidence, provenance, tolerance, traceability, and calculation-version contracts in the hourly product-gap audit.
 
 ### Changed
 
+- The product-gap baseline now records durable execution leases, orphaned
+  Actions identity remediation, and the independent publication-App boundary
+  with their live dependency and evidence status.
+- Each Contextual Orchestrator request now defaults to a two-hour timeout
+  instead of 120 seconds, with a bounded four-hour per-request ceiling.
+- Customer-facing organization-integration copy now names Contextual
+  Orchestrator without exposing its internal provider inventory.
+- PR steward maturity contracts now reject direct active or protected-main
+  classifications of the closed, unmerged PR #29 across common wording variants,
+  link its replacement authority, and fail closed on contradictory termination
+  decision fields through an executable `final_sweep_record_v1` validator,
+  including exact independent document/gate inventories and canonical UTC timestamps.
 - Apparent solar longitude now uses a bounded VSOP87 Earth series in Terrestrial Time with FK5, nutation, and aberration corrections; deterministic calculation evidence advances to `calendar-1.1.0`.
 - Calculation and standards doctoring now trace the official Korean calendar basis, independent NAOJ cross-check, IERS time-scale policy, JPL DE440 claim boundary, signed before/after model errors, and residual historical-time risks.
 

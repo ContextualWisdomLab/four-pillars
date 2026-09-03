@@ -9,6 +9,7 @@ REQUIRED = (
     "CHANGELOG.md",
     "SECURITY.md",
     "CONTRIBUTING.md",
+    "docs/product-technical-gap-baseline.md",
     "docs/product/PRD.md",
     "docs/technical/TRD.md",
     "docs/technical/CALCULATION.md",

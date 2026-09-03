@@ -39,7 +39,7 @@ This boundary owns solar/lunar normalization, solar terms, pillars, Ten Gods, hi
 
 `NimReportInterpreter` is the standalone default and opens a direct NIM client only when a report is generated. It requires `NVIDIA_NIM_API_KEY` at that point.
 
-`ContextualOrchestratorReportInterpreter` is optional. It opens `ContextualOrchestratorClient` only when selected and requires `CONTEXTUAL_ORCHESTRATOR_TOKEN`. It attaches prompt-safe organizational usage attribution and preserves strict report schemas. The orchestrator may route to approved NVIDIA or other workers, but Four Pillars sees one organization gateway and never receives worker credentials.
+`ContextualOrchestratorReportInterpreter` is optional. It opens `ContextualOrchestratorClient` only when selected and requires `CONTEXTUAL_ORCHESTRATOR_TOKEN`. It attaches prompt-safe organizational usage attribution and preserves strict report schemas. Four Pillars uses Contextual Orchestrator as one organization gateway and neither defines its provider inventory nor receives worker credentials.
 
 `build_report_interpreter(settings)` selects the explicit standalone adapter:
 

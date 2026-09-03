@@ -4,7 +4,7 @@ Deterministic Korean Four Pillars (사주·만세력) calculation and schema-val
 
 The product keeps **calendar calculation** and **AI interpretation** on separate trust boundaries. The calculation engine produces immutable pillars, solar-term boundaries, ten-god relationships, hidden stems, twelve growth stages, luck periods, warnings, and a SHA-256 fingerprint. The selected interpretation backend receives those facts as read-only evidence and returns schema-validated analysis. A quality gate rejects deterministic contradictions, unbalanced relationship guidance, vague copy, medical claims, and event certainty before HTML or PDF is emitted.
 
-Direct hosted NVIDIA NIM remains the standalone default. Organization deployments may explicitly select [Contextual Orchestrator](https://github.com/ContextualWisdomLab/contextual-orchestrator) to centralize OpenAI-compatible routing, usage attribution, and provider governance. The service never silently falls back between backends.
+Organization integration uses [Contextual Orchestrator](https://github.com/ContextualWisdomLab/contextual-orchestrator). The service never silently changes the selected interpretation boundary.
 
 Repository automation uses two independent hourly control loops. The minute-17 loop is a deterministic, model-free release-quality sentinel. The minute-47 loop may use checksum-pinned OpenCode with `NVIDIA_NIM_API_KEY` to propose one bounded pull request only when the queue is empty; model execution, uncredentialed verification, and late publication occur on separate runners, and ordinary exact-head review retains every merge and release decision.
 
@@ -16,7 +16,7 @@ Repository automation uses two independent hourly control loops. The minute-17 l
 - Ten Gods, hidden stems, twelve growth stages, element balance, combinations and clashes
 - Daewoon direction/start age, annual luck, and monthly luck
 - Versioned AI prompts for natal, daewoon, annual, monthly, synthesis, practical skills, editorial repair, and LLM judging
-- Direct NVIDIA NIM default or optional Contextual Orchestrator adapter
+- Organization integration through Contextual Orchestrator
 - Explicit credential separation and no silent provider fallback
 - Searchable Korean A4 PDF, HTML, JSON, and generation manifest
 - FastAPI service, Typer CLI, SQLite job queue, worker, Docker, and GitHub Actions
