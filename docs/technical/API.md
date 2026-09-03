@@ -28,22 +28,23 @@ The editable product-design source is the Figma file `Four Pillars — Report Hi
 
 `POST /v1/luck/monthly` accepts the same envelope and returns the requested Gregorian month's `jie`-bounded snapshot. A January `jie` month occurs before Li Chun and therefore uses the previous sexagenary year's stem when deriving the month pillar.
 
-## Interpretation backend
+## Model orchestration boundary
 
-Report-generation endpoints and job schemas do not change with the selected interpretation backend. The worker reads `INTERPRETATION_BACKEND` when the service is composed:
+Report-generation endpoints and job schemas do not expose a provider choice. The repository composition accepts only `INTERPRETATION_BACKEND=contextual_orchestrator`, and the product virtual model is fixed to `orchestrator/free`.
 
-- `nvidia_nim` is the standalone default and authenticates direct model calls with `NVIDIA_NIM_API_KEY`.
-- `contextual_orchestrator` calls an approved OpenAI-compatible gateway and authenticates with `CONTEXTUAL_ORCHESTRATOR_TOKEN`.
+The worker authenticates to the approved gateway with `CONTEXTUAL_ORCHESTRATOR_TOKEN`. NVIDIA, OpenAI, OpenRouter, Bytez, or other provider-native credentials are not product runtime inputs. Provider discovery, free-pool eligibility, and provider failover are responsibilities of Contextual Orchestrator.
 
-The selection applies only when no custom `ReportInterpreter` is injected. Missing credentials or backend failures are stored as ordinary job failures. The service never silently switches adapters.
+A custom `ReportInterpreter` may still be injected by an independently owned MSA composition. That structural extension point does not make provider selection part of this API or this repository's settings.
 
-Both built-in clients send schema-oriented chat-completions requests and require a Pydantic-valid JSON object. Contextual Orchestrator requests also include prompt-safe organizational attribution and synchronous routing metadata. Attribution never contains names, birth information, user notes, fingerprints, prompts, generated text, artifacts, or credentials.
+Missing gateway credentials, an unavailable free pool, transport failures, or exhausted schema repair are stored as ordinary job failures. The service never silently calls a direct provider or changes from `orchestrator/free` to a paid virtual route.
 
-The public API does not return provider administration details or the raw model response. Completed artifact metadata records the actual model, prompt versions, prompt hashes, attempts, repairs, and calculation fingerprint.
+The orchestration client sends schema-oriented chat-completions requests with prompt-safe organizational attribution and synchronous routing metadata. It deliberately omits provider passthrough fields that could collapse an orchestrated request to one upstream model. Attribution never contains names, birth information, user notes, fingerprints, prompts, generated text, artifacts, or credentials.
+
+The public API does not return provider administration details or raw model responses. Completed artifact metadata records the virtual model, prompt versions, prompt hashes, attempts, repairs, and calculation fingerprint; provider-level route evidence remains owned by the orchestration service.
 
 ## Report jobs
 
-`POST /v1/reports` validates a report request and returns HTTP 202 with a queued job. The body contains `subject_name`, `birth`, `annual_year`, `monthly_year`, `monthly_month`, and optional `user_context`. The request is durable before any model backend is called.
+`POST /v1/reports` validates a report request and returns HTTP 202 with a queued job. The body contains `subject_name`, `birth`, `annual_year`, `monthly_year`, `monthly_month`, and optional `user_context`. The request is durable before any model gateway is called.
 
 `POST /v1/reports`, `GET /v1/reports`, and `GET /v1/reports/{job_id}` return only job identifiers, public status, timestamps, bounded error text, and available artifact filenames. They never echo birth data, subject labels, context notes, stored requests, request fingerprints, idempotency material, generated report text, model traces, or internal artifact paths.
 
@@ -101,7 +102,7 @@ The service resolves the database path and requires it to be the direct UUID chi
 
 Pydantic validation returns HTTP 422. Missing resources return 404. Authentication failures return 401. Non-terminal deletion returns 409. A malformed `Idempotency-Key` returns 400, reuse for a different payload returns 422, and a keyed request against a legacy repository adapter without the optional capability returns 501. A malformed report-history cursor returns 400, invalid history limits or statuses return 422, and a history request against a legacy repository without `ReportJobHistoryRepository` returns 501.
 
-Calculation policy errors are returned synchronously by calculation endpoints. Report-generation failures are stored on the job. Selected-backend transport, authentication, rate-limit, response-shape, and schema failures become failed jobs without implicit fallback. Report copy that remains unsafe or contains a sexagenary pillar absent from deterministic evidence after editorial repair becomes `quality_failed` and is not published as a completed PDF.
+Calculation policy errors are returned synchronously by calculation endpoints. Report-generation failures are stored on the job. Gateway transport, authentication, rate-limit, response-shape, and schema failures become failed jobs without provider-native fallback. Report copy that remains unsafe or contains a sexagenary pillar absent from deterministic evidence after editorial repair becomes `quality_failed` and is not published as a completed PDF.
 
 The browser maps collection HTTP 401 to an API-key prompt and HTTP 501 to an unsupported-repository message. Other bounded API details are rendered as plain text in the history live region. A collection error never exposes hidden request fields or clears successfully loaded rows unless it occurred while resetting the first page.
 

@@ -2,7 +2,6 @@
 
 from .adapters import (
     ContextualOrchestratorReportInterpreter,
-    NimReportInterpreter,
     build_report_interpreter,
 )
 from .calendar import calculate_chart
@@ -26,7 +25,6 @@ __all__ = [
     "Gender",
     "GenerationTrace",
     "IdempotentReportJobRepository",
-    "NimReportInterpreter",
     "ReportInterpreter",
     "ReportJobHistoryRepository",
     "ReportJobRepository",

@@ -1,4 +1,4 @@
-"""Call OpenAI-compatible model gateways with strict Pydantic schemas."""
+"""Provide provider-neutral OpenAI-compatible JSON transport for orchestration ACLs."""
 
 from __future__ import annotations
 
@@ -9,25 +9,20 @@ from typing import Any, Self, TypeVar
 import httpx
 from pydantic import BaseModel, ValidationError
 
-from .generation import GenerationTrace
-from .settings import Settings
+from ...generation import GenerationTrace
 
 T = TypeVar("T", bound=BaseModel)
 
 
-class NimError(RuntimeError):
-    """Report an OpenAI-compatible structured-generation transport failure."""
+class OrchestrationTransportError(RuntimeError):
+    """Report a model-orchestration transport or response-envelope failure."""
 
 
-class NimSchemaError(NimError):
+class OrchestrationSchemaError(OrchestrationTransportError):
     """Report generated content that cannot satisfy the requested JSON schema."""
 
 
-NimTrace = GenerationTrace
-"""Backward-compatible alias for the provider-neutral generation trace."""
-
-
-class _OpenAICompatibleJsonClient:
+class OpenAICompatibleJsonClient:
     """Implement shared structured-generation transport and validation behavior."""
 
     def __init__(
@@ -39,16 +34,16 @@ class _OpenAICompatibleJsonClient:
         timeout_seconds: float,
         max_retries: int,
         max_schema_repairs: int,
-        provider_label: str,
+        service_label: str,
         request_metadata: dict[str, Any] | None = None,
-        native_json_mode: bool = True,
+        native_json_mode: bool = False,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         """Create a bounded OpenAI-compatible client with optional native JSON mode."""
         self._default_model = default_model
         self._max_retries = max_retries
         self._max_schema_repairs = max_schema_repairs
-        self._provider_label = provider_label
+        self._service_label = service_label
         self._request_metadata = dict(request_metadata or {})
         self._native_json_mode = native_json_mode
         self._client = httpx.AsyncClient(
@@ -83,15 +78,15 @@ class _OpenAICompatibleJsonClient:
                 response = await self._client.post("/chat/completions", json=payload)
             except (httpx.TimeoutException, httpx.NetworkError) as exc:
                 if attempts >= max_attempts:
-                    raise NimError(
-                        f"{self._provider_label} request failed after network retries"
+                    raise OrchestrationTransportError(
+                        f"{self._service_label} request failed after network retries"
                     ) from exc
                 await asyncio.sleep(min(2 ** (attempts - 1), 8))
                 continue
             if response.status_code in {408, 429} or response.status_code >= 500:
                 if attempts >= max_attempts:
-                    raise NimError(
-                        f"{self._provider_label} request failed after retries with "
+                    raise OrchestrationTransportError(
+                        f"{self._service_label} request failed after retries with "
                         f"HTTP {response.status_code}"
                     )
                 retry_after = response.headers.get("Retry-After")
@@ -103,30 +98,32 @@ class _OpenAICompatibleJsonClient:
                 await asyncio.sleep(delay)
                 continue
             if response.is_error:
-                raise NimError(
-                    f"{self._provider_label} returned HTTP {response.status_code}: "
+                raise OrchestrationTransportError(
+                    f"{self._service_label} returned HTTP {response.status_code}: "
                     f"{response.text[:500]}"
                 )
             try:
                 return response.json(), attempts
             except json.JSONDecodeError as exc:
-                raise NimError(
-                    f"{self._provider_label} returned a non-JSON HTTP response"
+                raise OrchestrationTransportError(
+                    f"{self._service_label} returned a non-JSON HTTP response"
                 ) from exc
-        raise NimError(
-            f"{self._provider_label} request exhausted its retry budget"
+        raise OrchestrationTransportError(
+            f"{self._service_label} request exhausted its retry budget"
         )
 
     def _content(self, data: dict[str, Any]) -> str:
         try:
             content = data["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
-            raise NimError(
-                f"{self._provider_label} response did not contain "
+            raise OrchestrationTransportError(
+                f"{self._service_label} response did not contain "
                 "choices[0].message.content"
             ) from exc
         if not isinstance(content, str) or not content.strip():
-            raise NimError(f"{self._provider_label} returned empty content")
+            raise OrchestrationTransportError(
+                f"{self._service_label} returned empty content"
+            )
         return content.strip()
 
     @staticmethod
@@ -140,9 +137,13 @@ class _OpenAICompatibleJsonClient:
         try:
             value = json.loads(cleaned)
         except json.JSONDecodeError as exc:
-            raise NimSchemaError("Generated content was not a JSON object") from exc
+            raise OrchestrationSchemaError(
+                "Generated content was not a JSON object"
+            ) from exc
         if not isinstance(value, dict):
-            raise NimSchemaError("Generated content must be one JSON object")
+            raise OrchestrationSchemaError(
+                "Generated content must be one JSON object"
+            )
         return value
 
     async def generate(
@@ -183,13 +184,11 @@ class _OpenAICompatibleJsonClient:
             total_attempts += attempts
             raw_content = self._content(data)
             try:
-                parsed = response_model.model_validate(
-                    self._json_object(raw_content)
-                )
-            except (NimSchemaError, ValidationError) as exc:
+                parsed = response_model.model_validate(self._json_object(raw_content))
+            except (OrchestrationSchemaError, ValidationError) as exc:
                 if repair >= self._max_schema_repairs:
-                    raise NimSchemaError(
-                        f"{self._provider_label} output failed schema validation "
+                    raise OrchestrationSchemaError(
+                        f"{self._service_label} output failed schema validation "
                         f"after {repair} repair attempts: {exc}"
                     ) from exc
                 messages.extend(
@@ -213,32 +212,4 @@ class _OpenAICompatibleJsonClient:
                 repairs=repair,
                 raw_content=raw_content,
             )
-        raise NimSchemaError("unreachable schema repair state")
-
-
-class NimClient(_OpenAICompatibleJsonClient):
-    """OpenAI-compatible client dedicated to direct hosted NVIDIA NIM."""
-
-    def __init__(
-        self,
-        settings: Settings,
-        *,
-        transport: httpx.AsyncBaseTransport | None = None,
-    ) -> None:
-        """Create a hosted NIM client from settings and an optional test transport."""
-        if not settings.nvidia_nim_api_key:
-            raise NimError(
-                "NVIDIA_NIM_API_KEY is required for AI report generation"
-            )
-        self.settings = settings
-        super().__init__(
-            api_key=settings.nvidia_nim_api_key,
-            base_url=settings.nim_base_url,
-            default_model=settings.nim_model,
-            timeout_seconds=settings.nim_timeout_seconds,
-            max_retries=settings.nim_max_retries,
-            max_schema_repairs=settings.nim_max_schema_repairs,
-            provider_label="NIM",
-            native_json_mode=True,
-            transport=transport,
-        )
+        raise OrchestrationSchemaError("unreachable schema repair state")

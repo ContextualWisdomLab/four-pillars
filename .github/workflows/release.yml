@@ -38,7 +38,7 @@ jobs:
       - run: python -m compileall -q src tests scripts
       - run: python scripts/check_docs.py
       - run: python scripts/check_prompts.py
-      - run: pytest -m 'not nim_live' -W error::ResourceWarning --cov=four_pillars --cov-report=term-missing
+      - run: pytest -m 'not orchestrator_live' -W error::ResourceWarning --cov=four_pillars --cov-report=term-missing
       - run: python -m build --no-isolation
       - name: Build the pinned runtime container
         run: docker build --tag four-pillars:release .

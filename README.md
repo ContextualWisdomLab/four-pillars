@@ -1,12 +1,14 @@
 # Four Pillars
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ContextualWisdomLab/four-pillars)
+
 Deterministic Korean Four Pillars (사주·만세력) calculation and schema-validated AI-assisted report generation.
 
-The product keeps **calendar calculation** and **AI interpretation** on separate trust boundaries. The calculation engine produces immutable pillars, solar-term boundaries, ten-god relationships, hidden stems, twelve growth stages, luck periods, warnings, and a SHA-256 fingerprint. The selected interpretation backend receives those facts as read-only evidence and returns schema-validated analysis. A quality gate rejects deterministic contradictions, unbalanced relationship guidance, vague copy, medical claims, and event certainty before HTML or PDF is emitted.
+The product keeps **calendar calculation** and **AI interpretation** on separate trust boundaries. The calculation engine produces immutable pillars, solar-term boundaries, ten-god relationships, hidden stems, twelve growth stages, luck periods, warnings, and a SHA-256 fingerprint. The interpretation application context receives those facts as read-only evidence and crosses a `ReportInterpreter` port into [Contextual Orchestrator](https://github.com/ContextualWisdomLab/contextual-orchestrator). A quality gate rejects deterministic contradictions, unbalanced relationship guidance, vague copy, medical claims, and event certainty before HTML or PDF is emitted.
 
-Direct hosted NVIDIA NIM remains the standalone default. Organization deployments may explicitly select [Contextual Orchestrator](https://github.com/ContextualWisdomLab/contextual-orchestrator) to centralize OpenAI-compatible routing, usage attribution, and provider governance. The service never silently falls back between backends.
+Four Pillars does not select or authenticate individual model providers in its product runtime. Provider discovery, free-pool eligibility, routing, and provider fallback belong to Contextual Orchestrator. The repository-owned composition is fixed to the fail-closed `orchestrator/free` virtual route and never silently falls back to a direct provider.
 
-Repository automation uses two independent hourly control loops. The minute-17 loop is a deterministic, model-free release-quality sentinel. The minute-47 loop may use checksum-pinned OpenCode with `NVIDIA_NIM_API_KEY` to propose one bounded pull request only when the queue is empty; model execution, uncredentialed verification, and late publication occur on separate runners, and ordinary exact-head review retains every merge and release decision.
+Repository automation keeps a model-free hourly release-quality sentinel. Autonomous product development is coordinated by the shared ContextualWisdomLab maintainer loop rather than a repository-specific provider-credentialed coding workflow. This avoids duplicated writer authority and keeps model-routing policy in the orchestration bounded context.
 
 ## Features
 
@@ -16,13 +18,12 @@ Repository automation uses two independent hourly control loops. The minute-17 l
 - Ten Gods, hidden stems, twelve growth stages, element balance, combinations and clashes
 - Daewoon direction/start age, annual luck, and monthly luck
 - Versioned AI prompts for natal, daewoon, annual, monthly, synthesis, practical skills, editorial repair, and LLM judging
-- Direct NVIDIA NIM default or optional Contextual Orchestrator adapter
-- Explicit credential separation and no silent provider fallback
+- Contextual Orchestrator anti-corruption layer fixed to `orchestrator/free`
+- No product-runtime provider credentials or direct-provider fallback
 - Searchable Korean A4 PDF, HTML, JSON, and generation manifest
 - FastAPI service, Typer CLI, SQLite job queue, worker, Docker, and GitHub Actions
 - Structural repository, interpreter, history, idempotency, and artifact-publisher ports for standalone or MSA use
 - APA 7th standards and research traceability with hourly regression checks
-- Proposal-only hourly OpenCode development with immutable patch handoff and three-runner isolation
 
 ## Quick start
 
@@ -36,39 +37,23 @@ four-pillars calculate --birth '1990-06-15T08:30:00' --timezone Asia/Seoul
 uvicorn four_pillars.api:app --host 0.0.0.0 --port 8000
 ```
 
-### Direct NVIDIA NIM
-
-Direct NIM is the default standalone path:
-
-```bash
-export INTERPRETATION_BACKEND='nvidia_nim'
-export NVIDIA_NIM_API_KEY='...'
-export NIM_MODEL='nvidia/llama-3.3-nemotron-super-49b-v1.5'
-```
-
-The model name is configuration, not a hard dependency; choose a model currently available to the account. Direct hosted tests are opt-in:
-
-```bash
-pytest -m nim_live
-```
-
-### Contextual Orchestrator
-
-Point Four Pillars at an approved organization gateway without changing the calculation, prompts, report schemas, queue, or artifact format. Local development may use the validated loopback HTTP exception:
+Calculation-only operations do not need a model credential. Report generation needs an approved Contextual Orchestrator gateway:
 
 ```bash
 export INTERPRETATION_BACKEND='contextual_orchestrator'
 export CONTEXTUAL_ORCHESTRATOR_BASE_URL='http://127.0.0.1:8100/v1'
 export CONTEXTUAL_ORCHESTRATOR_TOKEN='...'
-export CONTEXTUAL_ORCHESTRATOR_MODEL='contextual-orchestrator'
+export CONTEXTUAL_ORCHESTRATOR_MODEL='orchestrator/free'
 export CONTEXTUAL_ORCHESTRATOR_MODE='auto'
 export CONTEXTUAL_ORCHESTRATOR_COMPANY='ContextualWisdomLab'
 export CONTEXTUAL_ORCHESTRATOR_TEAM='fortune-products'
 ```
 
-Production must instead use an approved HTTPS URL, for example `https://orchestrator.example.com/v1`. Settings reject remote HTTP endpoints before constructing a credential-bearing client; only `localhost`, `127.0.0.1`, and `::1` may use HTTP for local development.
+Production must use an approved HTTPS gateway URL. Settings reject remote HTTP endpoints before constructing a credential-bearing client; only `localhost`, `127.0.0.1`, and `::1` may use HTTP for local development.
 
-The adapter sends prompt-safe usage attribution and an explicit orchestration mode through the orchestrator's OpenAI-compatible chat-completions endpoint. It intentionally omits `response_format`, tools, and function-calling fields because those capabilities select the orchestrator's single-agent passthrough path; `auto`, `route`, and `conduct` requests therefore retain real routing or multi-agent execution. Four Pillars still enforces the requested Pydantic schema after generation and may request a bounded repair through the same selected backend. Birth data, user context, generated copy, and credentials are never placed in attribution. A missing or unavailable orchestrator fails the report job visibly; it does not switch to direct NIM.
+The adapter sends prompt-safe usage attribution and a bounded orchestration mode through the gateway's OpenAI-compatible chat-completions endpoint. It intentionally omits provider passthrough fields such as `response_format`, tools, and function-calling controls because those can collapse orchestration to a provider-specific path. Four Pillars requests JSON in the prompt, validates the returned object with Pydantic, and permits a bounded repair through the same `orchestrator/free` route. Birth data, user context, generated copy, and credentials are never placed in attribution.
+
+A missing gateway, empty free pool, or invalid response fails the report job visibly. The deterministic calculation path remains available and Four Pillars does not switch to NVIDIA NIM, OpenAI, OpenRouter, Bytez, or another provider directly.
 
 ## Verification
 
@@ -79,11 +64,18 @@ ruff check .
 python -m compileall -q src tests scripts
 python scripts/check_docs.py
 python scripts/check_prompts.py
-pytest -m 'not nim_live' -W error::ResourceWarning --cov=four_pillars --cov-report=term-missing
+pytest -m 'not orchestrator_live' -W error::ResourceWarning --cov=four_pillars --cov-report=term-missing
 python -m build --no-isolation
 ```
 
-The release gate requires exactly 100 percent statement and branch coverage. Hosted model evaluation is supplementary and never replaces deterministic fixtures, rule-based quality checks, security review, or human review.
+The release gate requires exactly 100 percent statement and branch coverage. Live `orchestrator/free` evaluation is supplementary and never replaces deterministic fixtures, rule-based quality checks, security review, or human review.
+
+For an opt-in live test, configure the gateway URL and token, then run:
+
+```bash
+pytest -m orchestrator_live -vv
+python scripts/orchestrator_eval.py
+```
 
 ## Documents
 
@@ -94,10 +86,9 @@ The release gate requires exactly 100 percent statement and branch coverage. Hos
 - [Technical Requirements](docs/technical/TRD.md)
 - [Calculation Rules](docs/technical/CALCULATION.md)
 - [Standalone and MSA Modularity](docs/technical/MODULARITY.md)
-- [Interpretation Operations](docs/operations/NIM.md)
+- [Model Orchestration Operations](docs/operations/ORCHESTRATION.md)
 - [Operations Runbook](docs/operations/RUNBOOK.md)
-- [Hourly NVIDIA NIM Product Development](docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md)
-- [Hourly NIM/OpenCode Evidence Doctoring](docs/doctoring/hourly-nim-opencode-development.md)
+- [Hourly Product Quality Loop](docs/operations/HOURLY_PRODUCT_LOOP.md)
 - [APA 7th Standards and Research References](docs/standards/REFERENCES.md)
 - [Standards Traceability](docs/standards/TRACEABILITY.md)
 - [UML and Architecture](docs/uml/architecture.md)

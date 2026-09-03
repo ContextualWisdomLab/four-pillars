@@ -65,7 +65,7 @@ jobs:
           run_gate 'Python compilation' python -m compileall -q src tests scripts
           run_gate 'Project documents' python scripts/check_docs.py
           run_gate 'Versioned prompts' python scripts/check_prompts.py
-          run_gate 'Offline tests and 100% coverage' pytest -m 'not nim_live' -W error::ResourceWarning --cov=four_pillars --cov-report=term-missing
+          run_gate 'Offline tests and 100% coverage' pytest -m 'not orchestrator_live' -W error::ResourceWarning --cov=four_pillars --cov-report=term-missing
           run_gate 'Distribution build' python -m build --no-isolation
 
           cat "$report" >> "$GITHUB_STEP_SUMMARY"

@@ -1,4 +1,4 @@
-"""Provide standalone interpretation and filesystem application adapters."""
+"""Provide interpretation and filesystem application adapters."""
 
 from __future__ import annotations
 
@@ -8,40 +8,9 @@ from typing import Any
 from .analysis import GeneratedReport, generate_report
 from .contextual_orchestrator import ContextualOrchestratorClient
 from .models import Chart, DaewoonResult, LuckSnapshot, ReportDocument
-from .nim import NimClient
 from .ports import ReportInterpreter
 from .reporting import write_artifacts
 from .settings import Settings
-
-
-class NimReportInterpreter:
-    """Generate schema-validated reports through direct hosted NVIDIA NIM."""
-
-    def __init__(self, settings: Settings) -> None:
-        """Store NIM connection and model settings without opening a client."""
-        self.settings = settings
-
-    async def generate(
-        self,
-        *,
-        subject_name: str,
-        chart: Chart,
-        daewoon: DaewoonResult,
-        annual: LuckSnapshot,
-        monthly: LuckSnapshot,
-        user_context: str,
-    ) -> GeneratedReport:
-        """Open one bounded NIM client and interpret immutable calculation evidence."""
-        async with NimClient(self.settings) as client:
-            return await generate_report(
-                client=client,
-                subject_name=subject_name,
-                chart=chart,
-                daewoon=daewoon,
-                annual=annual,
-                monthly=monthly,
-                user_context=user_context,
-            )
 
 
 class ContextualOrchestratorReportInterpreter:
@@ -75,10 +44,8 @@ class ContextualOrchestratorReportInterpreter:
 
 
 def build_report_interpreter(settings: Settings) -> ReportInterpreter:
-    """Build the explicitly selected standalone interpretation adapter."""
-    if settings.interpretation_backend == "contextual_orchestrator":
-        return ContextualOrchestratorReportInterpreter(settings)
-    return NimReportInterpreter(settings)
+    """Build the sole product-owned LLM adapter through Contextual Orchestrator."""
+    return ContextualOrchestratorReportInterpreter(settings)
 
 
 class FilesystemArtifactPublisher:

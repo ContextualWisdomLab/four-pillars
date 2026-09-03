@@ -10,14 +10,33 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 - Independent KASI/NAOJ 2026 golden fixtures for all twelve month-changing solar terms, enforcing a two-minute timing budget and five-minute year/month pillar transition checks without network or test-only ephemeris dependencies.
 - Offline authority-fixture governance that detects missing evidence, provenance, tolerance, traceability, and calculation-version contracts in the hourly product-gap audit.
+- ADR 0004 and architecture-fitness tests defining Contextual Orchestrator as the Model Orchestration anti-corruption layer and `orchestrator/free` as the only repository-owned product LLM route.
+- An opt-in `orchestrator/free` live smoke and quality-evaluation workflow that receives only the Contextual Orchestrator gateway token and URL, with no provider-native credential.
 
 ### Changed
 
 - Apparent solar longitude now uses a bounded VSOP87 Earth series in Terrestrial Time with FK5, nutation, and aberration corrections; deterministic calculation evidence advances to `calendar-1.1.0`.
 - Calculation and standards doctoring now trace the official Korean calendar basis, independent NAOJ cross-check, IERS time-scale policy, JPL DE440 claim boundary, signed before/after model errors, and residual historical-time risks.
+- Product-owned LLM composition now always uses `ContextualOrchestratorReportInterpreter`; `INTERPRETATION_BACKEND=nvidia_nim` and non-`orchestrator/free` virtual models fail configuration validation instead of selecting another route.
+- Provider discovery, provider credentials, free-pool eligibility, failover, and test-time compute allocation are assigned to the Contextual Orchestrator bounded context; Four Pillars retains prompts, immutable calculation evidence, report schemas, quality rules, and artifact publication.
+- Root architecture, TRD, API, modularity, UML, standards traceability, operations, and environment examples now describe the same DDD context map and fail-closed orchestration boundary.
+- Repository-specific model-backed development is replaced by the shared ContextualWisdomLab hourly maintainer, while the minute-17 repository workflow remains a model-free release-quality sentinel.
+
+### Removed
+
+- Direct NVIDIA NIM live smoke/evaluation scripts and their provider-secret GitHub Actions workflow.
+- The minute-47 repository-specific NVIDIA NIM/OpenCode autonomous writer, its dedicated security tests, runbook, and doctoring file; the organization-level hourly writer now owns that responsibility.
+- Provider-native NIM configuration from `.env.example` and operator-facing runtime documentation.
+
+### Security
+
+- `orchestrator/free` is fail-closed: an unavailable gateway or empty free pool does not switch to a direct provider or paid virtual route.
+- Live evaluation logs no longer serialize raw model content in generation traces; only virtual model, attempts, repairs, and the structured judge result are printed.
+- Normal hourly and release gates receive no provider or Contextual Orchestrator credentials; the manual live lane receives only the gateway token and URL.
 
 ### Planned
 
+- Move the historical provider-specific `nim.py` transport namespace under a provider-neutral `infrastructure/orchestration` ACL together with imports, compatibility exports, tests, UML, and coverage evidence.
 - PostgreSQL and object-storage adapters for horizontally scalable multi-node deployments.
 - RFC 9457 Problem Details and W3C Trace Context propagation through a separately versioned compatibility change.
 - Stage-aware test-time compute allocation and ablation across routed and conducted interpretation stages.

@@ -47,7 +47,7 @@ def test_hourly_workflow_runs_the_full_release_gate_and_manages_one_issue() -> N
         "python -m compileall -q src tests scripts",
         "python scripts/check_docs.py",
         "python scripts/check_prompts.py",
-        "pytest -m 'not nim_live'",
+        "pytest -m 'not orchestrator_live'",
         "python -m build --no-isolation",
     ):
         assert command in text
@@ -56,6 +56,7 @@ def test_hourly_workflow_runs_the_full_release_gate_and_manages_one_issue() -> N
     assert "gh issue comment" in text
     assert "gh issue close" in text
     assert "NVIDIA_NIM_API_KEY" not in text
+    assert "OPENAI_API_KEY" not in text
     assert "CONTEXTUAL_ORCHESTRATOR_TOKEN" not in text
 
 
@@ -69,7 +70,7 @@ def test_hourly_issue_sync_treats_setup_or_loop_skips_as_failures() -> None:
 
 
 def test_product_gap_audit_passes_the_repository_contract() -> None:
-    """Report no release, interpretation, standards, prompt, or naming gaps."""
+    """Report no release, orchestration, standards, prompt, or naming gaps."""
     module = load_audit_module()
 
     assert module.audit_repository(Path(".")) == []
@@ -104,10 +105,7 @@ def assert_token_contract_detects_missing_entries(
         path.write_text(original_contents[path], encoding="utf-8")
         path.write_text("different contract", encoding="utf-8")
         missing_token = audit(root)
-        assert any(
-            gap.path == relative and token in gap.message
-            for gap in missing_token
-        )
+        assert any(gap.path == relative and token in gap.message for gap in missing_token)
         path.write_text(original_contents[path], encoding="utf-8")
 
     assert audit(root) == []
@@ -124,13 +122,32 @@ def test_report_history_contract_audit_detects_missing_tokens(tmp_path: Path) ->
 
 
 def test_interpretation_contract_audit_detects_missing_tokens(tmp_path: Path) -> None:
-    """Keep backend selection, credentials, adapters, and operations documentation aligned."""
+    """Keep orchestration settings, ACL adapters, tests, and operations docs aligned."""
     module = load_audit_module()
     assert_token_contract_detects_missing_entries(
         tmp_path,
         module.INTERPRETATION_CONTRACTS,
         "audit_interpretation_contract",
     )
+
+
+def test_interpretation_audit_rejects_provider_runtime_configuration(tmp_path: Path) -> None:
+    """Fail the architecture gate when product env docs advertise a provider-native route."""
+    module = load_audit_module()
+    root = tmp_path / "provider-runtime"
+    for relative, token in module.INTERPRETATION_CONTRACTS:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(token, encoding="utf-8")
+    env_path = root / ".env.example"
+    env_path.write_text(
+        env_path.read_text(encoding="utf-8") + "\nNVIDIA_NIM_API_KEY=forbidden\n",
+        encoding="utf-8",
+    )
+
+    gaps = module.audit_interpretation_contract(root)
+
+    assert any(gap.code == "direct_provider_runtime_config" for gap in gaps)
 
 
 def test_standards_contract_audit_detects_missing_tokens(tmp_path: Path) -> None:
@@ -179,6 +196,7 @@ def test_standards_doctoring_contains_authoritative_and_peer_reviewed_sources() 
     for token in (
         "StructuredGenerationClient",
         "ContextualOrchestratorClient",
+        "orchestrator/free",
         "traditional interpretation",
         "100% statement and branch coverage",
         "kasi_2026_jie_terms.json",
@@ -236,10 +254,11 @@ def test_hourly_loop_runbook_explains_scope_failure_and_recovery() -> None:
 
     for heading in (
         "## Schedule",
+        "## Shared autonomous development loop",
         "## Release-quality gate",
         "## Product-gap audit",
         "## Failure issue lifecycle",
-        "## Security and NIM boundary",
+        "## Security and orchestration boundary",
         "## Manual recovery",
     ):
         assert heading in text

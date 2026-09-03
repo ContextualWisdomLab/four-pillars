@@ -1,4 +1,4 @@
-"""Verify the optional Contextual Orchestrator structured-generation adapter."""
+"""Verify the Contextual Orchestrator structured-generation adapter."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ def settings(**updates: object) -> Settings:
         "interpretation_backend": "contextual_orchestrator",
         "contextual_orchestrator_base_url": "https://orchestrator.test/v1",
         "contextual_orchestrator_token": "orchestrator-test-token",
-        "contextual_orchestrator_model": "contextual-orchestrator",
+        "contextual_orchestrator_model": "orchestrator/free",
         "contextual_orchestrator_mode": "auto",
         "contextual_orchestrator_timeout_seconds": 30,
         "contextual_orchestrator_max_retries": 2,
@@ -44,8 +44,8 @@ def settings(**updates: object) -> Settings:
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_sends_auth_attribution_and_real_routing() -> None:
-    """Avoid JSON passthrough so the gateway may route or conduct the request."""
+async def test_orchestrator_sends_auth_attribution_and_free_routing() -> None:
+    """Send product LLM work through the fail-closed zero-cost virtual route."""
     observed: dict[str, object] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -77,12 +77,12 @@ async def test_orchestrator_sends_auth_attribution_and_real_routing() -> None:
     body = observed["body"]
     assert isinstance(body, dict)
     assert answer.title == "결과"
-    assert trace.model == "contextual-orchestrator"
+    assert trace.model == "orchestrator/free"
     assert trace.attempts == 1
     assert trace.repairs == 0
     assert observed["authorization"] == "Bearer orchestrator-test-token"
     assert observed["path"] == "/v1/chat/completions"
-    assert body["model"] == "contextual-orchestrator"
+    assert body["model"] == "orchestrator/free"
     assert "response_format" not in body
     assert body["mode"] == "auto"
     assert body["include_orchestration_trace"] is False
@@ -105,7 +105,7 @@ async def test_orchestrator_sends_auth_attribution_and_real_routing() -> None:
 
 @pytest.mark.asyncio
 async def test_orchestrator_respects_explicit_compute_mode() -> None:
-    """Forward the bounded route/conduct choice without triggering passthrough."""
+    """Forward the bounded route/conduct choice without leaving the free pool."""
     observed: dict[str, object] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -136,6 +136,7 @@ async def test_orchestrator_respects_explicit_compute_mode() -> None:
     body = observed["body"]
     assert isinstance(body, dict)
     assert body["mode"] == "conduct"
+    assert body["model"] == "orchestrator/free"
     assert "response_format" not in body
 
 
@@ -177,11 +178,12 @@ async def test_orchestrator_omits_empty_optional_attribution_values() -> None:
     body = observed["body"]
     assert isinstance(body, dict)
     assert body["attribution"] == {"service": "four-pillars"}
+    assert body["model"] == "orchestrator/free"
 
 
 @pytest.mark.asyncio
 async def test_invalid_first_response_gets_one_orchestrator_schema_repair() -> None:
-    """Repair one schema-invalid response without changing providers."""
+    """Repair one schema-invalid response without changing virtual routes."""
     calls: list[dict[str, object]] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -213,6 +215,7 @@ async def test_invalid_first_response_gets_one_orchestrator_schema_repair() -> N
     assert "Required JSON Schema" in calls[1]["messages"][-1]["content"]
     assert calls[1]["attribution"]["service"] == "four-pillars"
     assert calls[1]["mode"] == "auto"
+    assert calls[1]["model"] == "orchestrator/free"
     assert "response_format" not in calls[1]
 
 
@@ -227,7 +230,10 @@ async def test_orchestrator_retries_rate_limit_then_succeeds(
     async def fake_sleep(delay: float) -> None:
         sleeps.append(delay)
 
-    monkeypatch.setattr("four_pillars.nim.asyncio.sleep", fake_sleep)
+    monkeypatch.setattr(
+        "four_pillars.infrastructure.orchestration.openai_compatible.asyncio.sleep",
+        fake_sleep,
+    )
 
     def handler(request: httpx.Request) -> httpx.Response:
         nonlocal calls
@@ -261,6 +267,7 @@ async def test_orchestrator_retries_rate_limit_then_succeeds(
         )
 
     assert answer.title == "성공"
+    assert trace.model == "orchestrator/free"
     assert trace.attempts == 2
     assert calls == 2
     assert sleeps == [1.0]
@@ -268,7 +275,7 @@ async def test_orchestrator_retries_rate_limit_then_succeeds(
 
 @pytest.mark.asyncio
 async def test_orchestrator_fails_permanent_client_error_without_retry() -> None:
-    """Fail a caller error immediately and never invoke direct NVIDIA NIM."""
+    """Fail a caller error immediately and never invoke a direct provider."""
     calls = 0
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -314,7 +321,7 @@ async def test_orchestrator_exhausts_schema_repairs() -> None:
 
 
 def test_missing_orchestrator_token_fails_without_provider_fallback() -> None:
-    """Reject a missing orchestrator credential instead of calling direct NIM."""
+    """Reject a missing orchestrator credential instead of calling a provider directly."""
     with pytest.raises(
         ContextualOrchestratorError,
         match="CONTEXTUAL_ORCHESTRATOR_TOKEN",
@@ -324,10 +331,20 @@ def test_missing_orchestrator_token_fails_without_provider_fallback() -> None:
         )
 
 
-def test_settings_reject_unknown_interpretation_backend() -> None:
-    """Allow exactly the two explicitly supported interpretation backends."""
+def test_settings_reject_direct_or_unknown_interpretation_backends() -> None:
+    """Reject provider-native and unknown runtime composition choices."""
+    with pytest.raises(ValidationError):
+        Settings(interpretation_backend="nvidia_nim")
     with pytest.raises(ValidationError):
         Settings(interpretation_backend="silent-fallback")
+
+
+def test_settings_reject_non_free_orchestrator_virtual_model() -> None:
+    """Keep the product-owned LLM route pinned to the fail-closed free pool."""
+    with pytest.raises(ValidationError):
+        settings(contextual_orchestrator_model="contextual-orchestrator")
+    with pytest.raises(ValidationError):
+        settings(contextual_orchestrator_model="orchestrator/auto")
 
 
 def test_settings_bound_orchestrator_operational_values() -> None:

@@ -1,4 +1,4 @@
-"""Verify settings-driven interpretation backend selection and port compatibility."""
+"""Verify settings-driven interpretation composition and port compatibility."""
 
 from __future__ import annotations
 
@@ -12,13 +12,11 @@ from test_quality import valid_report
 import four_pillars
 from four_pillars.adapters import (
     ContextualOrchestratorReportInterpreter,
-    NimReportInterpreter,
     build_report_interpreter,
 )
 from four_pillars.analysis import GeneratedReport
 from four_pillars.generation import GenerationTrace, StructuredGenerationClient
 from four_pillars.models import BirthInput, Gender
-from four_pillars.nim import NimTrace
 from four_pillars.ports import ReportInterpreter
 from four_pillars.service import (
     ReportRequest,
@@ -29,10 +27,11 @@ from four_pillars.settings import Settings
 
 
 def settings(tmp_path: Path, **updates: object) -> Settings:
-    """Return isolated service settings with optional backend overrides."""
+    """Return isolated service settings with optional orchestrator overrides."""
     values: dict[str, object] = {
         "artifact_dir": tmp_path / "artifacts",
         "database_url": f"sqlite:///{tmp_path / 'report_jobs.sqlite3'}",
+        "contextual_orchestrator_token": "test-token",
     }
     values.update(updates)
     return Settings(**values)
@@ -57,32 +56,29 @@ def request() -> ReportRequest:
 def test_top_level_package_exports_modular_interpretation_contract() -> None:
     """Expose integration ports without requiring internal module imports."""
     assert four_pillars.GenerationTrace is GenerationTrace
-    assert NimTrace is GenerationTrace
     assert four_pillars.StructuredGenerationClient is StructuredGenerationClient
     assert four_pillars.build_report_interpreter is build_report_interpreter
     assert (
         four_pillars.ContextualOrchestratorReportInterpreter
         is ContextualOrchestratorReportInterpreter
     )
+    assert not hasattr(four_pillars, "NimReportInterpreter")
 
 
-def test_backend_factory_preserves_direct_nim_default(tmp_path: Path) -> None:
-    """Keep direct NVIDIA NIM as the standalone interpretation default."""
+def test_backend_factory_uses_contextual_orchestrator_by_default(tmp_path: Path) -> None:
+    """Route product-owned LLM work through the organization orchestrator by default."""
     configured = settings(tmp_path)
 
     interpreter = build_report_interpreter(configured)
 
-    assert isinstance(interpreter, NimReportInterpreter)
+    assert isinstance(interpreter, ContextualOrchestratorReportInterpreter)
     assert isinstance(interpreter, ReportInterpreter)
+    assert configured.contextual_orchestrator_model == "orchestrator/free"
 
 
 def test_backend_factory_builds_contextual_orchestrator_adapter(tmp_path: Path) -> None:
-    """Select the organization orchestrator only when explicitly configured."""
-    configured = settings(
-        tmp_path,
-        interpretation_backend="contextual_orchestrator",
-        contextual_orchestrator_token="test-token",
-    )
+    """Keep explicit orchestrator configuration compatible with the sole product path."""
+    configured = settings(tmp_path, interpretation_backend="contextual_orchestrator")
 
     interpreter = build_report_interpreter(configured)
 
@@ -91,12 +87,8 @@ def test_backend_factory_builds_contextual_orchestrator_adapter(tmp_path: Path) 
 
 
 def test_report_service_uses_settings_factory_for_standalone_default(tmp_path: Path) -> None:
-    """Compose the selected adapter without changing explicit dependency injection."""
-    configured = settings(
-        tmp_path,
-        interpretation_backend="contextual_orchestrator",
-        contextual_orchestrator_token="test-token",
-    )
+    """Compose the orchestrator adapter without changing explicit dependency injection."""
+    configured = settings(tmp_path)
 
     service = ReportService(configured)
 
@@ -104,13 +96,9 @@ def test_report_service_uses_settings_factory_for_standalone_default(tmp_path: P
 
 
 def test_report_service_preserves_an_explicit_interpreter(tmp_path: Path) -> None:
-    """Never replace a caller-supplied MSA interpreter with a settings default."""
-    configured = settings(
-        tmp_path,
-        interpretation_backend="contextual_orchestrator",
-        contextual_orchestrator_token="test-token",
-    )
-    injected = NimReportInterpreter(configured)
+    """Never replace a caller-supplied MSA interpreter with the product default."""
+    configured = settings(tmp_path)
+    injected = ContextualOrchestratorReportInterpreter(configured)
 
     service = ReportService(configured, interpreter=injected)
 
@@ -123,11 +111,7 @@ async def test_orchestrator_adapter_forwards_immutable_evidence(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Open the selected client and pass every calculated model unchanged."""
-    configured = settings(
-        tmp_path,
-        interpretation_backend="contextual_orchestrator",
-        contextual_orchestrator_token="test-token",
-    )
+    configured = settings(tmp_path)
     report_request = request()
     bundle = calculate_bundle(report_request)
     expected = GeneratedReport(report=valid_report(), traces={})

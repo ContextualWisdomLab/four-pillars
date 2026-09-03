@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-import httpx
 import pytest
 from pydantic import BaseModel, ConfigDict, ValidationError
 from test_quality import valid_report
@@ -13,7 +12,6 @@ from four_pillars.calendar import calculate_chart
 from four_pillars.fortune import calculate_monthly_luck
 from four_pillars.jobs import JobStore
 from four_pillars.models import BirthInput, PracticalSkill, ReportSection
-from four_pillars.nim import NimClient, NimError
 from four_pillars.quality import validate_report
 from four_pillars.service import ReportService
 from four_pillars.settings import Settings
@@ -38,28 +36,6 @@ def test_quality_gate_rejects_unsupplied_sexagenary_pillar() -> None:
     report.sections["monthly"].evidence = ["월운 甲子"]
     issues = validate_report(report, "a" * 64, allowed_pillars={"丙申"})
     assert "ungrounded_pillar" in {issue.code for issue in issues}
-
-
-@pytest.mark.asyncio
-async def test_zero_nim_retries_means_one_total_http_attempt() -> None:
-    calls = 0
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        nonlocal calls
-        calls += 1
-        return httpx.Response(503, text="unavailable")
-
-    settings = Settings(
-        nvidia_nim_api_key="key",
-        nim_base_url="https://nim.test/v1",
-        nim_model="model",
-        nim_max_retries=0,
-        nim_max_schema_repairs=0,
-    )
-    async with NimClient(settings, transport=httpx.MockTransport(handler)) as client:
-        with pytest.raises(NimError, match="after retries"):
-            await client.generate(system_prompt="JSON", user_payload={}, response_model=Answer)
-    assert calls == 1
 
 
 def test_artifact_reader_rejects_database_path_outside_configured_root(tmp_path: Path) -> None:

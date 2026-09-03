@@ -31,7 +31,7 @@ REQUIRED_DOCUMENTS = (
     "docs/technical/CALCULATION.md",
     "docs/technical/API.md",
     "docs/technical/MODULARITY.md",
-    "docs/operations/NIM.md",
+    "docs/operations/ORCHESTRATION.md",
     "docs/operations/RUNBOOK.md",
     "docs/operations/HOURLY_PRODUCT_LOOP.md",
     "docs/standards/REFERENCES.md",
@@ -39,6 +39,7 @@ REQUIRED_DOCUMENTS = (
     "docs/uml/architecture.md",
     "docs/uml/domain.puml",
     "docs/adr/0003-explicit-contextual-orchestrator-backend.md",
+    "docs/adr/0004-contextual-orchestrator-free-runtime.md",
 )
 REQUIRED_WORKFLOWS = (
     ".github/workflows/hourly-product-loop.yml",
@@ -65,14 +66,25 @@ INTERPRETATION_CONTRACTS = (
         "src/four_pillars/adapters.py",
         "class ContextualOrchestratorReportInterpreter",
     ),
-    ("src/four_pillars/adapters.py", "def build_report_interpreter"),
-    ("src/four_pillars/settings.py", "contextual_orchestrator_token"),
-    (".env.example", "INTERPRETATION_BACKEND=nvidia_nim"),
-    (".env.example", "CONTEXTUAL_ORCHESTRATOR_TOKEN="),
-    ("docs/operations/NIM.md", "never silently routes"),
     (
-        "docs/adr/0003-explicit-contextual-orchestrator-backend.md",
-        "No implicit fallback",
+        "src/four_pillars/adapters.py",
+        "Build the sole product-owned LLM adapter through Contextual Orchestrator",
+    ),
+    (
+        "src/four_pillars/settings.py",
+        'InterpretationBackend = Literal["contextual_orchestrator"]',
+    ),
+    (
+        "src/four_pillars/settings.py",
+        'Literal["orchestrator/free"] = "orchestrator/free"',
+    ),
+    (".env.example", "INTERPRETATION_BACKEND=contextual_orchestrator"),
+    (".env.example", "CONTEXTUAL_ORCHESTRATOR_MODEL=orchestrator/free"),
+    ("tests/test_contextual_orchestrator.py", 'body["model"] == "orchestrator/free"'),
+    ("docs/operations/ORCHESTRATION.md", "orchestrator/free"),
+    (
+        "docs/adr/0004-contextual-orchestrator-free-runtime.md",
+        "Direct provider compatibility code may remain temporarily as a test harness",
     ),
 )
 STANDARDS_CONTRACTS = (
@@ -200,13 +212,31 @@ def audit_history_contract(root: Path) -> list[ProductGap]:
 
 
 def audit_interpretation_contract(root: Path) -> list[ProductGap]:
-    """Return gaps in explicit interpretation backend and credential boundaries."""
-    return _audit_token_contracts(
+    """Return gaps in the orchestration ACL and free-pool runtime contract."""
+    gaps = _audit_token_contracts(
         root,
         INTERPRETATION_CONTRACTS,
         code="interpretation_backend_contract",
         label="Interpretation-backend contract",
     )
+    env_path = root / ".env.example"
+    if env_path.is_file():
+        env_text = env_path.read_text(encoding="utf-8")
+        for forbidden in (
+            "NVIDIA_NIM_API_KEY=",
+            "NIM_BASE_URL=",
+            "NIM_MODEL=",
+            "NIM_EVAL_MODEL=",
+        ):
+            if forbidden in env_text:
+                gaps.append(
+                    _gap(
+                        "direct_provider_runtime_config",
+                        ".env.example",
+                        f"Product runtime configuration must not advertise {forbidden.rstrip('=')}",
+                    )
+                )
+    return gaps
 
 
 def audit_standards_contract(root: Path) -> list[ProductGap]:
@@ -323,7 +353,7 @@ def audit_repository(root: Path) -> list[ProductGap]:
                 _gap(
                     "legacy_nim_key",
                     path.relative_to(root).as_posix(),
-                    "Use NVIDIA_NIM_API_KEY exclusively for direct hosted NVIDIA NIM.",
+                    "Use NVIDIA_NIM_API_KEY exclusively for historical direct-NIM compatibility code.",
                 )
             )
 
@@ -449,7 +479,7 @@ def render_markdown(gaps: list[ProductGap]) -> str:
     ]
     if not gaps:
         lines.append(
-            "All deterministic release, modularity, interpretation, standards, "
+            "All deterministic release, modularity, orchestration, standards, "
             "authority-fixture, prompt, credential, and database naming contracts passed."
         )
     else:

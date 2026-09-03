@@ -14,7 +14,7 @@ REQUIRED = (
     "docs/technical/CALCULATION.md",
     "docs/technical/API.md",
     "docs/technical/MODULARITY.md",
-    "docs/operations/NIM.md",
+    "docs/operations/ORCHESTRATION.md",
     "docs/operations/RUNBOOK.md",
     "docs/operations/HOURLY_PRODUCT_LOOP.md",
     "docs/standards/REFERENCES.md",
@@ -24,6 +24,7 @@ REQUIRED = (
     "docs/adr/0001-deterministic-core-and-nim-boundary.md",
     "docs/adr/0002-nvidia-nim.md",
     "docs/adr/0003-explicit-contextual-orchestrator-backend.md",
+    "docs/adr/0004-contextual-orchestrator-free-runtime.md",
 )
 FORBIDDEN = ("TBD", "TODO", "implement later", "fill in details")
 STANDARDS_TOKENS = {
@@ -41,7 +42,7 @@ STANDARDS_TOKENS = {
     "docs/standards/TRACEABILITY.md": (
         "ContextualOrchestratorClient",
         "StructuredGenerationClient",
-        "NVIDIA_NIM_API_KEY",
+        "orchestrator/free",
         "CONTEXTUAL_ORCHESTRATOR_TOKEN",
         "100% statement and branch coverage",
         "traditional interpretation",

@@ -1,4 +1,4 @@
-"""Verify standalone defaults and replaceable service ports for MSA integrations."""
+"""Verify default adapters and replaceable service ports for MSA integrations."""
 
 from __future__ import annotations
 
@@ -9,7 +9,10 @@ from typing import Any
 import pytest
 from test_quality import valid_report
 
-from four_pillars.adapters import FilesystemArtifactPublisher, NimReportInterpreter
+from four_pillars.adapters import (
+    ContextualOrchestratorReportInterpreter,
+    FilesystemArtifactPublisher,
+)
 from four_pillars.analysis import GeneratedReport
 from four_pillars.jobs import JobStore
 from four_pillars.models import (
@@ -159,19 +162,21 @@ def request() -> ReportRequest:
 
 
 def settings(tmp_path: Path) -> Settings:
-    """Return isolated storage configuration for one service test."""
+    """Return isolated storage and orchestrator configuration for one service test."""
     return Settings(
         artifact_dir=tmp_path / "artifacts",
         database_url=f"sqlite:///{tmp_path / 'report_jobs.sqlite3'}",
+        contextual_orchestrator_token="test-token",
     )
 
 
-def test_default_service_keeps_the_standalone_adapters(tmp_path: Path) -> None:
-    """Construct SQLite, hosted NIM, and filesystem adapters when none are injected."""
+def test_default_service_uses_orchestration_anti_corruption_layer(tmp_path: Path) -> None:
+    """Construct SQLite, Contextual Orchestrator, and filesystem adapters by default."""
     service = ReportService(settings(tmp_path))
 
     assert isinstance(service.store, JobStore)
-    assert isinstance(service.interpreter, NimReportInterpreter)
+    assert isinstance(service.interpreter, ContextualOrchestratorReportInterpreter)
+    assert service.interpreter.settings.contextual_orchestrator_model == "orchestrator/free"
     assert isinstance(service.publisher, FilesystemArtifactPublisher)
 
 
@@ -205,7 +210,7 @@ def test_optional_capabilities_preserve_existing_repository_adapters(tmp_path: P
 
 
 @pytest.mark.asyncio
-async def test_injected_ports_process_a_job_without_nim_or_default_filesystem_publisher(
+async def test_injected_ports_process_a_job_without_product_owned_llm_transport(
     tmp_path: Path,
 ) -> None:
     """Run application orchestration with independently supplied repository and adapters."""
