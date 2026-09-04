@@ -8,6 +8,11 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ### Added
 
+- CLI options for explicit solar or lunar calendar input, leap-month selection,
+  birthplace longitude, and civil, mean-solar, or apparent-solar time policy,
+  with a Bucheon 1990 regression proving the corrected time rounds to 07:57
+  while remaining in the same `壬辰` hour pillar.
+- Regression evidence distinguishing regular lunar 1990-05-23 (solar 1990-06-15) from leap lunar 1990-05-23 (solar 1990-07-15).
 - Independent KASI/NAOJ 2026 golden fixtures for all twelve month-changing solar terms, enforcing a two-minute timing budget and five-minute year/month pillar transition checks without network or test-only ephemeris dependencies.
 - Offline authority-fixture governance that detects missing evidence, provenance, tolerance, traceability, and calculation-version contracts in the hourly product-gap audit.
 

@@ -25,6 +25,8 @@ The selected interpretation adapter never changes deterministic evidence and nev
 
 `solar.py` evaluates a bounded VSOP87 Earth longitude/radius series in Terrestrial Time and applies FK5, dominant nutation, and aberration corrections without a network or third-party ephemeris dependency. `calendar.py` locates the month-changing roots, normalizes birth time, calculates four pillars, ten gods, hidden stems, growth stages, element balance, interactions, boundary warnings, and the SHA-256 fingerprint.
 
+Birth-time normalization keeps civil time as the default and applies mean or apparent solar correction only when an east-positive longitude and explicit policy are supplied. The effective IANA offset at the birth moment incorporates historical DST exactly once. The API model and both calculation CLI commands expose the same policy without retaining place names or calling a geocoder.
+
 All twelve 2026 `jie` boundaries are checked against committed KASI/NAOJ minute-precision evidence with a two-minute budget and buyer-visible five-minute year/month transition tests. The calculation evidence version is `calendar-1.1.0`.
 
 ### 3.2 `fortune.py`
@@ -110,7 +112,7 @@ Current generation traces are not W3C distributed traces. A future separately re
 
 ## 10. Test strategy
 
-Unit tests cover known pillars, all twelve externally published 2026 solar-term instants and transitions, time policies, ten gods, daewoon direction, monthly period dates, queue transitions, idempotent creation, strict history cursors, stable multi-page traversal, privacy redaction, optional adapter behavior, quality rules, report rendering, and API authentication.
+Unit tests cover known pillars, the Bucheon 1990 apparent-solar result and unchanged hour pillar, regular-versus-leap fifth lunar month conversion, all twelve externally published 2026 solar-term instants and transitions, time policies, ten gods, daewoon direction, monthly period dates, queue transitions, idempotent creation, strict history cursors, stable multi-page traversal, privacy redaction, optional adapter behavior, quality rules, report rendering, and API authentication.
 
 Structured-generation contract tests use `httpx.MockTransport` to verify both direct NIM and orchestrator authentication, endpoint shape, JSON mode, attribution, routing, schema validation, bounded repair, transient retry, terminal error, backend selection, and no-fallback behavior. Live direct NIM tests are marked and skipped without `NVIDIA_NIM_API_KEY`.
 

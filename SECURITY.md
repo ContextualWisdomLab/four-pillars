@@ -10,7 +10,7 @@ Do not open a public issue for a vulnerability that could expose birth data, gen
 
 ## Protected information
 
-Birth date, birth time, location, calendar choice, relationship notes, work notes, and generated reports can identify a person or reveal sensitive circumstances. Production deployments must encrypt transport, restrict storage access, set a retention period, avoid logging raw prompts or reports, and provide deletion.
+Birth date, birth time, location, calendar choice, relationship notes, work notes, and generated reports can identify a person or reveal sensitive circumstances. Production deployments must encrypt transport, restrict storage access, set a retention period, avoid logging raw prompts or reports, and provide deletion. Birthplace correction accepts only bounded numeric longitude; the product neither retains a place name nor calls an external geocoder.
 
 `NVIDIA_NIM_API_KEY`, `CONTEXTUAL_ORCHESTRATOR_TOKEN`, API authentication values, database credentials, and organization gateway credentials must be stored as secrets and never committed. Direct NVIDIA NIM and Contextual Orchestrator credentials are separate trust boundaries and must not be substituted, forwarded, or copied into one another's configuration.
 

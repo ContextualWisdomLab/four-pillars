@@ -149,6 +149,8 @@ The integration introduces no database object. Existing application-owned object
 
 ## 11. Independent calendar-evidence traceability
 
+Birthplace-time evidence is separately traced in `docs/doctoring/bucheon-birth-time.md`: NOAA supplies the solar-time relationship, IANA supplies historical Seoul UTC/DST offsets, Korean law supplies the 135° E standard meridian, and public CLI/calendar regressions cover the Bucheon time and regular-versus-leap lunar month assertions.
+
 | Contract | Implementation | Verification evidence | Residual limitation |
 |---|---|---|---|
 | Official Korean calendar basis | KASI 2026 월력요항 announcement and institute calendar-data presentation | `docs/doctoring/kasi-solar-term-golden-fixtures.md` | Display page is convenient evidence; formal announcement remains the authority boundary |
