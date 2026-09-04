@@ -2,7 +2,7 @@
 
 ## Development setup
 
-Use Python 3.11 or 3.12. Create a virtual environment and run `pip install -e '.[dev]'`. Copy `.env.example` only when testing the API or NVIDIA NIM. Offline tests must not require an API key.
+Use Python 3.11 through 3.14. Create a virtual environment and run `pip install -e '.[dev]'`. Copy `.env.example` only when testing the API or NVIDIA NIM. Offline tests must not require an API key.
 
 ## Change workflow
 
