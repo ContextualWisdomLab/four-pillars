@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import closing
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -32,7 +33,7 @@ def test_job_retention_purges_only_old_terminal_rows(tmp_path: Path) -> None:
     store.fail(recent.id, "failure")
 
     old_timestamp = (datetime.now(UTC) - timedelta(days=45)).isoformat()
-    with sqlite3.connect(store.database_path) as connection:
+    with closing(sqlite3.connect(store.database_path)) as connection, connection:
         connection.execute("UPDATE report_jobs SET updated_at=? WHERE id=?", (old_timestamp, old.id))
     assert store.purge(30) == [old.id]
     assert store.get(old.id) is None

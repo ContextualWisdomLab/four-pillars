@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import sqlite3
+from contextlib import closing
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -120,7 +121,7 @@ def test_existing_job_database_is_migrated_without_losing_queued_requests(tmp_pa
     """Backfill fingerprints and add the unique idempotency index to a v0.3 database."""
     database = tmp_path / "report_jobs.sqlite3"
     now = datetime.now(UTC).isoformat()
-    with sqlite3.connect(database) as connection:
+    with closing(sqlite3.connect(database)) as connection, connection:
         connection.execute(
             """
             CREATE TABLE report_jobs (
@@ -141,7 +142,7 @@ def test_existing_job_database_is_migrated_without_losing_queued_requests(tmp_pa
 
     store = JobStore(database)
     migrated = store.get("legacy-job")
-    with sqlite3.connect(database) as connection:
+    with closing(sqlite3.connect(database)) as connection, connection:
         columns = {row[1] for row in connection.execute("PRAGMA table_info(report_jobs)")}
         indexes = {row[1] for row in connection.execute("PRAGMA index_list(report_jobs)")}
 

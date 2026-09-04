@@ -1,11 +1,40 @@
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
 from four_pillars.jobs import JobStore
+
+
+def test_store_connection_context_closes_the_database(tmp_path: Path) -> None:
+    """Release SQLite handles when one repository operation leaves its context."""
+    store = JobStore(tmp_path / "jobs.sqlite3")
+
+    with store._connect() as connection:
+        connection.execute("SELECT 1")
+
+    with pytest.raises(sqlite3.ProgrammingError, match="closed"):
+        connection.execute("SELECT 1")
+
+
+def test_store_connection_closes_when_setup_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Release the SQLite handle when post-connect configuration fails."""
+    store = JobStore(tmp_path / "jobs.sqlite3")
+    connection = MagicMock()
+    connection.execute.side_effect = sqlite3.OperationalError("setup failed")
+    monkeypatch.setattr(sqlite3, "connect", lambda *_args, **_kwargs: connection)
+
+    with pytest.raises(sqlite3.OperationalError, match="setup failed"), store._connect():
+        pass
+
+    connection.close.assert_called_once_with()
 
 
 class LostClaimConnection:

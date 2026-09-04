@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from types import ModuleType
 
@@ -216,7 +217,7 @@ def test_database_schema_uses_only_policy_compliant_object_names(tmp_path: Path)
 
     database = tmp_path / "audit.sqlite3"
     JobStore(database)
-    with sqlite3.connect(database) as connection:
+    with closing(sqlite3.connect(database)) as connection, connection:
         names = [
             row[0]
             for row in connection.execute(
