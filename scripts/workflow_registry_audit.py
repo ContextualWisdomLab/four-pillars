@@ -16,18 +16,20 @@ import json
 import os
 import re
 import sys
-import urllib.error
-import urllib.request
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, NamedTuple
+
+import httpx
 
 EXIT_CLEAN = 0
 EXIT_ORPHANS = 1
 EXIT_UNRESOLVED = 2
 
 API_ROOT = "https://api.github.com"
+# Pseudo-status for a URL the transport refuses to request (wrong scheme or host).
+STATUS_REFUSED_URL = 0
 DYNAMIC_PREFIX = "dynamic/"
 WORKFLOW_DIRECTORY = ".github/workflows"
 
@@ -92,29 +94,32 @@ def _next_link(link_header: str | None) -> str | None:
     return match.group(1) if match else None
 
 
-def github_fetcher(token: str) -> Fetcher:
-    """Build a transport that returns ``{"status", "body", "next_url"}`` and never raises."""
+def github_fetcher(token: str, *, transport: httpx.BaseTransport | None = None) -> Fetcher:
+    """Build a transport that returns ``{"status", "body", "next_url"}`` and never raises.
+
+    Only ``https://api.github.com/`` URLs are requested, including ``rel="next"``
+    links echoed back by the API, so no other scheme or host can be reached.
+    """
+    client = httpx.Client(
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+        timeout=60,
+        transport=transport,
+    )
 
     def fetch(url: str) -> dict[str, Any]:
-        request = urllib.request.Request(
-            url,
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-            },
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=60) as response:  # nosec B310
-                payload = json.loads(response.read().decode("utf-8"))
-                return {
-                    "status": response.status,
-                    "body": payload,
-                    "next_url": _next_link(response.headers.get("Link")),
-                }
-        except urllib.error.HTTPError as error:
-            error.close()
-            return {"status": error.code, "body": {}, "next_url": None}
+        if not url.startswith(f"{API_ROOT}/"):
+            return {"status": STATUS_REFUSED_URL, "body": {}, "next_url": None}
+        response = client.get(url)
+        body = response.json() if response.status_code == 200 else {}
+        return {
+            "status": response.status_code,
+            "body": body,
+            "next_url": _next_link(response.headers.get("Link")),
+        }
 
     return fetch
 

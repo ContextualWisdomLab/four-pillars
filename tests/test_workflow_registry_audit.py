@@ -175,44 +175,47 @@ def test_main_reads_token_from_environment_and_writes_output(
     assert "`cafe`" in output.read_text(encoding="utf-8")
 
 
-def test_github_fetcher_maps_http_errors_and_link_headers(
-    registry_audit: ModuleType, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_github_fetcher_maps_http_errors_and_link_headers(registry_audit: ModuleType) -> None:
     """The real transport returns status, JSON body, and the rel=next link without raising."""
-    import io
-    import urllib.error
+    import httpx
 
-    class _Response(io.BytesIO):
-        def __init__(self, payload: bytes, link: str | None) -> None:
-            super().__init__(payload)
-            self.status = 200
-            self.headers = {"Link": link} if link else {}
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers["Authorization"] == "Bearer token"
+        if request.url.path == "/next":
+            return httpx.Response(403, json={"message": "forbidden"})
+        return httpx.Response(
+            200,
+            json={"workflows": []},
+            headers={"Link": '<https://api.github.com/next>; rel="next"'},
+        )
 
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *_exc: object) -> None:
-            self.close()
-
-    responses = {
-        "https://api.github.com/repos/o/r/actions/workflows?per_page=100": _Response(
-            b'{"workflows": []}', '<https://api.github.com/next>; rel="next"'
-        ),
-    }
-
-    def fake_urlopen(request, timeout=None):
-        url = request.full_url
-        if url == "https://api.github.com/next":
-            raise urllib.error.HTTPError(url, 403, "forbidden", {}, io.BytesIO(b"{}"))
-        return responses[url]
-
-    monkeypatch.setattr(registry_audit.urllib.request, "urlopen", fake_urlopen)
-    fetch = registry_audit.github_fetcher("token")
+    fetch = registry_audit.github_fetcher("token", transport=httpx.MockTransport(handler))
 
     first = fetch("https://api.github.com/repos/o/r/actions/workflows?per_page=100")
     assert first["status"] == 200
     assert first["next_url"] == "https://api.github.com/next"
     assert fetch("https://api.github.com/next")["status"] == 403
+
+
+@pytest.mark.parametrize(
+    "url",
+    ["file:///etc/passwd", "http://api.github.com/x", "https://evil.example/api.github.com/"],
+)
+def test_github_fetcher_refuses_non_github_api_urls(registry_audit: ModuleType, url: str) -> None:
+    """Only https://api.github.com/ URLs are ever requested; anything else is unresolved."""
+    import httpx
+
+    def handler(request: httpx.Request) -> httpx.Response:  # pragma: no cover - must not run
+        raise AssertionError(f"unexpected request to {request.url}")
+
+    fetch = registry_audit.github_fetcher("token", transport=httpx.MockTransport(handler))
+
+    page = fetch(url)
+
+    assert page["status"] == registry_audit.STATUS_REFUSED_URL
+    assert page["next_url"] is None
+    result = registry_audit.inventory(lambda _url: page, "owner/repo")
+    assert result.unresolved_reason == f"registry_page_status_{registry_audit.STATUS_REFUSED_URL}"
 
 
 def test_hourly_loop_runs_the_registry_audit_with_actions_read_only() -> None:
