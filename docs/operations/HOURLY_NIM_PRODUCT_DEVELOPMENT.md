@@ -126,7 +126,7 @@ Stable no-op reasons are:
 - `maintainer_app_unavailable`
 - `ready_dry_run_without_credentials`
 
-If the vendored gateway does not answer `/healthz` within its startup budget,
+If the vendored gateway does not answer authenticated `/readyz` (HTTP 200 only once at least one model agent is enabled; `/healthz` is unauthenticated liveness and would pass an empty pool) within its startup budget,
 the step fails closed with the tail of its own log rather than falling back to
 a direct provider call. A failed verifier publishes nothing. A publisher
 aborts if the artifact, base, queue, or metadata changed. If branch push

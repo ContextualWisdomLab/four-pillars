@@ -47,6 +47,23 @@ def test_gateway_sidecar_isolates_provider_credentials_from_the_agent() -> None:
     ) < proposer.index("Run the hourly product-development agent")
 
 
+def test_gateway_readiness_gate_rejects_auth_failure_and_empty_model_pool() -> None:
+    """Gate the agent on authenticated /readyz, which is 503 while no agent is enabled."""
+
+    proposer, _, _ = workflow_sections()
+
+    gateway_step = proposer.split(
+        "Start the contextual-orchestrator gateway (orchestrator/free)", 1
+    )[1].split("Configure OpenCode for the contextual-orchestrator gateway", 1)[0]
+
+    assert '${ORCHESTRATOR_PORT}/readyz"' in gateway_step
+    assert '${ORCHESTRATOR_PORT}/healthz"' not in gateway_step
+    assert 'Authorization: Bearer ${CONTEXTUAL_ORCHESTRATOR_TOKEN}' in gateway_step
+    # Fail closed: an unready gateway must end the job, never a silent skip.
+    assert "exit 1" in gateway_step
+    assert "dispatch=false" not in gateway_step
+
+
 def test_every_verification_gate_runs_after_runtime_channels_are_unset() -> None:
     """Keep proposed tests away from Actions tokens and command files."""
 

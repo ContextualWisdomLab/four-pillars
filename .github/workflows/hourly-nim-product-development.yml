@@ -242,15 +242,20 @@ jobs:
             --auth-token-key CONTEXTUAL_ORCHESTRATOR_TOKEN \
             --host "$ORCHESTRATOR_HOST" --port "$ORCHESTRATOR_PORT" \
             >"$RUNNER_TEMP/orchestrator-gateway.log" 2>&1 &
+          # /readyz (not /healthz) is the gate: healthz is unauthenticated process
+          # liveness and answers 200 even when auto-discovery found no models,
+          # while readyz returns not_ready until at least one enabled agent
+          # exists. Missing or rejected bearer and an empty orchestrator/free pool
+          # therefore both fail closed here instead of surfacing inside the agent run.
           for _attempt in $(seq 1 30); do
             if curl -fsS -H "Authorization: Bearer ${CONTEXTUAL_ORCHESTRATOR_TOKEN}" \
-              "http://${ORCHESTRATOR_HOST}:${ORCHESTRATOR_PORT}/healthz" >/dev/null 2>&1; then
-              echo 'gateway ready'
+              "http://${ORCHESTRATOR_HOST}:${ORCHESTRATOR_PORT}/readyz" >/dev/null 2>&1; then
+              echo 'gateway ready with a non-empty model pool'
               exit 0
             fi
             sleep 2
           done
-          echo '::error::contextual-orchestrator gateway did not become healthy'
+          echo '::error::contextual-orchestrator gateway did not become ready (auth rejected, not started, or empty model pool)'
           tail -n 100 "$RUNNER_TEMP/orchestrator-gateway.log"
           exit 1
 

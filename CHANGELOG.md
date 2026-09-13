@@ -22,6 +22,10 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 - RFC 9457 Problem Details and W3C Trace Context propagation through a separately versioned compatibility change.
 - Stage-aware test-time compute allocation and ablation across routed and conducted interpretation stages.
 
+### Fixed
+
+- The hourly product-development gateway gate now polls authenticated `/readyz`, which stays 503 until at least one model agent is enabled, so a rejected bearer or an empty orchestrator/free pool fails closed before the agent runs instead of passing unauthenticated `/healthz` liveness.
+
 ## [0.8.0] - 2026-08-06
 
 ### Added
