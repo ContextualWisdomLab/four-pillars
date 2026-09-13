@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   issues: write
 
 concurrency:
@@ -33,6 +34,8 @@ jobs:
       - name: Run every release-quality and product-gap gate
         id: loop
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set +e
           mkdir -p artifacts
@@ -61,6 +64,7 @@ jobs:
 
           run_gate 'Dependency integrity' python -m pip check
           run_gate 'Product gap audit' python scripts/product_gap_audit.py --output artifacts/product-gap-audit.md
+          run_gate 'Workflow registry audit' python scripts/workflow_registry_audit.py --repository "$GITHUB_REPOSITORY" --default-branch-sha "$GITHUB_SHA" --output artifacts/workflow-registry-audit.md
           run_gate 'Ruff and public API docstrings' ruff check .
           run_gate 'Python compilation' python -m compileall -q src tests scripts
           run_gate 'Project documents' python scripts/check_docs.py

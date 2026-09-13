@@ -8,6 +8,7 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ### Added
 
+- A read-only Actions workflow-registry audit in the minute-17 quality loop that paginates the registry, binds the inventory to the run SHA, and fails on active identities whose workflow file is absent from the default branch, so orphaned one-shot workflow records cannot silently return (#33).
 - Independent KASI/NAOJ 2026 golden fixtures for all twelve month-changing solar terms, enforcing a two-minute timing budget and five-minute year/month pillar transition checks without network or test-only ephemeris dependencies.
 - Offline authority-fixture governance that detects missing evidence, provenance, tolerance, traceability, and calculation-version contracts in the hourly product-gap audit.
 
