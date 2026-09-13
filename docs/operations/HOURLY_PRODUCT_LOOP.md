@@ -22,7 +22,7 @@ Each invocation installs the hash-locked Python 3.12 CI environment and executes
 
 1. dependency consistency with `pip check`;
 2. the deterministic product-gap audit;
-3. the read-only Actions workflow-registry audit (`scripts/workflow_registry_audit.py`), which paginates the registry with the job's `actions: read` token, binds the inventory to the run SHA and time, and fails on any `active` identity whose path is absent from the tree (issue #33); a 403/404/5xx page or a duplicated id/path is reported as unresolved, never as clean;
+3. the read-only Actions workflow-registry audit (`scripts/workflow_registry_audit.py`), which paginates the registry with the job's `actions: read` token, binds the inventory to the run SHA and time, and fails on any `active` identity whose path is absent from the tree (issue #33); a 403/404/5xx page, a connection failure, a non-JSON body, or a duplicated id/path is reported as unresolved, never as clean; the job token is handed only to this command, and a manual run from a non-default ref skips the audit because the registry is only meaningful against the default branch tree;
 4. Ruff, including production docstring enforcement;
 5. Python bytecode compilation;
 6. required-document and standards-traceability validation;

@@ -35,7 +35,9 @@ jobs:
         id: loop
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
+          # Handed only to the registry audit command below; other gates never see GH_TOKEN.
+          REGISTRY_AUDIT_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set +e
           mkdir -p artifacts
@@ -64,7 +66,11 @@ jobs:
 
           run_gate 'Dependency integrity' python -m pip check
           run_gate 'Product gap audit' python scripts/product_gap_audit.py --output artifacts/product-gap-audit.md
-          run_gate 'Workflow registry audit' python scripts/workflow_registry_audit.py --repository "$GITHUB_REPOSITORY" --default-branch-sha "$GITHUB_SHA" --output artifacts/workflow-registry-audit.md
+          if [ "$GITHUB_REF" = "refs/heads/$DEFAULT_BRANCH" ]; then
+            run_gate 'Workflow registry audit' env GH_TOKEN="$REGISTRY_AUDIT_TOKEN" python scripts/workflow_registry_audit.py --repository "$GITHUB_REPOSITORY" --default-branch-sha "$GITHUB_SHA" --output artifacts/workflow-registry-audit.md
+          else
+            printf '## ⏭️ Workflow registry audit\n\nSkipped: manual run from `%s`; the registry is only compared against the default branch tree.\n\n' "$GITHUB_REF" >> "$report"
+          fi
           run_gate 'Ruff and public API docstrings' ruff check .
           run_gate 'Python compilation' python -m compileall -q src tests scripts
           run_gate 'Project documents' python scripts/check_docs.py

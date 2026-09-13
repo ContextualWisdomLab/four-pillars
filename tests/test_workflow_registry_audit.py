@@ -218,6 +218,30 @@ def test_github_fetcher_refuses_non_github_api_urls(registry_audit: ModuleType, 
     assert result.unresolved_reason == f"registry_page_status_{registry_audit.STATUS_REFUSED_URL}"
 
 
+def test_github_fetcher_reports_transport_and_json_failures_as_unresolved(
+    registry_audit: ModuleType,
+) -> None:
+    """A connection error or a non-JSON 200 body becomes an unresolved page, not a crash."""
+    import httpx
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/broken"):
+            raise httpx.ConnectError("boom", request=request)
+        return httpx.Response(200, content=b"<html>not json</html>")
+
+    fetch = registry_audit.github_fetcher("token", transport=httpx.MockTransport(handler))
+
+    transport_page = fetch("https://api.github.com/broken")
+    json_page = fetch("https://api.github.com/repos/o/r/actions/workflows?per_page=100")
+
+    assert transport_page["status"] == registry_audit.STATUS_TRANSPORT_ERROR
+    assert json_page["status"] == registry_audit.STATUS_INVALID_JSON
+    for page in (transport_page, json_page):
+        result = registry_audit.inventory(lambda _url, page=page: page, "owner/repo")
+        assert result.unresolved_reason == f"registry_page_status_{page['status']}"
+        assert len(result.receipts) == 1
+
+
 def test_hourly_loop_runs_the_registry_audit_with_actions_read_only() -> None:
     """The minute-17 sentinel runs the detector read-only with the workflow token."""
     text = WORKFLOW.read_text(encoding="utf-8")
@@ -225,3 +249,12 @@ def test_hourly_loop_runs_the_registry_audit_with_actions_read_only() -> None:
     assert "python scripts/workflow_registry_audit.py" in text
     assert "actions: read" in text
     assert "actions: write" not in text
+    # The token reaches only the audit command, never the other gate commands.
+    gate_step = text.split("Run every release-quality and product-gap gate", 1)[1].split(
+        "Synchronize the idempotent failure issue", 1
+    )[0]
+    assert "GH_TOKEN: ${{ github.token }}" not in gate_step
+    assert 'env GH_TOKEN="$REGISTRY_AUDIT_TOKEN" python scripts/workflow_registry_audit.py' in gate_step
+    # Manual runs from a non-default ref skip the audit instead of comparing the wrong tree.
+    assert 'if [ "$GITHUB_REF" = "refs/heads/$DEFAULT_BRANCH" ]; then' in gate_step
+    assert "DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}" in gate_step

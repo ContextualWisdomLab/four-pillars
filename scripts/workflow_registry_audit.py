@@ -28,8 +28,12 @@ EXIT_ORPHANS = 1
 EXIT_UNRESOLVED = 2
 
 API_ROOT = "https://api.github.com"
-# Pseudo-status for a URL the transport refuses to request (wrong scheme or host).
+# Pseudo-statuses for pages that never produced an HTTP status: a URL the transport
+# refuses (wrong scheme or host), a connection/timeout failure, and a 200 whose body
+# is not JSON. Each one makes the inventory unresolved, never clean.
 STATUS_REFUSED_URL = 0
+STATUS_TRANSPORT_ERROR = -1
+STATUS_INVALID_JSON = -2
 DYNAMIC_PREFIX = "dynamic/"
 WORKFLOW_DIRECTORY = ".github/workflows"
 
@@ -113,8 +117,16 @@ def github_fetcher(token: str, *, transport: httpx.BaseTransport | None = None) 
     def fetch(url: str) -> dict[str, Any]:
         if not url.startswith(f"{API_ROOT}/"):
             return {"status": STATUS_REFUSED_URL, "body": {}, "next_url": None}
-        response = client.get(url)
-        body = response.json() if response.status_code == 200 else {}
+        try:
+            response = client.get(url)
+        except httpx.RequestError:
+            return {"status": STATUS_TRANSPORT_ERROR, "body": {}, "next_url": None}
+        body: dict[str, Any] = {}
+        if response.status_code == 200:
+            try:
+                body = response.json()
+            except ValueError:
+                return {"status": STATUS_INVALID_JSON, "body": {}, "next_url": None}
         return {
             "status": response.status_code,
             "body": body,
