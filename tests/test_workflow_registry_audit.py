@@ -249,12 +249,17 @@ def test_hourly_loop_runs_the_registry_audit_with_actions_read_only() -> None:
     assert "python scripts/workflow_registry_audit.py" in text
     assert "actions: read" in text
     assert "actions: write" not in text
-    # The token reaches only the audit command, never the other gate commands.
+    # The token lives only in the dedicated audit step; the shared gate step never sees it.
+    audit_step = text.split("Audit the Actions workflow registry", 1)[1].split(
+        "Run every release-quality and product-gap gate", 1
+    )[0]
     gate_step = text.split("Run every release-quality and product-gap gate", 1)[1].split(
         "Synchronize the idempotent failure issue", 1
     )[0]
-    assert "GH_TOKEN: ${{ github.token }}" not in gate_step
-    assert 'env GH_TOKEN="$REGISTRY_AUDIT_TOKEN" python scripts/workflow_registry_audit.py' in gate_step
-    # Manual runs from a non-default ref skip the audit instead of comparing the wrong tree.
-    assert 'if [ "$GITHUB_REF" = "refs/heads/$DEFAULT_BRANCH" ]; then' in gate_step
-    assert "DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}" in gate_step
+    assert "GH_TOKEN: ${{ github.token }}" in audit_step
+    assert "GH_TOKEN" not in gate_step
+    assert "github.token" not in gate_step
+    # Only default-branch runs audit the registry; the gate step reports the recorded result.
+    assert "github.ref == format('refs/heads/{0}', github.event.repository.default_branch)" in audit_step
+    assert "artifacts/workflow-registry-audit.exit" in audit_step
+    assert "artifacts/workflow-registry-audit.exit" in gate_step

@@ -31,13 +31,21 @@ jobs:
           cache-dependency-path: requirements/ci.txt
       - name: Install the immutable verification environment
         run: python -m pip install --require-hashes -r requirements/ci.txt
+      - name: Audit the Actions workflow registry
+        # Dedicated step so the job token is visible to this command only; the shared
+        # gate step below reads the recorded report and exit code without any token.
+        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          mkdir -p artifacts
+          python scripts/workflow_registry_audit.py --repository "$GITHUB_REPOSITORY" --default-branch-sha "$GITHUB_SHA" --output artifacts/workflow-registry-audit.md
+          echo "$?" > artifacts/workflow-registry-audit.exit
       - name: Run every release-quality and product-gap gate
         id: loop
         shell: bash
-        env:
-          # Handed only to the registry audit command below; other gates never see GH_TOKEN.
-          REGISTRY_AUDIT_TOKEN: ${{ github.token }}
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set +e
           mkdir -p artifacts
@@ -66,8 +74,8 @@ jobs:
 
           run_gate 'Dependency integrity' python -m pip check
           run_gate 'Product gap audit' python scripts/product_gap_audit.py --output artifacts/product-gap-audit.md
-          if [ "$GITHUB_REF" = "refs/heads/$DEFAULT_BRANCH" ]; then
-            run_gate 'Workflow registry audit' env GH_TOKEN="$REGISTRY_AUDIT_TOKEN" python scripts/workflow_registry_audit.py --repository "$GITHUB_REPOSITORY" --default-branch-sha "$GITHUB_SHA" --output artifacts/workflow-registry-audit.md
+          if [ -f artifacts/workflow-registry-audit.exit ]; then
+            run_gate 'Workflow registry audit' sh -c 'cat artifacts/workflow-registry-audit.md; exit "$(cat artifacts/workflow-registry-audit.exit)"'
           else
             printf '## ⏭️ Workflow registry audit\n\nSkipped: manual run from `%s`; the registry is only compared against the default branch tree.\n\n' "$GITHUB_REF" >> "$report"
           fi
