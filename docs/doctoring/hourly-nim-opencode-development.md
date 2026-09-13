@@ -15,8 +15,8 @@ and exact-head branch rules remain independent controls.
 | GitHub jobs | Jobs run on separate runner instances and receive scoped tokens | Model, verifier, and publisher are separate jobs |
 | GitHub App authentication | A workflow can mint an installation token with explicit repository permissions | Publication token is minted only after non-executing validation |
 | Artifact handoff | Artifact upload/download actions expose immutable IDs and digests | Patch ID, digest, base, size, count, and modes are checked twice |
-| OpenCode | OpenCode is a programmable coding agent with provider configuration | One checksum-pinned binary uses NVIDIA NIM only |
-| NVIDIA NIM | NIM exposes OpenAI-compatible hosted inference APIs | Only `NVIDIA_NIM_API_KEY` reaches the proposal process |
+| OpenCode | OpenCode is a programmable coding agent with provider configuration | One checksum-pinned binary uses the vendored contextual-orchestrator gateway only |
+| Contextual Orchestrator | `ContextualWisdomLab/contextual-orchestrator`'s `orchestrator/free` pool routes across every live-discovered free-priced provider and fails closed when none is available | A pinned-commit vendored gateway sidecar, not a direct NVIDIA NIM call, is the model's only provider; only its ephemeral loopback bearer reaches the proposal process |
 | SSDF | NIST SP 800-218 recommends protected build environments, review, provenance, and vulnerability response | Fresh verification and ordinary PR governance remain mandatory |
 | AI risk | ISO/IEC 23894:2023 and 42001:2023 require contextual risk treatment and controlled change | Stable no-op reasons, bounded proposals, traceable decisions, and rollback are documented |
 | Test-time compute | Fugu, Conductor, and TRINITY distinguish routing from deeper role-based workflows | Runtime LLM increments must preserve route/conduct and access-list controls |
@@ -109,8 +109,14 @@ deterministic workflow tests and must be revisited in a later literature update.
 
 ## Residual risk
 
-The NIM key exists inside the model process, proposed code is executed by an
-uncredentialed verifier with ordinary hosted-runner egress, and artifact digests
-do not establish semantic safety. A later broker can narrow NIM egress; a later
-central reusable workflow can remove duplicated repository policy. Neither
-future improvement may combine model execution with publication authority.
+Proposed code is executed by an uncredentialed verifier with ordinary
+hosted-runner egress, and artifact digests do not establish semantic safety.
+The vendored contextual-orchestrator gateway sidecar (pinned commit
+`045d17da5e2aea56a97e241ee158ab1628d78660`, the same commit
+`ContextualWisdomLab/.github`'s central review sidecar trusts) now narrows the
+model process's own credential to an ephemeral, loopback-only bearer instead
+of a raw upstream provider key, resolving the broker gap this section
+previously named as a future improvement; the gateway process itself still
+holds the five org provider secrets in memory for the run's duration. A later
+central reusable workflow can remove duplicated repository policy. No future
+improvement may combine model execution with publication authority.

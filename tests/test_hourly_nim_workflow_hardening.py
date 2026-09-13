@@ -19,16 +19,49 @@ def workflow_sections() -> tuple[str, str, str]:
     return proposer, verifier, publisher
 
 
-def test_cleanup_never_exposes_the_nim_key_to_dependency_installation() -> None:
-    """Remove the inference credential before fallback reinstalls dependencies."""
+def test_gateway_sidecar_isolates_provider_credentials_from_the_agent() -> None:
+    """Scope every provider secret to the gateway step, never the agent step."""
 
     proposer, _, _ = workflow_sections()
 
-    assert "env -u NVIDIA_NIM_API_KEY" in proposer
-    assert proposer.index("env -u NVIDIA_NIM_API_KEY") < proposer.index(
-        "python -m pip install --require-hashes -r requirements/ci.txt",
-        proposer.index("Run bounded NVIDIA NIM fallback"),
+    gateway_step = proposer.split(
+        "Start the contextual-orchestrator gateway (orchestrator/free)", 1
+    )[1].split("Configure OpenCode for the contextual-orchestrator gateway", 1)[0]
+    agent_step = proposer.split("Run the hourly product-development agent", 1)[1]
+
+    for provider_secret in (
+        "BYTEZ_API_KEY",
+        "NVIDIA_NIM_API_KEY",
+        "NVIDIA_NIM_API_KEY_SUB",
+        "OPENROUTER_API_KEY",
+        "OPENAI_API_KEY",
+    ):
+        assert f"secrets.{provider_secret}" in gateway_step
+        assert provider_secret not in agent_step
+
+    assert proposer.index("Vendor the contextual-orchestrator gateway") < proposer.index(
+        "Start the contextual-orchestrator gateway (orchestrator/free)"
     )
+    assert proposer.index(
+        "Start the contextual-orchestrator gateway (orchestrator/free)"
+    ) < proposer.index("Run the hourly product-development agent")
+
+
+def test_gateway_readiness_gate_rejects_auth_failure_and_empty_model_pool() -> None:
+    """Gate the agent on authenticated /readyz, which is 503 while no agent is enabled."""
+
+    proposer, _, _ = workflow_sections()
+
+    gateway_step = proposer.split(
+        "Start the contextual-orchestrator gateway (orchestrator/free)", 1
+    )[1].split("Configure OpenCode for the contextual-orchestrator gateway", 1)[0]
+
+    assert '${ORCHESTRATOR_PORT}/readyz"' in gateway_step
+    assert '${ORCHESTRATOR_PORT}/healthz"' not in gateway_step
+    assert 'Authorization: Bearer ${CONTEXTUAL_ORCHESTRATOR_TOKEN}' in gateway_step
+    # Fail closed: an unready gateway must end the job, never a silent skip.
+    assert "exit 1" in gateway_step
+    assert "dispatch=false" not in gateway_step
 
 
 def test_every_verification_gate_runs_after_runtime_channels_are_unset() -> None:

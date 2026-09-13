@@ -44,20 +44,24 @@ def test_hourly_workflow_schedule_credentials_and_queue_gate() -> None:
         "hourly-nim-product-development-${{ github.repository }}",
         "cancel-in-progress: false",
         "secrets.NVIDIA_NIM_API_KEY",
-        "{env:NVIDIA_NIM_API_KEY}",
+        "{env:CONTEXTUAL_ORCHESTRATOR_TOKEN}",
+        "ORCHESTRATOR_PIN_SHA",
+        "orchestrator/free",
         "OPENCODE_VERSION",
         "OPENCODE_SHA256",
         "sha256sum -c",
         "pull_request_inventory_unavailable",
         "open_pull_request",
-        "nim_api_key_unavailable",
+        "provider_api_key_unavailable",
         "maintainer_app_unavailable",
         "base_branch_advanced",
         "open_pull_request_after_generation",
     ):
         assert token in text
     assert "COPILOT_GITHUB_TOKEN" not in text
-    assert "CONTEXTUAL_ORCHESTRATOR_TOKEN" not in text
+    assert "{env:NVIDIA_NIM_API_KEY}" not in text
+    assert "nvidia-nim" not in text
+    assert "integrate.api.nvidia.com" not in text
     assert text.count("gh pr create") == 1
     assert "gh pr merge" not in text
     assert "gh release create" not in text
@@ -78,6 +82,20 @@ def test_hourly_workflow_separates_three_runner_trust_boundaries() -> None:
     assert "NVIDIA_NIM_API_KEY" in proposer
     assert "create-github-app-token" not in proposer
     assert "gh pr create" not in proposer
+    # The five provider secrets flow only into the sidecar-start step's own
+    # env, seeding the gateway's process-local KV; the agent-run step that
+    # actually executes untrusted, prompt-influenced OpenCode receives only
+    # the ephemeral, loopback-scoped CONTEXTUAL_ORCHESTRATOR_TOKEN.
+    agent_step = proposer.split("Run the hourly product-development agent", 1)[1]
+    for provider_secret in (
+        "BYTEZ_API_KEY",
+        "NVIDIA_NIM_API_KEY",
+        "NVIDIA_NIM_API_KEY_SUB",
+        "OPENROUTER_API_KEY",
+        "OPENAI_API_KEY",
+    ):
+        assert f"secrets.{provider_secret}" not in agent_step
+    assert "CONTEXTUAL_ORCHESTRATOR_TOKEN" in proposer
     assert "NVIDIA_NIM_API_KEY" not in verifier
     assert "create-github-app-token" not in verifier
     assert "Run every release-quality gate" in verifier
