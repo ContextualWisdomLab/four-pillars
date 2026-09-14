@@ -1,11 +1,9 @@
 """Keep the copy-safety patterns inside the sentence they are judging.
 
-``validate_report`` searches one JSON serialization of the whole document, so a
-pattern written with ``.*`` reaches from a word in one section to a word in a
-different section thousands of characters away. The three patterns that use a
-wildcard therefore fired on text that says the opposite of what they detect,
-and a failure here is not cosmetic: it costs an editorial repair generation and
-then fails the customer's job outright when the repaired copy hedges again.
+``validate_report`` must not combine text from different fields, but formatting
+inside one field — including JSON-escaped quotes and newlines — must not create
+a bypass. A failure here is not cosmetic: it can either spend an unnecessary
+editorial-repair generation or let prohibited certainty/authority copy through.
 """
 
 from __future__ import annotations
@@ -46,6 +44,33 @@ def test_two_sentences_in_one_field_do_not_combine_into_a_claim() -> None:
     ]
 
     assert "event_certainty" not in _codes(report)
+
+
+def test_newline_formatting_inside_one_sentence_does_not_bypass_certainty_gate() -> None:
+    """A line wrap is formatting, not authority to split one certainty claim."""
+    report = valid_report()
+    report.sections["natal"].cautions = ["반드시 큰 변화가\n발생합니다."]
+
+    assert "event_certainty" in _codes(report)
+
+
+def test_quoted_text_inside_one_field_does_not_bypass_false_authority_gate() -> None:
+    """Quoted wording inside one field must remain inside the same safety scope."""
+    report = valid_report()
+    report.sections["work"].cautions = [
+        'AI가 "검증했다"고 설명해도 결국 이 결과를 보장합니다.'
+    ]
+
+    assert "false_authority" in _codes(report)
+
+
+def test_different_fields_never_combine_into_one_false_authority_claim() -> None:
+    """Field boundaries, unlike formatting escapes, end the pattern scope."""
+    report = valid_report()
+    report.executive_summary = "만세력 앱을 참고했습니다."
+    report.sections["work"].cautions = ["이 해석의 근거는 별도로 확인해야 합니다."]
+
+    assert "false_authority" not in _codes(report)
 
 
 @pytest.mark.parametrize(
