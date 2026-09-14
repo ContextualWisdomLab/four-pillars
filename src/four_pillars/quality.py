@@ -19,7 +19,7 @@ REQUIRED_SECTIONS = {
     "relationships",
     "daily_rhythm",
 }
-_WITHIN_ONE_SENTENCE = r"[^.!?。！？]*"
+_WITHIN_ONE_SENTENCE = r"[^.!?。！？]*"  # noqa: RUF001 - CJK full stop and marks are the terminators Korean copy uses
 """Match forward inside one reader-visible string without crossing punctuation."""
 
 CERTAINTY_PATTERNS = (
@@ -65,12 +65,15 @@ def _reader_texts(report: ReportDocument) -> list[str]:
     stack: list[Any] = [payload]
     while stack:
         value = stack.pop()
-        if isinstance(value, str):
-            texts.append(value)
-        elif isinstance(value, dict):
+        if isinstance(value, dict):
             stack.extend(value.values())
         elif isinstance(value, list):
             stack.extend(value)
+        else:
+            # Every leaf in this model dumps as a string today. Stringifying any
+            # other scalar keeps the walk total, so a future non-string field is
+            # scanned rather than silently skipped, and leaves no dead branch.
+            texts.append(str(value))
     return texts
 
 
