@@ -6,6 +6,10 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ## [Unreleased]
 
+### Fixed
+
+- The browser studio now refuses to submit a monthly window it could not parse. The submit handler split the month field on `-` and used the result unchecked, so an empty value produced year 0, because `Number('')` is 0, and every unparsable value left the month `undefined`, which `JSON.stringify` drops from the request entirely. The server answered a malformed request instead of the page naming the field. The input also carries a `YYYY-MM` pattern so a browser that renders `type="month"` as plain text is still constrained.
+
 ### Added
 
 - Independent KASI/NAOJ 2026 golden fixtures for all twelve month-changing solar terms, enforcing a two-minute timing budget and five-minute year/month pillar transition checks without network or test-only ephemeris dependencies.
