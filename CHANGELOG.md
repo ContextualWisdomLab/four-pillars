@@ -8,6 +8,7 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ### Added
 
+- Sealing of the untrusted-input delimiter in the model prompt, so customer free text containing `</input>` can no longer close the boundary that marks caller data as data.
 - Independent KASI/NAOJ 2026 golden fixtures for all twelve month-changing solar terms, enforcing a two-minute timing budget and five-minute year/month pillar transition checks without network or test-only ephemeris dependencies.
 - Offline authority-fixture governance that detects missing evidence, provenance, tolerance, traceability, and calculation-version contracts in the hourly product-gap audit.
 
