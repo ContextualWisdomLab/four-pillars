@@ -4,9 +4,12 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
+
 from four_pillars.calendar import calculate_chart
 from four_pillars.fortune import calculate_annual_luck, calculate_daewoon, calculate_monthly_luck
 from four_pillars.models import BirthInput, Gender, PracticalSkill, ReportDocument, ReportSection
+from four_pillars import reporting
 from four_pillars.reporting import render_html, render_pdf, write_artifacts
 
 
@@ -69,6 +72,44 @@ def test_pdf_is_created_with_korean_report_content(tmp_path: Path) -> None:
     render_pdf(target, report(), chart, daewoon, annual, monthly)
     assert target.read_bytes().startswith(b"%PDF")
     assert target.stat().st_size > 2000
+
+
+# The Korean CID font, its encoding, and the composite-font machinery that carry
+# Hangul glyphs into the PDF. A latin-only fallback emits none of them.
+KOREAN_PDF_MARKERS = (b"HYSMyeongJo-Medium", b"UniKS-UCS2-H", b"/Type0", b"CIDFont")
+
+
+def test_pdf_carries_the_korean_font_that_renders_hangul(tmp_path: Path) -> None:
+    """Assert the Korean typesetting machinery, not just that some PDF was written."""
+    chart, daewoon, annual, monthly = bundle()
+    target = tmp_path / "report.pdf"
+
+    render_pdf(target, report(), chart, daewoon, annual, monthly)
+
+    produced = target.read_bytes()
+    for marker in KOREAN_PDF_MARKERS:
+        assert marker in produced, f"{marker!r} missing; Hangul would render as tofu boxes"
+
+
+def test_a_latin_font_fallback_still_writes_a_valid_but_unreadable_pdf(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Pin why a header-and-size check is not enough to protect the Korean report.
+
+    With a latin font every Hangul glyph becomes a filled box, yet the file is still
+    a well-formed PDF of ordinary size, so only the font markers catch the regression.
+    """
+    monkeypatch.setattr(reporting, "_register_fonts", lambda: ("Helvetica", "Helvetica"))
+    chart, daewoon, annual, monthly = bundle()
+    target = tmp_path / "report.pdf"
+
+    render_pdf(target, report(), chart, daewoon, annual, monthly)
+
+    produced = target.read_bytes()
+    assert produced.startswith(b"%PDF")
+    assert target.stat().st_size > 2000
+    for marker in KOREAN_PDF_MARKERS:
+        assert marker not in produced
 
 
 def test_artifact_manifest_hashes_every_output(tmp_path: Path) -> None:
