@@ -19,8 +19,18 @@ REQUIRED_SECTIONS = {
     "relationships",
     "daily_rhythm",
 }
+_WITHIN_ONE_SENTENCE = r'[^"\\.!?]*'
+"""Match forward without leaving the sentence, or the JSON string value, it began in.
+
+``validate_report`` searches one JSON serialization of the whole document, so a
+bare ``.*`` reaches from a word in one section to a word in another section far
+away and reports a claim nobody wrote. Excluding the quote and the backslash
+stops a match at the end of a field or at an escape such as ``\\n``, and
+excluding sentence terminators keeps the claim and its object in one statement.
+"""
+
 CERTAINTY_PATTERNS = (
-    re.compile(r"반드시 .*(발생|된다|합니다)"),
+    re.compile(rf"반드시 {_WITHIN_ONE_SENTENCE}(발생|된다|합니다)"),
     re.compile(r"틀림없이"),
     re.compile(r"확정적으로"),
 )
@@ -30,9 +40,9 @@ MEDICAL_PATTERNS = (
     re.compile(r"치료를 (받아야|중단해야)"),
 )
 FALSE_AUTHORITY_PATTERNS = (
-    re.compile(r"만세력 앱.*근거"),
-    re.compile(r"AI가.*보장"),
-    re.compile(r"계산기.*확정"),
+    re.compile(rf"만세력 앱{_WITHIN_ONE_SENTENCE}근거"),
+    re.compile(rf"AI가{_WITHIN_ONE_SENTENCE}보장"),
+    re.compile(rf"계산기{_WITHIN_ONE_SENTENCE}확정"),
 )
 PILLAR_PATTERN = re.compile(f"[{''.join(STEMS_HANJA)}][{''.join(BRANCHES_HANJA)}]")
 

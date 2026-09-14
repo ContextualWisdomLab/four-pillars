@@ -6,6 +6,10 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ## [Unreleased]
 
+### Fixed
+
+- The report copy-safety patterns that used a wildcard now have to match inside one sentence of one field. They were searched against a single JSON serialization of the whole document, so `반드시 .*(발생|된다|합니다)` matched a hedge in one section against a polite verb ending in another and reported a certainty claim nobody wrote, and `만세력 앱.*근거` did the same for a neutral mention of a tool. A false rejection is not cosmetic: it spends an editorial repair generation and then fails the customer's job when the repaired copy hedges again. Genuine single-sentence violations are still rejected.
+
 ### Added
 
 - Independent KASI/NAOJ 2026 golden fixtures for all twelve month-changing solar terms, enforcing a two-minute timing budget and five-minute year/month pillar transition checks without network or test-only ephemeris dependencies.
