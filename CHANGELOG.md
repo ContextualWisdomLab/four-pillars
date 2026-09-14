@@ -6,6 +6,10 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ## [Unreleased]
 
+### Fixed
+
+- A model answer the provider cut short at its token ceiling (`finish_reason` of `length` or `max_tokens`) now fails as a distinct `NimTruncationError` instead of being parsed as a complete interpretation. A truncated prefix could satisfy a schema whose later fields are optional and reach the customer's report as if it were whole, and the schema-repair loop would re-ask under the same ceiling. An absent or unrecognised `finish_reason` is still treated as unknown, never as truncation.
+
 ### Added
 
 - Independent KASI/NAOJ 2026 golden fixtures for all twelve month-changing solar terms, enforcing a two-minute timing budget and five-minute year/month pillar transition checks without network or test-only ephemeris dependencies.
