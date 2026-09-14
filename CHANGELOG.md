@@ -6,6 +6,10 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ## [Unreleased]
 
+### Fixed
+
+- A birth clock that daylight saving made impossible or repeated now raises a boundary warning instead of being resolved in silence. Korea observed daylight saving in 1987 and 1988, so a stated 02:30 on 1987-05-10 never happened and one on 1987-10-11 happened twice. `normalize_birth` attaches the zone with `replace(tzinfo=...)`, which always picks one instant: the hour pillar still follows the stated clock, but the chosen instant reads an hour later on the zone's own clock, and solar-term boundaries are compared against the instant. The calculation and its fingerprint are unchanged; what is added is the disclosure.
+
 ### Added
 
 - Independent KASI/NAOJ 2026 golden fixtures for all twelve month-changing solar terms, enforcing a two-minute timing budget and five-minute year/month pillar transition checks without network or test-only ephemeris dependencies.
