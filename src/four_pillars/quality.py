@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from .constants import BRANCHES_HANJA, FORBIDDEN_COPY, STEMS_HANJA, VAGUE_COPY
 from .models import ReportDocument
@@ -19,15 +19,8 @@ REQUIRED_SECTIONS = {
     "relationships",
     "daily_rhythm",
 }
-_WITHIN_ONE_SENTENCE = r'[^"\\.!?]*'
-"""Match forward without leaving the sentence, or the JSON string value, it began in.
-
-``validate_report`` searches one JSON serialization of the whole document, so a
-bare ``.*`` reaches from a word in one section to a word in another section far
-away and reports a claim nobody wrote. Excluding the quote and the backslash
-stops a match at the end of a field or at an escape such as ``\\n``, and
-excluding sentence terminators keeps the claim and its object in one statement.
-"""
+_WITHIN_ONE_SENTENCE = r"[^.!?。！？]*"
+"""Match forward inside one reader-visible string without crossing punctuation."""
 
 CERTAINTY_PATTERNS = (
     re.compile(rf"반드시 {_WITHIN_ONE_SENTENCE}(발생|된다|합니다)"),
@@ -65,11 +58,20 @@ class ReportQualityError(ValueError):
         super().__init__("; ".join(f"{issue.code}: {issue.message}" for issue in issues))
 
 
-def _all_text(report: ReportDocument) -> str:
-    # Diagnostic notes intentionally quote rejected copy. They are audit metadata,
-    # not reader-visible report prose, and must not cause the repaired report to fail again.
+def _reader_texts(report: ReportDocument) -> list[str]:
+    """Return reader-visible string values without serializing field boundaries away."""
     payload = report.model_dump(mode="json", exclude={"quality_notes"})
-    return json.dumps(payload, ensure_ascii=False)
+    texts: list[str] = []
+    stack: list[Any] = [payload]
+    while stack:
+        value = stack.pop()
+        if isinstance(value, str):
+            texts.append(value)
+        elif isinstance(value, dict):
+            stack.extend(value.values())
+        elif isinstance(value, list):
+            stack.extend(value)
+    return texts
 
 
 def validate_report(
@@ -115,7 +117,8 @@ def validate_report(
                     "sections.relationships",
                 )
             )
-    text = _all_text(report)
+    reader_texts = _reader_texts(report)
+    text = "\n".join(reader_texts)
     if allowed_pillars is not None:
         for mentioned in sorted(set(PILLAR_PATTERN.findall(text)) - allowed_pillars):
             issues.append(
@@ -132,13 +135,13 @@ def validate_report(
         if phrase in text:
             issues.append(QualityIssue("vague_copy", f"지시 대상이 모호합니다: {phrase}", "$"))
     for pattern in CERTAINTY_PATTERNS:
-        if pattern.search(text):
+        if any(pattern.search(value) for value in reader_texts):
             issues.append(QualityIssue("event_certainty", "미래 사건을 확정하는 문장이 있습니다.", "$"))
     for pattern in MEDICAL_PATTERNS:
-        if pattern.search(text):
+        if any(pattern.search(value) for value in reader_texts):
             issues.append(QualityIssue("medical_claim", "의학적 진단 또는 치료 지시가 있습니다.", "$"))
     for pattern in FALSE_AUTHORITY_PATTERNS:
-        if pattern.search(text):
+        if any(pattern.search(value) for value in reader_texts):
             issues.append(QualityIssue("false_authority", "앱·AI·계산기를 권위 근거로 사용했습니다.", "$"))
     disclaimer_terms = ("전통", "상징", "의학", "법률", "재정", "실제")
     if not all(term in report.disclaimer for term in disclaimer_terms):
