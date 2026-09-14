@@ -131,13 +131,51 @@ def _equation_of_time_minutes(moment: datetime) -> float:
     return 9.87 * math.sin(2 * b) - 7.53 * math.cos(b) - 1.5 * math.sin(b)
 
 
+def _wall_clock(value: BirthInput) -> datetime:
+    """Return the naive local clock reading the birth input states."""
+    if value.calendar is CalendarKind.LUNAR:
+        return _convert_lunar_to_solar(value)
+    return value.birth
+
+
+def clock_transition_warning(value: BirthInput) -> str | None:
+    """Report a stated birth clock the timezone maps to zero or two real instants.
+
+    A daylight-saving change makes some local readings impossible and others
+    repeat. Korea had both in 1987 and 1988. Attaching a zone with
+    ``replace(tzinfo=...)`` always resolves such a reading to one instant, which
+    is a choice the customer never made and cannot see in the result.
+
+    Args:
+        value: Validated birth input carrying the stated clock and IANA zone.
+
+    Returns:
+        A Korean explanation of which case applies, or ``None`` when the clock
+        is an ordinary single instant.
+    """
+    wall_clock = _wall_clock(value)
+    zone = ZoneInfo(value.timezone)
+    earlier = wall_clock.replace(tzinfo=zone)
+    later = wall_clock.replace(tzinfo=zone, fold=1)
+    if earlier.utcoffset() == later.utcoffset():
+        return None
+    reread = earlier.astimezone(UTC).astimezone(zone)
+    if reread.replace(tzinfo=None) != wall_clock:
+        return (
+            "입력한 출생 시각은 해당 시간대에 존재하지 않습니다. "
+            "서머타임이 시작되며 시계가 건너뛴 구간이어서 전환 직전의 시간대 차이를 적용했습니다. "
+            "원자료의 시각과 표준시·서머타임 표기를 다시 확인하십시오."
+        )
+    return (
+        "입력한 출생 시각은 해당 시간대에 두 번 존재합니다. "
+        "서머타임이 끝나며 시계가 되돌아간 구간이어서 앞선 쪽을 적용했습니다. "
+        "원자료의 시각과 표준시·서머타임 표기를 다시 확인하십시오."
+    )
+
+
 def normalize_birth(value: BirthInput) -> datetime:
     """Convert validated birth input into the effective timezone-aware birth moment."""
-    wall_clock = (
-        _convert_lunar_to_solar(value)
-        if value.calendar is CalendarKind.LUNAR
-        else value.birth
-    )
+    wall_clock = _wall_clock(value)
     zone = ZoneInfo(value.timezone)
     localized = wall_clock.replace(tzinfo=zone)
     if value.time_basis is TimeBasis.CIVIL:
@@ -342,6 +380,9 @@ def calculate_chart(value: BirthInput) -> Chart:
                 f"출생 시각이 {label} 경계에서 6시간 이내입니다. "
                 "원자료의 시각과 시간대 설정을 다시 확인하십시오."
             )
+    transition = clock_transition_warning(value)
+    if transition is not None:
+        warnings.append(transition)
     if not value.birth_time_known:
         warnings.append("출생 시각이 없어 시주는 확정하지 않았습니다.")
 
