@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from enum import StrEnum
 from typing import Any, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -60,6 +61,20 @@ class BirthInput(BaseModel):
         """Normalize birth input to a timezone-naive local wall clock."""
         if value.tzinfo is not None:
             return value.replace(tzinfo=None)
+        return value
+
+    @field_validator("timezone")
+    @classmethod
+    def require_resolvable_timezone(cls, value: str) -> str:
+        """Reject a key the installed IANA database cannot resolve into a zone.
+
+        Without this the unusable key only fails deep inside the calculation, which
+        turns an ordinary caller typo into a server fault instead of a field error.
+        """
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as unusable:
+            raise ValueError(f"unusable IANA timezone {value!r}: {unusable}") from unusable
         return value
 
 
