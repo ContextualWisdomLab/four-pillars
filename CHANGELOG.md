@@ -8,6 +8,7 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ### Added
 
+- Contract-boundary validation of the IANA timezone key on birth input, so an unresolvable or non-relative key is answered as a 422 field error on `/v1/chart` and `/v1/luck/*` instead of a 500 internal server error.
 - Independent KASI/NAOJ 2026 golden fixtures for all twelve month-changing solar terms, enforcing a two-minute timing budget and five-minute year/month pillar transition checks without network or test-only ephemeris dependencies.
 - Offline authority-fixture governance that detects missing evidence, provenance, tolerance, traceability, and calculation-version contracts in the hourly product-gap audit.
 
