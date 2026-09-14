@@ -14,3 +14,6 @@ artifacts/
 build/
 dist/
 *.egg-info/
+
+# Graphify analysis artifacts are regenerated per head and are not product sources.
+graphify-out/

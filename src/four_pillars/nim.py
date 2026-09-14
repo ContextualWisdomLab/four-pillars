@@ -23,6 +23,19 @@ class NimSchemaError(NimError):
     """Report generated content that cannot satisfy the requested JSON schema."""
 
 
+class NimTruncationError(NimError):
+    """Report an answer the provider cut short when it reached the token ceiling."""
+
+
+TRUNCATED_FINISH_REASONS = frozenset({"length", "max_tokens"})
+"""Chat-completions ``finish_reason`` values that mean the answer is a prefix.
+
+``length`` is the OpenAI-compatible spelling and ``max_tokens`` is the variant
+some gateways emit. Any other value, including an absent one, means the reason
+is unknown rather than truncated, so it is never treated as a failure.
+"""
+
+
 NimTrace = GenerationTrace
 """Backward-compatible alias for the provider-neutral generation trace."""
 
@@ -119,12 +132,20 @@ class _OpenAICompatibleJsonClient:
 
     def _content(self, data: dict[str, Any]) -> str:
         try:
-            content = data["choices"][0]["message"]["content"]
-        except (KeyError, IndexError, TypeError) as exc:
+            choice = data["choices"][0]
+            content = choice["message"]["content"]
+            finish_reason = choice.get("finish_reason")
+        except (KeyError, IndexError, TypeError, AttributeError) as exc:
             raise NimError(
                 f"{self._provider_label} response did not contain "
                 "choices[0].message.content"
             ) from exc
+        if finish_reason in TRUNCATED_FINISH_REASONS:
+            raise NimTruncationError(
+                f"{self._provider_label} stopped at the token ceiling "
+                f"(finish_reason={finish_reason}), so the answer is incomplete "
+                "and is not reported as a successful generation"
+            )
         if not isinstance(content, str) or not content.strip():
             raise NimError(f"{self._provider_label} returned empty content")
         return content.strip()
