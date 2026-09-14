@@ -6,6 +6,10 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ## [Unreleased]
 
+### Fixed
+
+- The browser studio's calculation button now asks the browser to validate the birth date and timezone before requesting a chart. The button is `type="button"`, so constraint validation never ran, and a cleared required field produced a malformed birth timestamp that the API rejected. The customer saw a server validation error instead of the browser pointing at the field they emptied. Only the fields the chart request actually sends are checked, so an unrelated empty field cannot block a calculation.
+
 ### Added
 
 - Independent KASI/NAOJ 2026 golden fixtures for all twelve month-changing solar terms, enforcing a two-minute timing budget and five-minute year/month pillar transition checks without network or test-only ephemeris dependencies.
