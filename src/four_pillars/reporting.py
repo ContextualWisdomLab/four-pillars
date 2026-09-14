@@ -115,6 +115,26 @@ def _register_fonts() -> tuple[str, str]:
     return regular, regular
 
 
+def _evidence_table(rows: list[list[Any]], widths: list[float]) -> Table:
+    """Build one deterministic-evidence table with the shared report styling."""
+    table = Table(rows, colWidths=widths)
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("GRID", (0, 0), (-1, -1), 0.5, BORDER),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 0), (-1, -1), 7),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+            ]
+        )
+    )
+    return table
+
+
 def render_pdf(
     destination: Path,
     report: ReportDocument,
@@ -155,9 +175,43 @@ def render_pdf(
         [Paragraph("연주", small), Paragraph("월주", small), Paragraph("일주", small), Paragraph("시주", small)],
         [Paragraph(chart.year.hanja, body), Paragraph(chart.month.hanja, body), Paragraph(chart.day.hanja, body), Paragraph(hour, body)],
     ]
-    table = Table(table_data, colWidths=[42 * mm] * 4)
-    table.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), NAVY), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white), ("GRID", (0, 0), (-1, -1), 0.5, BORDER), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 8), ("RIGHTPADDING", (0, 0), (-1, -1), 8), ("TOPPADDING", (0, 0), (-1, -1), 7), ("BOTTOMPADDING", (0, 0), (-1, -1), 7)]))
-    story.extend([table, Paragraph(f"계산 fingerprint: {_safe(report.calculation_fingerprint)}", small), PageBreak()])
+    luck_data = [
+        [Paragraph(label, small) for label in ("구분", "시작", "종료", "간지")],
+        *[
+            [
+                Paragraph(label, body),
+                Paragraph(f"{snapshot.starts_at:%Y-%m-%d}", body),
+                Paragraph(f"{snapshot.ends_at:%Y-%m-%d}", body),
+                Paragraph(snapshot.pillar.hanja, body),
+            ]
+            for label, snapshot in (("세운", annual), ("월운", monthly))
+        ],
+    ]
+    daewoon_data = [
+        [Paragraph(label, small) for label in ("대운 방향", "시작 나이", "초기 네 대운")],
+        *[
+            [
+                Paragraph(scenario.label, body),
+                Paragraph(f"{scenario.start_age:.2f}세", body),
+                Paragraph(
+                    ", ".join(period.pillar.hanja for period in scenario.periods[:4]),
+                    body,
+                ),
+            ]
+            for scenario in daewoon.scenarios
+        ],
+    ]
+    story.extend(
+        [
+            _evidence_table(table_data, [42 * mm] * 4),
+            Spacer(1, 4 * mm),
+            _evidence_table(luck_data, [42 * mm] * 4),
+            Spacer(1, 4 * mm),
+            _evidence_table(daewoon_data, [42 * mm, 42 * mm, 84 * mm]),
+            Paragraph(f"계산 fingerprint: {_safe(report.calculation_fingerprint)}", small),
+            PageBreak(),
+        ]
+    )
 
     for section in report.sections.values():
         story.append(Paragraph(_safe(section.title), heading))

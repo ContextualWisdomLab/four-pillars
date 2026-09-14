@@ -6,6 +6,10 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ## [Unreleased]
 
+### Fixed
+
+- The PDF report now prints the 세운 and 월운 windows with their 간지 and the 대운 scenarios with their starting age and first four periods. `render_pdf` accepted the daewoon, annual, and monthly calculations and rendered only the natal pillars, so a reader holding the downloaded report saw interpretation about a luck period without the deterministic evidence it was grounded in. The HTML artifact already carried both tables.
+
 ### Added
 
 - Independent KASI/NAOJ 2026 golden fixtures for all twelve month-changing solar terms, enforcing a two-minute timing budget and five-minute year/month pillar transition checks without network or test-only ephemeris dependencies.
