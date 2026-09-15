@@ -18,6 +18,17 @@ from four_pillars.nim import NimTrace
 
 
 REQUIRED = ("natal", "daewoon", "annual", "monthly", "work", "money", "relationships", "daily_rhythm")
+# A real report heads each section in Korean; the identifier is the dictionary key.
+TITLES_KO = {
+    "natal": "타고난 기질",
+    "daewoon": "대운의 흐름",
+    "annual": "올해의 세운",
+    "monthly": "이달의 월운",
+    "work": "일과 역할",
+    "money": "돈과 자원",
+    "relationships": "가까운 관계",
+    "daily_rhythm": "하루의 리듬",
+}
 
 
 def section(title: str) -> ReportSection:
@@ -67,7 +78,7 @@ class FakeClient:
             summary = "시키는 대로 책임지는 사람입니다." if self.invalid_synthesis else "혜지 님은 책임 범위와 지원 조건을 확인합니다."
             return SynthesisDraft(
                 executive_summary=summary,
-                sections={key: section(key) for key in REQUIRED},
+                sections={key: section(TITLES_KO[key]) for key in REQUIRED},
                 disclaimer="이 보고서는 전통 명리학의 상징 자료입니다. 의학·법률·재정 판단은 실제 정보와 전문가 의견을 우선합니다.",
             ), trace
         if response_model is ReportDocument:
@@ -77,7 +88,7 @@ class FakeClient:
                 title="최혜지 사주 보고서",
                 executive_summary="혜지 님은 책임 범위와 지원 조건을 확인합니다.",
                 calculation_fingerprint=fingerprint,
-                sections={key: section(key) for key in REQUIRED},
+                sections={key: section(TITLES_KO[key]) for key in REQUIRED},
                 practical_skills=[
                     PracticalSkill(
                         name="주간 검토",

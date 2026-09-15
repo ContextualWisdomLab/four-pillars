@@ -8,6 +8,8 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ### Added
 
+- The report quality gate now requires the prose a customer reads to contain Korean. Every other customer-visible property was checked before publication while the language was not, so a report whose body had drifted entirely into English passed with zero issues. The schema-repair turn appends an English pydantic error and the full English JSON Schema to the conversation, which is a known way to pull a model's output language across. The subject's own name is excluded, so a customer whose name is written in Latin script is never a violation.
+
 - Independent KASI/NAOJ 2026 golden fixtures for all twelve month-changing solar terms, enforcing a two-minute timing budget and five-minute year/month pillar transition checks without network or test-only ephemeris dependencies.
 - Offline authority-fixture governance that detects missing evidence, provenance, tolerance, traceability, and calculation-version contracts in the hourly product-gap audit.
 

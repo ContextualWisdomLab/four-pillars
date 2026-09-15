@@ -62,6 +62,43 @@ def _all_text(report: ReportDocument) -> str:
     return json.dumps(payload, ensure_ascii=False)
 
 
+HANGUL = re.compile(r"[\uac00-\ud7a3]")
+"""Match one precomposed Hangul syllable.
+
+The subject's own name is excluded from the language check, so a customer whose
+name is written in Latin script is never treated as a violation. Every other
+string below is prose this product wrote and a Korean reader has to read.
+"""
+
+
+def _reader_prose(report: ReportDocument) -> list[tuple[str, str]]:
+    """Return every reader-visible string with the document path that produced it.
+
+    The set is exactly what ``render_html`` and ``render_pdf`` put in front of a
+    customer. Internal values such as evidence notes, the fingerprint, the model
+    identity, prompt versions, and quality notes are deliberately absent, as is
+    ``subject_name``.
+    """
+    prose: list[tuple[str, str]] = [
+        ("title", report.title),
+        ("executive_summary", report.executive_summary),
+        ("disclaimer", report.disclaimer),
+    ]
+    for key, section in report.sections.items():
+        prose.append((f"sections.{key}.title", section.title))
+        prose.append((f"sections.{key}.summary", section.summary))
+        for field in ("opportunities", "cautions", "actions"):
+            for index, value in enumerate(getattr(section, field)):
+                prose.append((f"sections.{key}.{field}[{index}]", value))
+    for index, skill in enumerate(report.practical_skills):
+        prose.append((f"practical_skills[{index}].name", skill.name))
+        prose.append((f"practical_skills[{index}].purpose", skill.purpose))
+        prose.append((f"practical_skills[{index}].when_to_use", skill.when_to_use))
+        for step, value in enumerate(skill.steps):
+            prose.append((f"practical_skills[{index}].steps[{step}]", value))
+    return prose
+
+
 def validate_report(
     report: ReportDocument,
     expected_fingerprint: str,
@@ -103,6 +140,15 @@ def validate_report(
                     "relationship_warning_only",
                     "가까운 관계 장에 신뢰·협력·안정 가능성이 구체적으로 제시되지 않았습니다.",
                     "sections.relationships",
+                )
+            )
+    for path, value in _reader_prose(report):
+        if HANGUL.search(value) is None:
+            issues.append(
+                QualityIssue(
+                    "foreign_language",
+                    "한국어 독자에게 전달되는 문장에 한글이 없습니다.",
+                    path,
                 )
             )
     text = _all_text(report)
