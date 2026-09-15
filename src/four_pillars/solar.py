@@ -236,3 +236,76 @@ def apparent_solar_longitude(moment: datetime) -> float:
     nutation = _nutation_longitude(centuries)
     aberration = -(20.4898 / earth_radius) / 3600.0
     return (geocentric_longitude + fk5_correction + nutation + aberration) % 360.0
+
+
+def _nutation_obliquity(julian_centuries: float) -> float:
+    """Return the dominant nutation-in-obliquity correction in degrees."""
+    t = julian_centuries
+    node = math.radians(125.04452 - 1934.136261 * t + 0.0020708 * t * t + t**3 / 450000.0)
+    sun = math.radians(280.4665 + 36000.7698 * t)
+    moon = math.radians(218.3165 + 481267.8813 * t)
+    arcseconds = (
+        9.20 * math.cos(node)
+        + 0.57 * math.cos(2.0 * sun)
+        + 0.10 * math.cos(2.0 * moon)
+        - 0.09 * math.cos(2.0 * node)
+    )
+    return arcseconds / 3600.0
+
+
+def equation_of_time_minutes(moment: datetime) -> float:
+    """Return apparent solar time minus mean solar time, in minutes.
+
+    The value is derived from the Sun's geometric mean longitude, mean anomaly,
+    orbital eccentricity, and true obliquity rather than fitted to a short sine
+    series, so it carries the same time scale and corrections as
+    :func:`apparent_solar_longitude` instead of a separate approximation.
+
+    Args:
+        moment: A timezone-aware civil datetime, converted to Terrestrial Time.
+
+    Returns:
+        Minutes to add to mean solar time to obtain apparent solar time. The
+        value runs from roughly -14.2 in February to +16.5 in November.
+
+    Raises:
+        ValueError: If ``moment`` has no timezone information.
+    """
+    if moment.tzinfo is None:
+        raise ValueError("Equation of time requires a timezone-aware datetime")
+    julian_ephemeris_date = _julian_ephemeris_date(moment)
+    millennia = (julian_ephemeris_date - 2451545.0) / 365250.0
+    centuries = (julian_ephemeris_date - 2451545.0) / 36525.0
+    mean_longitude = math.radians(
+        (
+            280.4664567
+            + 360007.6982779 * millennia
+            + 0.03032028 * millennia**2
+            + millennia**3 / 49931.0
+            - millennia**4 / 15300.0
+            - millennia**5 / 2000000.0
+        )
+        % 360.0
+    )
+    mean_anomaly = math.radians(
+        (357.52911 + 35999.05029 * centuries - 0.0001537 * centuries * centuries) % 360.0
+    )
+    eccentricity = (
+        0.016708634 - 0.000042037 * centuries - 0.0000001267 * centuries * centuries
+    )
+    mean_obliquity = (
+        23.0
+        + 26.0 / 60.0
+        + 21.448 / 3600.0
+        - (46.8150 * centuries + 0.00059 * centuries**2 - 0.001813 * centuries**3) / 3600.0
+    )
+    obliquity = math.radians(mean_obliquity + _nutation_obliquity(centuries))
+    y = math.tan(obliquity / 2.0) ** 2
+    radians = (
+        y * math.sin(2.0 * mean_longitude)
+        - 2.0 * eccentricity * math.sin(mean_anomaly)
+        + 4.0 * eccentricity * y * math.sin(mean_anomaly) * math.cos(2.0 * mean_longitude)
+        - 0.5 * y * y * math.sin(4.0 * mean_longitude)
+        - 1.25 * eccentricity * eccentricity * math.sin(2.0 * mean_anomaly)
+    )
+    return math.degrees(radians) * 4.0
