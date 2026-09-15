@@ -8,6 +8,8 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ### Added
 
+- `solar.equation_of_time_minutes` derives apparent minus mean solar time from the Sun's geometric mean longitude, mean anomaly, eccentricity, and true obliquity, on the same Terrestrial Time scale and corrections as the apparent longitude. It is validated against published almanac values rather than against the code: the February minimum, the November maximum, and all four zero crossings. This is the first step of #58; switching the apparent solar time basis onto it advances the calculation version and is left for one change, because the version is pinned in files several open pull requests occupy.
+
 - Independent KASI/NAOJ 2026 golden fixtures for all twelve month-changing solar terms, enforcing a two-minute timing budget and five-minute year/month pillar transition checks without network or test-only ephemeris dependencies.
 - Offline authority-fixture governance that detects missing evidence, provenance, tolerance, traceability, and calculation-version contracts in the hourly product-gap audit.
 
