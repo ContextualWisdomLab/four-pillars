@@ -18,10 +18,22 @@ REQUIRED_KEYS = (
 )
 
 
+SECTION_TITLES_KO = {
+    "natal": "타고난 기질",
+    "daewoon": "대운의 흐름",
+    "annual": "올해의 세운",
+    "monthly": "이달의 월운",
+    "work": "일과 역할",
+    "money": "돈과 자원",
+    "relationships": "가까운 관계",
+    "daily_rhythm": "하루의 리듬",
+}
+
+
 def _section(key: str) -> ReportSection:
     summary = "가까운 관계에서는 신뢰와 협력을 구체적인 약속으로 키울 수 있습니다." if key == "relationships" else "계산 근거를 생활의 조건부 판단 기준으로 설명합니다."
     return ReportSection(
-        title=key,
+        title=SECTION_TITLES_KO[key],
         summary=summary,
         opportunities=["현실적인 조건을 확인하면 안정적인 성과 가능성이 있습니다."],
         cautions=["미래 사건을 단정하지 말고 실제 자료와 대화를 먼저 확인합니다."],
