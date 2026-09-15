@@ -8,6 +8,8 @@ The format follows Keep a Changelog, and release numbers follow Semantic Version
 
 ### Added
 
+- The browser studio now shows how long a queued or running report has been waiting, computed from the job's own `created_at`. The status line read `상태: 실행 중` and never changed while the page polled every two seconds, and a claim that is abandoned stays in that state permanently because nothing reclaims it. The page cannot know whether a worker is alive, and a guessed timeout would tell a customer their healthy long report had died, so it reports elapsed time and leaves the judgement to them.
+
 - Independent KASI/NAOJ 2026 golden fixtures for all twelve month-changing solar terms, enforcing a two-minute timing budget and five-minute year/month pillar transition checks without network or test-only ephemeris dependencies.
 - Offline authority-fixture governance that detects missing evidence, provenance, tolerance, traceability, and calculation-version contracts in the hourly product-gap audit.
 
